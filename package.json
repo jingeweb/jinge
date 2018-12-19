@@ -1,0 +1,37 @@
+{
+  "name": "jinge",
+  "version": "0.0.0",
+  "description": "A Messenger, Proxy and Compiler based MVVM framework",
+  "main": "src/index.js",
+  "scripts": {
+    "lint": "eslint --fix .",
+    "validate": "npm ls"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YuhangGe/jinge.git"
+  },
+  "license": "ISC",
+  "homepage": "https://github.com/YuhangGe/jinge#readme",
+  "bugs": {
+    "url": "https://github.com/YuhangGe/jinge/issues"
+  },
+  "keywords": [
+    "mvvm",
+    "jinge",
+    "spa"
+  ],
+  "author": "Yuhang Ge <abeyuhang@gmail.com>",
+  "dependencies": {},
+  "devDependencies": {
+    "acorn": "^6.1.0",
+    "acorn-walk": "^6.1.1",
+    "antlr4": "^4.7.2",
+    "escodegen": "^1.11.0",
+    "eslint": "^5.14.0",
+    "precommit-hook": "^3.0.0"
+  },
+  "pre-commit": [
+    "lint"
+  ]
+}
