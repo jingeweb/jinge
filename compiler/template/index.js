@@ -14,9 +14,9 @@ const IMPORTS = (function() {
     'jinge/src/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createFragment,'
       + 'appendText,appendChild,setText,setAttribute,setInputValue,addEvent',
     'jinge/src/viewmodel/notify': 'VM_ON,VM_NOTIFY',
-    'jinge/src/core/component': 'CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,REF_NODES,ARG_COMPONENTS,RENDER',
+    'jinge/src/core/component': 'assertRenderResults,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,REF_NODES,ARG_COMPONENTS,RENDER',
     'jinge/src/viewmodel/proxy': 'wrapViewModel',
-    'jinge/src/util': 'STR_DEFAULT'
+    'jinge/src/util': 'STR_EMPTY,STR_DEFAULT'
   };
   const rtn = {
     code: '',

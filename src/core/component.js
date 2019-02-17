@@ -23,7 +23,8 @@ import {
   assert_fail,
   isFunction,
   STR_DEFAULT,
-  isObject
+  isObject,
+  isArray
 } from '../util';
 import {
   getParent,
@@ -299,3 +300,16 @@ export function isComponent(c) {
   return instanceOf(c, Component);
 }
 
+export function assertRenderResults(renderResults, Component) {
+  if (!isArray(renderResults) || renderResults.length === 0) {
+    throw new Error(`Render results of component '${Component}' is empty`);
+  }
+  return renderResults;
+}
+
+export function getFirstHtmlDOM(el) {
+  const ns = el[ROOT_NODES];
+  if (!ns || ns.length === 0) assert_fail();
+  if (isComponent(ns[0])) return getFirstHtmlDOM(ns[0]);
+  else return ns[0];
+}

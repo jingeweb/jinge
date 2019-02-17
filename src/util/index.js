@@ -30,6 +30,7 @@ export function simpleUUID() {
 
 export const STR_DEFAULT = 'default';
 export const STR_JINGE = 'jinge';
+export const STR_EMPTY = 'empty';
 
 export function mapObject(obj, fn) {
   const newObj = {};

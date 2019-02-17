@@ -53,6 +53,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       jinge: {
         IfComponent: 'if',
         ForComponent: 'for',
+        SwitchComponent: 'switch',
         Component: ['argument', 'parameter']
       }
     });
@@ -462,7 +463,7 @@ const el = new ${Component}(attrs);
 ${result.listeners.map(lt => `el.on('${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
-return el[RENDER_${this._id}](component);`, true) + '\n})()'
+return assertRenderResults_${this._id}(el[RENDER_${this._id}](component), '${Component}');`, true) + '\n})()'
     };
   }
   _parse_expr(txt) {

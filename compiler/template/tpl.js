@@ -5,7 +5,7 @@ const TEXT_CONST = `(() => {
 })()`;
 
 const EMPTY = `function(component) {
-  const el = createComment_$ID$('empty');
+  const el = createComment_$ID$(STR_EMPTY_$ID$);
   component[ROOT_NODES_$ID$].push(el);
   return el;
 }`;

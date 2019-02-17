@@ -4,4 +4,4 @@ node_modules
 /.vscode
 /.git
 dist
-/webpack/template/parser
+/compiler/template/parser

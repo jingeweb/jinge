@@ -6,26 +6,30 @@ import {
   UPDATE_IF_NEED,
   UPDATE,
   DESTROY,
-  isComponent
+  isComponent,
+  getFirstHtmlDOM
 } from '../core/component';
 import {
   isArray,
   Symbol,
   STR_DEFAULT,
   isObject,
-  assert_fail
+  assert_fail,
+  STR_EMPTY
 } from '../util';
 import {
   createComment,
   createFragment,
   appendChild,
   getParent,
-  insertBefore
+  insertBefore,
+  removeChild
 } from '../dom';
 import {
   VM_PARENTS
 } from '../viewmodel/common';
 
+export const FOR_LENGTH = Symbol('length');
 export const FOR_KEYS = Symbol('keys');
 export const FOR_KEY_NAME = Symbol('key');
 
@@ -46,12 +50,7 @@ export class ForEachComponent extends Component {
     return renderFn(this);
   }
 }
-function getFirstHtmlNode(el) {
-  const ns = el[ROOT_NODES];
-  if (!ns || ns.length === 0) assert_fail();
-  if (isComponent(ns[0])) return getFirstHtmlNode(ns[0]);
-  else return ns[0];
-}
+
 
 function appendRenderEach(item, i, itemRenderFn, roots) {
   const el = new ForEachComponent(itemRenderFn, item, i);
@@ -104,6 +103,7 @@ export class ForComponent extends Component {
     super(attrs);
     this.loop = attrs.loop;
     this[FOR_KEY_NAME] = attrs._key;
+    this[FOR_LENGTH] = 0;
     this[FOR_KEYS] = null;
     if (kn !== KEY_INDEX && kn !== KEY_EACH) {
       this[FOR_KEY_NAME] = new Function(KEY_EACH, `return ${kn}`);
@@ -117,20 +117,21 @@ export class ForComponent extends Component {
     this[UPDATE_IF_NEED]();
   }
   [RENDER]() {
-    const items = this.loop;
     const roots = this[ROOT_NODES];
-    const $cmt = createComment(' <for> ');
-    roots.push($cmt);
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
-    if (!itemRenderFn) return roots;
+    if (!itemRenderFn) {
+      roots.push(createComment(STR_EMPTY));
+      return roots;
+    }
+    const items = this.loop;
     const keyName = this[FOR_KEY_NAME];
     if (keyName !== KEY_INDEX) this[FOR_KEYS] = [];
     if (!isArray(items) || items.length === 0) {
+      roots.push(createComment(STR_EMPTY));
       return roots;
     }
-    const result = renderItems(items, itemRenderFn, roots, this[FOR_KEYS], keyName);
-    result.unshift($cmt);
-    return result;
+    this[FOR_LENGTH] = items.length;
+    return renderItems(items, itemRenderFn, roots, this[FOR_KEYS], keyName);
   }
   [UPDATE]() {
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
@@ -139,19 +140,40 @@ export class ForComponent extends Component {
     const newItems = Array.isArray(this.loop) ? this.loop : EMP_ARR;
     const roots = this[ROOT_NODES];
     const nl = newItems.length;
-    const ol = roots.length - 1;
+    const ol = this[FOR_LENGTH];
     // nothing changed, return directly.
     if (nl === 0 && ol === 0) return;
 
     const keyName = this[FOR_KEY_NAME];
-    const $parent = getParent(roots[0]);
+    // if new length equal 0, clear & render comment.
+    if (nl === 0 && ol > 0) {
+      const fd = getFirstHtmlDOM(roots[0]);
+      const $cmt = createComment(STR_EMPTY);
+      insertBefore(getParent(fd), $cmt, fd);
+      for(let i = 0; i < ol; i++) {
+        roots[i][DESTROY]();
+      }
+      roots.length = 1;
+      roots[0] = $cmt;
+      if (keyName !== KEY_INDEX) {
+        this[FOR_KEYS].length = 0;
+      }
+      this[FOR_LENGTH] = 0;
+      return;
+    }
+
+    this[FOR_LENGTH] = nl;
+    const $parent = getParent(ol === 0 ? roots[0] : getFirstHtmlDOM(roots[0]));
+    if (ol === 0) {
+      removeChild($parent, roots[0]);
+      roots.length = 0;
+    }
 
     if (keyName === KEY_INDEX) {
-      // const st = Date.now();
       let $f = null;
       for(let i = 0; i < nl; i++) {
         if (i < ol) {
-          const el = roots[i + 1];
+          const el = roots[i];
           if (newItems[i] !== el.each) {
             el.each = newItems[i];
           }
@@ -165,27 +187,13 @@ export class ForComponent extends Component {
       }
       if (nl >= ol) return;
       for(let i = nl; i < ol; i++) {
-        roots[i + 1][DESTROY]();
+        roots[i][DESTROY]();
       }
-      roots.splice(1 + nl);
+      roots.splice(nl);
       return;
     }
 
     const oldKeys = this[FOR_KEYS];
-
-    /**
-     * if length of new array equal 0 or length of old array equal 0,
-     *   do not need compare diffs,
-     *   this is a special optimization.
-     */
-    if (nl === 0) {
-      for(let i = 0; i < ol; i++) {
-        roots[i + 1][DESTROY]();
-      }
-      roots.length = 1;
-      oldKeys.length = 0;
-      return;
-    }
     if (ol === 0) {
       const rs = renderItems(newItems, itemRenderFn, roots, oldKeys, keyName);
       appendChild($parent, createFragment(rs));
@@ -205,7 +213,7 @@ export class ForComponent extends Component {
     
     let oi = 0;
     let ni = 0;
-    const newRoots = [roots[0]];
+    const newRoots = [];
     const oldTags = new Uint8Array(ol);
     while(oi < ol || ni < nl) {
       while(oi < ol) {
@@ -214,7 +222,7 @@ export class ForComponent extends Component {
         } else if (newKeyMap.has(oldKeys[oi]) && newKeyMap.get(oldKeys[oi]) >= ni) {
           break;
         } else {
-          roots[1 + oi][DESTROY]();
+          roots[oi][DESTROY]();
           oi++;
         }
       }
@@ -239,7 +247,7 @@ export class ForComponent extends Component {
         if (oldKeyMap.has(newKey)) {
           const oldIdx = oldKeyMap.get(newKey);
           if (oldIdx > oi && oldTags[oldIdx] === 0) {
-            reuseEl = roots[1 + oldIdx];
+            reuseEl = roots[oldIdx];
             oldTags[oldIdx] = 1;
           } 
         }
@@ -258,8 +266,8 @@ export class ForComponent extends Component {
       if (ni >= nl) {
         assert_fail('unimpossible?!');
       }
-      const el = roots[1 + oi];
-      $f && insertBefore($parent, $f, getFirstHtmlNode(el));
+      const el = roots[oi];
+      $f && insertBefore($parent, $f, getFirstHtmlDOM(el));
       if (el.index !== ni) el.index = ni;
       if (el.each !== newItems[ni]) el.each = newItems[ni];
       newRoots.push(el);
