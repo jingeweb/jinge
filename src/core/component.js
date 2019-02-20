@@ -43,6 +43,8 @@ export const CONTEXT_STATE = Symbol('context_state');
 export const ROOT_NODES = Symbol('root_nodes');
 export const NON_ROOT_COMPONENT_NODES = Symbol('non_root_components');
 export const REF_NODES = Symbol('ref_nodes');
+export const SET_REF_NODE = Symbol('setChild');
+export const RELATED_VM_REFS = Symbol('related_refs');
 export const RELATED_VM_LISTENERS = Symbol('related_vm_listeners');
 export const RELATED_VM_ADD = Symbol('related_vm_add');
 export const GET_STATE_NAME = Symbol('get_state_name');
@@ -82,6 +84,12 @@ function removeRootNodes(component, $parent) {
   component[ROOT_NODES] = null;
 }
 
+function getOrCreateMap(comp, prop) {
+  let m = comp[prop];
+  if (!m) m = comp[prop] = new Map();
+  return m;
+}
+
 export class Component extends Messenger {
   /**
    * compiler will auto transform the `template` getter's return value from String to Render Function.
@@ -90,23 +98,15 @@ export class Component extends Messenger {
     return null;
   }
   constructor(attrs) {
-    if (attrs === null || attrs === undefined) {
-      // do nothing.
-    } else if (isFunction(attrs)) {
-      attrs = {
-        [ARG_COMPONENTS]: {
-          [STR_DEFAULT]: attrs
-        }
-      };
-    } else if (isObject(attrs) && !(VM_PARENTS in attrs)) {
-      throw new Error('First argument passed to Component constructor must be ViewModel');
+    if (attrs === null || !isObject(attrs) || !(VM_PARENTS in attrs)) {
+      throw new Error('First argument passed to Component constructor must be ViewModel with Messenger interface. See https://[todo]');
     }
     super();
     this[VM_PARENTS] = VM_EMPTY_PARENTS;
     this[VM_LISTENERS] = {};
-    this[CONTEXT] = attrs ? attrs[CONTEXT] : null;
+    this[CONTEXT] = attrs[CONTEXT];
     this[CONTEXT_STATE] = 0;
-    this[ARG_COMPONENTS] = attrs ? (attrs[ARG_COMPONENTS] || null) : null;
+    this[ARG_COMPONENTS] = attrs[ARG_COMPONENTS];
     this[STATE] = STATE_INITIALIZE;
     /**
      * ROOT_NODES means root children of this component,
@@ -138,7 +138,7 @@ export class Component extends Messenger {
     /**
      * REF_NODES contains all children with ref: attribute.
      */
-    this[REF_NODES] = {};
+    this[REF_NODES] = null;
     /**
      * If some child of this component is passed as argument(ie. 
      * use arg:pass attribute) like ng-tranclude in angular 1.x,
@@ -170,7 +170,12 @@ export class Component extends Messenger {
      * to the outer parent RootApp which watch `name` variable should 
      * also be removed.
      */
-    this[RELATED_VM_LISTENERS] = new Map();
+    this[RELATED_VM_LISTENERS] = null;
+    /**
+     * Simalary as RELATED_VM_LISTENERS, RELATED_VM_REFS stores
+     *   ref elements of parent component.
+     */
+    this[RELATED_VM_REFS] = null;
   }
   [VM_ON](prop, handler, componentCtx) {
     vmAddListener(this, prop, handler);
@@ -178,10 +183,11 @@ export class Component extends Messenger {
     componentCtx[RELATED_VM_ADD](this, prop, handler);
   }
   [RELATED_VM_ADD](vm, prop, handler) {
-    let hook = this[RELATED_VM_LISTENERS].get(vm);
+    const rvl = getOrCreateMap(this, RELATED_VM_LISTENERS);
+    let hook = rvl.get(vm);
     if (!hook) {
       hook = [];
-      this[RELATED_VM_LISTENERS].set(vm, hook);
+      rvl.set(vm, hook);
     }
     hook.push([prop, handler]);
   }
@@ -219,7 +225,7 @@ export class Component extends Messenger {
     this.beforeDestroy();
     super.clear();   // dont forgot call super clear.
     this[VM_CLEAR](); // dont forgot clear vm listeners
-    destroyRelatedVMListeners(this);
+    destroyRelatedVM(this);
     this[NON_ROOT_COMPONENT_NODES].forEach(component => {
       component[DESTROY](false);
     });
@@ -272,11 +278,28 @@ export class Component extends Messenger {
     this[CONTEXT][id] = ctx;
   }
   getContext(id) {
-    if (!this[CONTEXT]) return null;
-    return this[CONTEXT][id] || null;
+    return this[CONTEXT] ? this[CONTEXT][id] : null;
+  }
+  [SET_REF_NODE](ref, el, relatedComponent) {
+    const rns = getOrCreateMap(this, REF_NODES);
+    if (rns.has(ref)) {
+      throw new Error(`ref name '${ref}' of component '${this.constructor.name}' is dulplicated.`);
+    }
+    rns[ref] = el;
+    if (relatedComponent === this) return;
+    const rvrs = getOrCreateMap(relatedComponent, RELATED_VM_REFS);
+    let rs = rvrs.get(this);
+    if (!rs) {
+      rs = [];
+      rvrs.set(this, rs);
+    }
+    rs.push(ref);
   }
   getChild(ref) {
-    return this[REF_NODES][ref] || null;
+    if (this[STATE] !== STATE_RENDERED) {
+      console.error(`Warning: call getChild before component '${this.constructor.name}' is rendered will get nothing, try put getChild into afterRender lifecycle hook.`);
+    }
+    return this[REF_NODES] ? this[REF_NODES][ref] : null;
   }
   afterRender() {
     // life time hook
@@ -286,23 +309,35 @@ export class Component extends Messenger {
   }
 }
 
-export function destroyRelatedVMListeners(comp) {
-  comp[RELATED_VM_LISTENERS].forEach((hooks, ctx) => {
-    hooks.forEach(hook => {
-      ctx[VM_OFF](hook[0], hook[1]);
+export function destroyRelatedVM(comp) {
+  function _destroy(prop, cb) {
+    const m = comp[prop];
+    if (!m) return;
+    m.forEach((arr, ctx) => {
+      arr.forEach(k => cb(ctx, k));
+      arr.length = 0;
     });
-    hooks.length = 0;
+    m.clear();
+  }
+  _destroy(RELATED_VM_LISTENERS, (ctx, hook) => {
+    ctx[VM_OFF](hook[0], hook[1]);
   });
-  comp[RELATED_VM_LISTENERS].clear();
+  _destroy(RELATED_VM_REFS, (ctx, ref) => {
+    // const rn = ctx[REF_NODES];
+    // if (rn) debugger;
+    // rn.delete(ref);
+    // debugger;
+    ctx[REF_NODES].delete(ref);
+  });
 }
 
 export function isComponent(c) {
   return instanceOf(c, Component);
 }
 
-export function assertRenderResults(renderResults, Component) {
+export function assertRenderResults(renderResults) {
   if (!isArray(renderResults) || renderResults.length === 0) {
-    throw new Error(`Render results of component '${Component}' is empty`);
+    throw new Error('Render results of component is empty');
   }
   return renderResults;
 }

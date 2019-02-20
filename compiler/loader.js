@@ -8,10 +8,11 @@ function jingeLoader(source) {
   const Parser = /\.html$/.test(resourcePath) ? TemplateParser : ComponentParser;
   const opts = this.query || {};
   Parser.parse(source, {
+    resourcePath,
     jingeBase: resourcePath.startsWith(jingeRoot) ? jingeRoot : 'jinge',
     webpackLoaderContext: this,
     tabSize: opts.tabSize,
-    componentAliases: opts.componentAliases,
+    componentAlias: opts.componentAlias,
     vmReflections: opts.vmReflections,
     isProduction: this._compiler.options.mode === 'production'
   }).then(result => {

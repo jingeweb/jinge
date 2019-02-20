@@ -1,11 +1,12 @@
 const escodegen = require('escodegen');
+const crypto = require('crypto');
 const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
-const RND_ID = require('crypto').randomBytes(4).toString('hex');
+const HTMLTags = require('html-tags');
 const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
 const { TemplateParser } = require('./parser/TemplateParser');
-const { ExtractImportLocalParser } = require('./ExtractImportLocalParser');
 const { AttributeValueParser } = require('./AttributeValueParser');
+const { HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS } = require('./const');
 
 const {
   replaceTplStr,
@@ -14,8 +15,6 @@ const {
 
 const TPL = require('./tpl');
 const KNOWN_ATTR_TYPES = [
-  /* bellow is special attribute type */
-  '#bind',
   /* bellow is parameter related attribute types */
   /* s is just alias of str */
   'expr', 'e', 'str', 's',
@@ -25,9 +24,8 @@ const KNOWN_ATTR_TYPES = [
   'vm', 'arg', 'ref'
 ];
 
-
 function mergeAlias(src, dst) {
-  if (src) for(const k in src) {
+  if (src) for (const k in src) {
     if (!src[k] || typeof src[k] !== 'object') throw new Error('bad alias format');
     if (k in dst) {
       Object.assign(dst[k], src[k]);
@@ -44,11 +42,15 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._stack = [];
     this._vms = [];
     this._id = opts.rndId;
+    this._tplId = crypto.randomBytes(4).toString('hex');
     this._tabSize = opts.tabSize || 2;
-    this._imports = [];
+    this._source = opts.source;
+    this._resourcePath = opts.resourcePath;
+    this._baseLinePosition = opts.baseLinePosition || 1;
+    this._imports = {};
     this._importOutputCodes = [];
     this._needHandleComment = true;
-    this._parent = {type: 'component', sub: 'normal'};
+    this._parent = { type: 'component', sub: 'normal' };
     const alias = mergeAlias(opts.alias, {
       jinge: {
         IfComponent: 'if',
@@ -58,17 +60,28 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
     });
     this._alias = {};
-    this._aliasImports = '';
-    for(const source in alias) {
+    this._aliasImports = {};
+    for (const source in alias) {
       const m = alias[source];
-      this._aliasImports += `import {
-  ${Object.keys(m).map(c => {
-    const as = Array.isArray(m[c]) ? m[c] : [m[c]];
-    as.forEach(a => this._alias[a] = `${c}_${RND_ID}`);
-    return `${c} as ${c}_${RND_ID}`;
-  }).join(', ')}
-} from '${source}';`;
+      Object.keys(m).map(c => {
+        const as = Array.isArray(m[c]) ? m[c] : [m[c]];
+        as.forEach(a => this._alias[a] = [c, source]);
+      });
     }
+  }
+  _logParseError(tokenPosition, msg) {
+    let idx = -1;
+    for(let i = 0; i < tokenPosition.line - 1; i++) {
+      idx = this._source.indexOf('\n', idx + 1);
+    }
+    console.error(`Error occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
+  > ${this._source.substring(idx + 1, this._source.indexOf('\n', idx + 1))}
+  > ${this._resourcePath}
+  > ${msg}`);
+  }
+  _throwParseError(tokenPosition, msg) {
+    this._logParseError(tokenPosition, msg);
+    throw new Error('parsing aborted as error occur.');
   }
   _replace_tpl(str, ctx) {
     ctx = ctx || {};
@@ -107,19 +120,82 @@ class TemplateVisitor extends TemplateParserVisitor {
   }
   _parse_listener(str, mode) {
     const tree = acorn.Parser.parse(`function _() {\n ${str} \n}`);
-    this._walkAcorn(tree.body[0].body, {
+    const block = tree.body[0].body;
+    if (block.type !== 'BlockStatement') throw new Error('unimpossible?!');
+
+    if (block.body.length === 1 && block.body[0].type === 'ExpressionStatement') {
+      /**
+       * if listener is identifer or member expression, conver it to function call.
+       * for example, 
+       * <SomeComponent on:click="someFn" />
+       * is exactly same as:
+       * <SomeComponent on:click="someFn(...args)"/>
+       */
+      const exp = block.body[0];
+      if (exp.expression.type === 'Identifier' || exp.expression.type === 'MemberExpression') {
+        exp.expression = {
+          'type': 'CallExpression',
+          'callee': exp.expression,
+          'arguments': [{
+            'type': 'SpreadElement',
+            'argument': {
+              'type': 'Identifier',
+              'name': 'args'
+            }
+          }]
+        };
+      }
+    }
+    this._walkAcorn(block, {
       Identifier: node => {
-        if (node.name === 'args' || (mode === 'html' && node.name === '$event')) return false;
-        const vm = this._vms.find(v => v.name === node.name);
-        node.name = `vm_${vm ? vm.level : 0}.${node.name}`;
+        if (node.name === 'args') return false;
+        if (mode === 'html' && node.name === '$event') {
+          node.name = 'args[0]';
+          return false;
+        }
+        const varName = node.name;
+        const vmVar = this._vms.find(v => v.name === varName);
+        const level = vmVar ? vmVar.level : 0;
+        node.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
         return false;
+      },
+      CallExpression: node => {
+        if (mode !== 'html') return;
+        /**
+         * we will replace all '$event' to 'args[0]' for html element listener
+         */
+        const args = node.arguments;
+        if (!args || args.length === 0) return;
+        args.forEach((a, i) => {
+          if (a.type === 'Identifier' && a.name === '$event') {
+            args[i] = {
+              'type': 'MemberExpression',
+              'computed': true,
+              'object': {
+                'type': 'Identifier',
+                'name': 'args'
+              },
+              'property': {
+                'type': 'Literal',
+                'value': 0,
+                'raw': '0'
+              }
+            };
+          }
+        });
       },
       MemberExpression: node => {
         const obj = node.object;
         if (obj.type !== 'Identifier') return;
-        if (obj.name === 'args' || (mode === 'html' && obj.name === '$event')) return false;
-        const vm = this._vms.find(v => v.name === obj.name);
-        obj.name = `vm_${vm ? vm.level : 0}.${obj.name}`;
+        if (obj.name === 'args') return false;
+        if (mode === 'html' && obj.name === '$event') {
+          obj.name = 'args[0]';
+          return false;
+        }
+        const varName = obj.name;
+        const vmVar = this._vms.find(v => v.name === varName);
+        const level = vmVar ? vmVar.level : 0;
+        obj.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
         return false;
       },
       IfStatement: node => {
@@ -138,7 +214,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         }
       }
     });
-    let code =  escodegen.generate(tree, {indent: ''});
+    let code = escodegen.generate(tree, { indent: '' });
     code = code.substring(14, code.length - 1);
     return {
       code
@@ -153,8 +229,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       vms: [],
       argPass: null,
       ref: null,
-      argUse: null,
-      bind: null
+      argUse: null
     };
     const constAttrs = {};
     const argAttrs = {};
@@ -164,7 +239,6 @@ class TemplateVisitor extends TemplateParserVisitor {
     let argPass = null;
     let argUse = null;
     let ref = null;
-    let bind = null;
 
     attrCtxs.forEach(attrCtx => {
       const attr_data = attrCtx.ATTR_NAME().getText().split(':').map(it => it.trim());
@@ -172,13 +246,8 @@ class TemplateVisitor extends TemplateParserVisitor {
 
       let [a_category, a_name] = attr_data;
       if (attr_data.length === 1) {
-        if (a_category === '#bind') {
-          a_category = '#bind';
-          a_name = 'bind';
-        } else {
-          a_name = a_category;
-          a_category = 'str';
-        }
+        a_name = a_category;
+        a_category = 'str';
       }
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
         throw new Error('unkown attribute type ' + a_category);
@@ -194,7 +263,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         ref = a_name;
         return;
       }
-      
+
       const atv = attrCtx.ATTR_VALUE();
       let aval = atv ? atv.getText().trim() : '';
       // extract from quote
@@ -205,7 +274,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!aval) throw new Error('vm type attribute require reflect variable name.');
         if (!/^[\w\d$_]+$/.test(aval)) throw new Error('vm type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (pVms.find(v => v.name === aval) || vms.find(v => v.name === aval)) throw new Error('vm type attribute reflect varibale name has been declared: ' + aval);
-        vms.push({name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1});
+        vms.push({ name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1 });
         return;
       }
 
@@ -225,18 +294,6 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (a_category === '#bind') {
-        if (mode !== 'html' || (tag !== 'input' && tag !== 'textarea')) {
-          throw new Error('#bind attribute can be only used on <input> or <texearea> element');
-        }
-        if (bind) throw new Error('#bind attribute can only be used once.');
-        if (!/^[\w\d$_]+(\.[\w\d$_]+)*$/.test(aval)) {
-          throw new Error('#bind attribute value must match format: /^[\\w\\d$_]+(\\.[\\w\\d$_]+)*$/');
-        }
-        bind = aval;
-        return;
-      }
-
       if (a_category === 'on') {
         if (!a_name) throw new Error('event name is required!');
         if (a_name in listeners) throw new Error('event name is dulplicated: ' + a_name);
@@ -249,16 +306,16 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (a_category === 'expr') {
           throw new Error('Attribute with expression type must have value.');
         }
-        constAttrs[a_name] = atv ? '' : true;     
+        constAttrs[a_name] = atv ? '' : true;
         return;
       }
 
       if (a_category === 'expr' || a_category === 'e') {
         // TODO: if expression is const，handle it as 'constAttrs'
-        argAttrs[a_name] = this._parse_expr(aval);
+        argAttrs[a_name] = this._parse_expr(aval, ctx);
         return;
       }
-      
+
       if (aval.indexOf('$') < 0) {
         constAttrs[a_name] = aval;
         return;
@@ -273,14 +330,14 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (it.type === 'TEXT') {
           es.push(JSON.stringify(it.value));
         } else if (it.value) {
-          const result = this._parse_expr(it.value);
+          const result = this._parse_expr(it.value, attrCtx);
           result.paths.forEach(addPath);
           es.push(`(${result.expr})`);
         }
       });
 
       argAttrs[a_name] = {
-        expr: es.join(' + '),
+        expr: es.length > 1 ? '\'\' + ' + es.join(' + ') : es[0],
         paths
       };
     });
@@ -289,27 +346,6 @@ class TemplateVisitor extends TemplateParserVisitor {
       return Object.keys(obj).map(k => [k, obj[k]]);
     }
 
-    if (bind) {
-      if ('value' in constAttrs || 'value' in argAttrs) {
-        throw new Error('once you use \'#bind\' attribute, you cannot use \'value\' attribute any more.');
-      }
-      const es = bind.split('.');
-      const vm = this._vms.find(v => v.name === es[0]);
-      const vmLevel = vm ? vm.level : 0;
-      const code = `vm_${vmLevel}.${bind} = el.value;`;
-      argAttrs['value'] = {
-        expr: bind,
-        props: [`'${bind}'`]
-      };
-      if (listeners.input) {
-        listeners.input.code = code + listeners.input.code;
-      } else {
-        listeners.input = {
-          event: 'input',
-          code
-        };
-      }
-    }
 
     if (argPass && argUse) throw new Error('arg:pass and arg:use attribute cannot be both used');
 
@@ -318,30 +354,26 @@ class TemplateVisitor extends TemplateParserVisitor {
       argAttrs: obj2arr(argAttrs),
       listeners: obj2arr(listeners).map(lis => {
         lis[1].code = lis[1].code.replace(/(^[\s;]+)|([\s;]+$)/g, '').replace(/[\r\n]/g, ';').replace(/;+/g, ';');
-        if (mode === 'html') {
-          lis[1].code = lis[1].code.replace(/\b\$event\b/g, 'args[0]');
-        }
         lis[1].code = lis[1].code.replace(/\{\s*;+/g, '{');
         return lis;
       }),
       vms,
       argPass,
       argUse,
-      ref,
-      bind
+      ref
     };
 
     if ((argPass || argUse) && (
-      rtn.constAttrs.length > 0 || rtn.argAttrs.length > 0 || rtn.listeners.length > 0 
-      || rtn.vms.length > 0 || ref || bind
+      rtn.constAttrs.length > 0 || rtn.argAttrs.length > 0 || rtn.listeners.length > 0
+      || rtn.vms.length > 0 || ref
     )) throw new Error('if a component has type attribute(ie. arg:pass or arg:use), it can\'t have any other attribute');
 
     return rtn;
   }
   _parse_html_ele(etag, ctx) {
     const result = this._parse_attrs('html', etag, ctx, this._parent);
-    const elements = this._visit_child_nodes(ctx, result.vms, {type: 'html'});
-    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, {NAME: result.ref}) : '';
+    const elements = this._visit_child_nodes(ctx, result.vms, { type: 'html' });
+    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
     const ce = `${result.constAttrs.length > 0 ? 'createElement' : 'createElementWithoutAttrs'}_${this._id}`;
@@ -356,9 +388,27 @@ class TemplateVisitor extends TemplateParserVisitor {
 const el = ${ce}(
 ${this._prependTab(arr.join(',\n'))}
 );
-${result.argAttrs.map((at, i) => `const fn_${i} = () => setAttribute_${this._id}(el, '${at[0]}', ${at[1].expr});
+${result.argAttrs.map((at, i) => {
+    let setFn = null;
+
+    if (at[0] in HTML_BOOL_IDL_ATTRS) {
+      const attr = HTML_BOOL_IDL_ATTRS[at[0]];
+      if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
+        setFn = `() => el[JINGE_CONSTS_${this._id}.HTML_ATTR_${at[0]}] = !!(${at[1].expr})`;
+      }
+    } else if (at[0] in HTML_COMMON_IDL_ATTRS) {
+      const attr = HTML_COMMON_IDL_ATTRS[at[0]];
+      if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
+        setFn = `() => el[JINGE_CONSTS_${this._id}.HTML_ATTR_${at[0]}] = ${at[1].expr}`;
+      }
+    }
+    if (!setFn) {
+      setFn = `() => setAttribute_${this._id}(el, "${at[0]}", ${at[1].expr})`;
+    }
+    return `const fn_${i} = ${setFn};
 ${at[1].paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_${i}, component);
-fn_${i}();`).join('\n')}`)}
+fn_${i}();`).join('\n')}`;
+  }).join('\n')}
 ${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -403,13 +453,13 @@ return el;`, true) + '\n})()';
       vms: result.vms
     });
     const hasArg = this._assert_arg_pass(elements, tag);
-    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REFELE, {NAME: result.ref}) : '';
+    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
     if (result.argUse) {
       if (hasArg || result.vms.length > 0) throw new Error('impossible?!');
       return {
         type: 'component',
-        sub:'parameter',
+        sub: 'parameter',
         value: this._replace_tpl(TPL.PARAMETER, {
           ARG_USE: JSON.stringify(result.argUse),
           DEFAULT: elements.length > 0 ? ` || ${this._gen_render(elements, vmLevel)}` : ''
@@ -428,7 +478,7 @@ return el;`, true) + '\n})()';
         value: this._gen_render(elements, vmLevel)
       };
     }
-    
+
     if (elements.length > 0) {
       if (!hasArg) {
         elements = [{
@@ -450,9 +500,9 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${this._prependTab(attrs.join(',\n'), true)}
 }, true);
-${result.argAttrs.map((at, i) => `const fn_${i} = () => attrs.${at[0]} = ${at[1].expr};
+${result.argAttrs.map((at, i) => `const fn_${i} = () => attrs.${at[0]} = ${at[0].startsWith('_') ? at[1].expr : `wrapViewModel_${this._id}(${at[1].expr})`};
 ${at[1].paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_${i}, component);`).join('\n')}
-fn_${i}();`).join('')}
+fn_${i}();`).join('\n')}
 `;
     return {
       type: 'component',
@@ -463,13 +513,24 @@ const el = new ${Component}(attrs);
 ${result.listeners.map(lt => `el.on('${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
-return assertRenderResults_${this._id}(el[RENDER_${this._id}](component), '${Component}');`, true) + '\n})()'
+return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()'
     };
   }
-  _parse_expr(txt) {
-    let expr = acorn.Parser.parse(txt);
+  
+  _parse_expr(txt, ctx) {
+    txt = txt.trim();
+    /*
+     * if expression startsWith '{', we treat it as ObjectExpression.
+     * we wrap it into '()' to treat it as ObjectExpression.
+     */
+    if (txt[0] === '{') txt = '(' + txt + ')';
+    let expr = acorn.Parser.parse(txt, {
+      // ranges: true,
+      locations: true,
+    });
     if (expr.body.length > 1 || expr.body[0].type !== 'ExpressionStatement') {
-      throw new Error('bad expression');
+      // console.log(ctx.start.line, this._baseLinePosition);
+      this._throwParseError(ctx.start, 'expression only support single ExpressionStatement. see https://[todo].');
     }
     expr = expr.body[0].expression;
 
@@ -478,6 +539,13 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component), '${Com
       if (!paths.find(ep => ep.vm === p.vm && ep.n === p.n)) paths.push(p);
     };
     this._walkAcorn(expr, {
+      CallExpression: node => {
+        /**
+         * KNOWN ISSUE: in injected template, ctx.start.column + ctx.start.text.length may not be correct column position.
+         */
+        const pos = {line: (node.loc.start.line - 1) + ctx.start.line, column: ctx.start.column + ctx.start.text.length + node.loc.start.column};
+        this._throwParseError(pos, `expression not support function call: '${txt.substring(node.start, node.end)}'. see https://[todo]`);
+      },
       Identifier: node => {
         const varName = node.name;
         const vmVar = this._vms.find(v => v.name === varName);
@@ -516,18 +584,18 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component), '${Com
 
     function visitMem(node, props, isObject = false) {
       if (node.type === 'Identifier') {
-        props.unshift({node, v: node.name});
+        props.unshift({ node, v: node.name });
         return false;
       }
       if (node.type === 'Literal') {
         if (isObject) throw new Error('current version does not support Literal type object in member expression');
-        props.unshift({node, v: node.value.toString()});
+        props.unshift({ node, v: node.value.toString() });
         return true;
       }
       if (node.type !== 'MemberExpression') {
         throw new Error('current version does not support computed member expression: ' + node.type);
       }
-      
+
       return visitMem(node.property, props, false) || visitMem(node.object, props, true);
     }
     const dd = escodegen.generate(expr);
@@ -561,7 +629,9 @@ ${body}
     // console.log(elements);
     return {
       renderFn: this._gen_render(elements, 0),
-      aliasImports: this._aliasImports,
+      aliasImports: Object.keys(this._aliasImports).map(source => {
+        return `import { ${this._aliasImports[source].map(c => `${c} as ${c}_${this._tplId}`).join(', ')} } from '${source}';`;
+      }).join('\n'),
       imports: this._importOutputCodes.join('\n')
     };
   }
@@ -591,7 +661,7 @@ ${body}
       } else {
         txt = txt.substring(2, txt.length - 1).trim(); // extract from '${}'
         if (!txt) return;
-        const result = this._parse_expr(txt);
+        const result = this._parse_expr(txt, cn);
         eles.push(this._replace_tpl(TPL.TEXT_EXPR, {
           PUSH_ELE: this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '',
           EXPR: result.expr,
@@ -623,28 +693,76 @@ ${body}
     }
     if (/^[a-z\d-]+$/.test(etag)) {
       if (etag in this._alias) {
-        return this._parse_component_ele(etag, this._alias[etag], ctx);
+        const [c, source] = this._alias[etag];
+        let arr = this._aliasImports[source];
+        if (!arr) {
+          arr = this._aliasImports[source] = [];
+        }
+        if (arr.indexOf(c) < 0) {
+          arr.push(c);
+        }
+        return this._parse_component_ele(etag, `${c}_${this._tplId}`, ctx);
+      }
+
+      if (HTMLTags.indexOf(etag) < 0) {
+        console.warn(`warning: '${etag}' is not known html tag, do you forgot to config component alias?`);
       }
       return this._parse_html_ele(etag, ctx);
     }
-    const sm = this._imports.indexOf(etag);
-    if (sm < 0) {
-      throw new Error(`Component:${etag} not found. Forgot to import it on the top?`);
+    if (!(etag in this._imports)) {
+      throw new Error(`Component '${etag}' not found. Forgot to import it on the top?`);
     }
-    return this._parse_component_ele(etag, etag, ctx);
+    return this._parse_component_ele(etag, this._imports[etag], ctx);
   }
   visitHtmlComment(ctx) {
     if (!this._needHandleComment) return null; // we only handle comment on topest
     const comment = ctx.getText();
-    const result = ExtractImportLocalParser.parse(comment);
-    result.locals.forEach(local => {
-      if (!/^[A-Z]/.test(local)) throw new Error(`imported local name must be start with upper-case letter, but got: ${local}`);
-      if (this._imports.indexOf(local) >= 0) {
-        throw new Error(`imported local name: ${local} is duplicated.`);
+    // extract code from comment: <!-- -->
+    const code = comment.substring(4, comment.length - 3);
+    // import keyword not found. 
+    if (!/(^|[\s;])import($|\s)/.test(code)) return null; 
+    let tree;
+    try {
+      tree = acorn.Parser.parse(code, {
+        sourceType: 'module'
+      });
+    } catch(ex) {
+      console.error('Warning: keyword "import" is found in comment, but got error when tring to parse it as js code. see https://[todo]');
+      console.error(' >', ex.message);
+      console.error(' >', this._resourcePath);
+      return;
+    }
+    tree.body = tree.body.filter(node => {
+      if (node.type !== 'ImportDeclaration') return false;
+      const specifiers = [];
+      for (let i = 0; i < node.specifiers.length; i++) {
+        const spec = node.specifiers[i];
+        const local = spec.local.name;
+        if (local in this._imports) {
+          console.log(`Warning: dulpilcated imported local name '${local}' will be ignore. see https://[todo]`);
+          console.log(' >', this._resourcePath);
+          continue;
+        } else {
+          this._imports[local] = node.source.value === '.' ? local : `${local}_${this._tplId}`;
+        }
+        if (node.source.value === '.') {
+          // skip import XX from '.', which means Component used is in same file.
+          continue;
+        }
+        spec.local.name += `_${this._tplId}`;
+        specifiers.push(spec);
       }
-      this._imports.push(local);
+      if (specifiers.length > 0) {
+        node.specifiers = specifiers;
+        return true;
+      } else {
+        return false;
+      }
     });
-    this._importOutputCodes.push(...result.imports);
+    if (tree.body.length === 0) return null;
+    const output = escodegen.generate(tree, { indent: '' });
+    // console.log(output);
+    this._importOutputCodes.push(output);
     return null;
   }
 }

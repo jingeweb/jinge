@@ -15,6 +15,10 @@ export function setAttribute($ele, attrName, attrValue) {
   $ele.setAttribute(attrName, attrValue);
 }
 
+export function removeAttribute($ele, attrName) {
+  return $ele.removeAttribute(attrName);
+}
+
 export function setInputValue($inputOrTextarea, value) {
   $inputOrTextarea.value = value;
 }
@@ -48,8 +52,9 @@ export function createElementWithChild(tag, attrs, child) {
   return $e;
 }
 
+let DEBUG_INC = 0;
 export function createComment(data) {
-  return document.createComment(data);
+  return document.createComment(data + (DEBUG_INC++).toString());
 }
 
 function prepareNewNode(newNode) {

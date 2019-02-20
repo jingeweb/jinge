@@ -8,7 +8,8 @@ import {
   ROOT_NODES,
   onAfterRender,
   isComponent,
-  getFirstHtmlDOM
+  getFirstHtmlDOM,
+  CONTEXT
 } from '../core/component';
 import {
   createComment,
@@ -16,6 +17,9 @@ import {
   removeChild,
   insertBefore
 } from '../dom';
+import {
+  wrapViewModel
+} from '../viewmodel/proxy';
 import {
   STR_DEFAULT,
   STR_EMPTY
@@ -26,19 +30,28 @@ function getRenderFn(acs, value) {
   return acs ? ((value in acs) ? acs[value] : acs[STR_DEFAULT]) : null;
 }
 
-export function renderSwitch(acs, roots, value) {
+function createEl(renderFn, context) {
+  return new Component(wrapViewModel({
+    [CONTEXT]: context,
+    [ARG_COMPONENTS]: {
+      [STR_DEFAULT]: renderFn
+    }
+  }, true));
+}
+
+export function renderSwitch(acs, roots, value, context) {
   const renderFn = getRenderFn(acs, value);
   if (!renderFn) {
     roots.push(createComment(STR_EMPTY));
     return roots;
   }
-  const el = new Component(renderFn);
+  const el = createEl(renderFn, context);
   roots.push(el);
   return el[RENDER]();
 }
 
 
-export function updateSwitch(acs, roots, value) {
+export function updateSwitch(acs, roots, value, context) {
   const renderFn = getRenderFn(acs, value);
   if (!renderFn) {
     const el = roots[0];
@@ -67,7 +80,7 @@ export function updateSwitch(acs, roots, value) {
     fd = el;
     pa = getParent(el);
   }
-  const ne = new Component(renderFn);
+  const ne = createEl(renderFn, context);
   roots[0] = ne;
   insertBefore(
     pa,
@@ -100,9 +113,9 @@ export class IfComponent extends Component {
     if (acs) {
       acs[false] = acs['else'];
     }
-    return renderSwitch(acs, this[ROOT_NODES], this.expect);
+    return renderSwitch(acs, this[ROOT_NODES], this.expect, this[CONTEXT]);
   }
   [UPDATE]() {
-    updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.expect);
+    updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.expect, this[CONTEXT]);
   }
 }

@@ -38,3 +38,7 @@ export function isPropertyEnumerable(obj, key) {
 export function getOwnPropertySymbols(obj) {
   return Object.getOwnPropertySymbols(obj);
 }
+
+export function createEmptyObject(o) {
+  return Object.create(o || null);
+}

@@ -2,6 +2,7 @@
 export * from './type';
 export * from './array';
 export * from './diff';
+export * from './const';
 
 export function Symbol(description) {
   return window.Symbol(description);
@@ -28,9 +29,6 @@ export function simpleUUID() {
   return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
 }
 
-export const STR_DEFAULT = 'default';
-export const STR_JINGE = 'jinge';
-export const STR_EMPTY = 'empty';
 
 export function mapObject(obj, fn) {
   const newObj = {};

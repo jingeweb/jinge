@@ -15,3 +15,19 @@ export function arrayPushIfNotExist(array, item) {
   if (idx >= 0) return;
   array.push(item);
 }
+
+export function arrayFind(array, predicate) {
+  if (array.find) {
+    return array.find(predicate);
+  } else {
+    const i = arrayFindIndex(array, predicate);
+    return i >= 0 ? array[i] : null;
+  }
+}
+
+export function arrayFindIndex(array, predicate) {
+  for(let i = 0; i < array.length; i++) {
+    if (predicate(array[i], i)) return i;
+  }
+  return -1;
+}

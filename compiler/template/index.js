@@ -12,9 +12,9 @@ const TPL = require('./tpl');
 const IMPORTS = (function() {
   const map = {
     'jinge/src/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createFragment,'
-      + 'appendText,appendChild,setText,setAttribute,setInputValue,addEvent',
+      + 'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
     'jinge/src/viewmodel/notify': 'VM_ON,VM_NOTIFY',
-    'jinge/src/core/component': 'assertRenderResults,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,REF_NODES,ARG_COMPONENTS,RENDER',
+    'jinge/src/core/component': 'assertRenderResults,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
     'jinge/src/viewmodel/proxy': 'wrapViewModel',
     'jinge/src/util': 'STR_EMPTY,STR_DEFAULT'
   };
@@ -31,6 +31,8 @@ const IMPORTS = (function() {
   }).join(', ')}
 } from '${dep}';\n`;
   });
+  // import all constants
+  rtn.code += `import * as JINGE_CONSTS_${RND_ID} from 'jinge/src/util/const';\n`;
   return rtn;
 })();
 
@@ -39,7 +41,7 @@ class JingeTemplateParser {
     const tplParser = new JingeTemplateParser(options);
     const result = tplParser.parse(content);
     return options.wrapCode !== false ? {
-      code: IMPORTS.code + '\n' + result.aliasImports + '\n' + result.imports + `export default ${result.renderFn}`
+      code: IMPORTS.code + '\n' + result.aliasImports + '\n' + result.imports + `\nexport default ${result.renderFn}`
     } : {
       globalImports: IMPORTS.code,
       aliasImports: result.aliasImports,
@@ -58,17 +60,18 @@ class JingeTemplateParser {
   }
   constructor(options) {
     this.tabSize = options.tabSize || 2;
-    this.alias = options.componentAliases;
+    this.alias = options.componentAlias;
+    this.resourcePath = options.resourcePath;
+    this.baseLinePosition = options.baseLinePosition || 1;
   }
-  parse(content) {
-    content = content.trim();
-    if (!content) return {
+  parse(source) {
+    if (!source.trim()) return {
       aliasImports: '',
       imports: '',
       renderFn: replaceTplStr(TPL.EMPTY, {ID: RND_ID})
     };
 
-    const lexer = new TemplateLexer(new antlr.InputStream(content));
+    const lexer = new TemplateLexer(new antlr.InputStream(source));
     const tokens = new antlr.CommonTokenStream(lexer);
     // console.log(lexer.getAllTokens().map(t => {
     //   console.log(t.text);
@@ -89,6 +92,9 @@ class JingeTemplateParser {
     // });
     const tree = parser.html();
     const visitor = new TemplateVisitor({
+      source: source,
+      baseLinePosition: this.baseLinePosition,
+      resourcePath: this.resourcePath,
       tabSize: this.tabSize,
       alias: this.alias,
       rndId: RND_ID

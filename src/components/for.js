@@ -7,7 +7,8 @@ import {
   UPDATE,
   DESTROY,
   isComponent,
-  getFirstHtmlDOM
+  getFirstHtmlDOM,
+  CONTEXT
 } from '../core/component';
 import {
   isArray,
@@ -28,6 +29,7 @@ import {
 import {
   VM_PARENTS
 } from '../viewmodel/common';
+import { wrapViewModel } from '../viewmodel/proxy';
 
 export const FOR_LENGTH = Symbol('length');
 export const FOR_KEYS = Symbol('keys');
@@ -39,8 +41,8 @@ const EMP_ARR = [];
 // let DEBUG_INC = 0;
 
 export class ForEachComponent extends Component {
-  constructor(renderFn, item, index) {
-    super(renderFn);
+  constructor(attrs, item, index) {
+    super(attrs);
     this.each = item;
     this.index = index;
   }
@@ -51,28 +53,36 @@ export class ForEachComponent extends Component {
   }
 }
 
+function createEl(item, i, itemRenderFn, context) {
+  return new ForEachComponent(wrapViewModel({
+    [CONTEXT]: context,
+    [ARG_COMPONENTS]: {
+      [STR_DEFAULT]: itemRenderFn
+    }
+  }), item, i);
+}
 
-function appendRenderEach(item, i, itemRenderFn, roots) {
-  const el = new ForEachComponent(itemRenderFn, item, i);
+function appendRenderEach(item, i, itemRenderFn, roots, context) {
+  const el = createEl(item, i, itemRenderFn, context);
   roots.push(el);
   return el[RENDER]();
 }
 
 function assert_vm(item, i) {
   if (item !== null && isObject(item) && !(VM_PARENTS in item)) {
-    throw new Error(`<for>: array item [${i}] must be ViewModel.`);
+    throw new Error(`loop item [${i}] of <for> component must be ViewModel.`);
   }
 }
 
 function prepare_key(item, i, keyMap, keyName) {
   const key = keyName === KEY_EACH ? item : keyName(item);
   if (keyMap.has(key)) {
-    console.error(`<for>: array item [${i}] and [${keyMap.get(key)}] both have key '${key}', dulplicated key may cause update error.`);
+    console.error(`loop items [${i}] and [${keyMap.get(key)}] of <for> component both have key '${key}', dulplicated key may cause update error.`);
   }
   keyMap.set(key, i);
   return key;
 }
-function renderItems(items, itemRenderFn, roots, keys, keyName) {
+function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
   const result = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
@@ -80,7 +90,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName) {
     if (keyName !== KEY_INDEX) {
       keys.push(prepare_key(item, i, tmpKeyMap, keyName));  
     }
-    result.push(...appendRenderEach(item, i, itemRenderFn, roots));
+    result.push(...appendRenderEach(item, i, itemRenderFn, roots, context));
   });
   return result;
 }
@@ -95,14 +105,13 @@ function loopAppend($parent, el) {
 }
 export class ForComponent extends Component {
   constructor(attrs) {
-    const kn = attrs._key;
-    if (!kn) throw new Error('<for>: require "_key" attribute.');
-    if (!kn || !/^(index|each(.[\w\d$_]+)*)$/.test(kn)) {
-      throw new Error('<for>: bad "_key" attribute value. See https://[todo]');
+    const kn = attrs._key || KEY_INDEX;
+    if (kn && !/^(index|each(.[\w\d$_]+)*)$/.test(kn)) {
+      throw new Error('Value of "_key" attribute of <for> component is invalidate. See https://[todo]');
     }
     super(attrs);
     this.loop = attrs.loop;
-    this[FOR_KEY_NAME] = attrs._key;
+    this[FOR_KEY_NAME] = kn;
     this[FOR_LENGTH] = 0;
     this[FOR_KEYS] = null;
     if (kn !== KEY_INDEX && kn !== KEY_EACH) {
@@ -131,7 +140,7 @@ export class ForComponent extends Component {
       return roots;
     }
     this[FOR_LENGTH] = items.length;
-    return renderItems(items, itemRenderFn, roots, this[FOR_KEYS], keyName);
+    return renderItems(items, itemRenderFn, roots, this[FOR_KEYS], keyName, this[CONTEXT]);
   }
   [UPDATE]() {
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
@@ -163,6 +172,7 @@ export class ForComponent extends Component {
     }
 
     this[FOR_LENGTH] = nl;
+    const ctx = this[CONTEXT];
     const $parent = getParent(ol === 0 ? roots[0] : getFirstHtmlDOM(roots[0]));
     if (ol === 0) {
       removeChild($parent, roots[0]);
@@ -179,7 +189,7 @@ export class ForComponent extends Component {
           }
         } else {
           if (!$f) $f = createFragment();
-          appendChild($f, ...appendRenderEach(newItems[i], i, itemRenderFn, roots));
+          appendChild($f, ...appendRenderEach(newItems[i], i, itemRenderFn, roots, ctx));
         }
       }
       if ($f) {
@@ -229,7 +239,7 @@ export class ForComponent extends Component {
       if (oi >= ol) {
         let $f = null;
         for(; ni < nl; ni++) {
-          const el = new ForEachComponent(itemRenderFn, newItems[ni], ni);
+          const el = createEl(newItems[ni], ni, itemRenderFn, ctx);
           if (!$f) $f = createFragment();
           appendChild($f, ...el[RENDER]());
           newRoots.push(el);
@@ -253,7 +263,7 @@ export class ForComponent extends Component {
         }
         if (!$f) $f = createFragment();
         if (!reuseEl) {
-          reuseEl = new ForEachComponent(itemRenderFn, newItems[ni], ni);
+          reuseEl = createEl(newItems[ni], ni, itemRenderFn, ctx);
           appendChild($f, ...reuseEl[RENDER]());
         } else {
           loopAppend($f, reuseEl);

@@ -22,13 +22,15 @@
     "spa"
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
-  "dependencies": {},
+  "dependencies": {
+    "html-tags": "^2.0.0"
+  },
   "devDependencies": {
     "acorn": "^6.1.0",
     "acorn-walk": "^6.1.1",
     "antlr4": "^4.7.2",
-    "escodegen": "^1.11.0",
-    "eslint": "^5.14.0",
+    "escodegen": "^1.11.1",
+    "eslint": "^5.14.1",
     "precommit-hook": "^3.0.0"
   },
   "pre-commit": [

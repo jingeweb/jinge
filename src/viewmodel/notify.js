@@ -3,7 +3,8 @@ import {
   arrayRemove,
   arrayPushIfNotExist,
   Symbol,
-  startsWith
+  startsWith,
+  createEmptyObject
 } from '../util';
 
 export const VM_NOTIFY = Symbol('vm_notify');
@@ -16,7 +17,7 @@ export const VM_LISTENERS_HANDLERS = Symbol('vm_listeners_handlers');
 export const VM_LISTENERS_CHILDREN = Symbol('vm_listeners_children');
 
 
-function walkGetNode(vm, props, level = 0, create = false) {
+function walkGetNode(vm, props, level, create) {
   const end = props.length - 1;
   if (end < 0) return null;
   const propN = '' + props[level]; // force to string
@@ -28,11 +29,11 @@ function walkGetNode(vm, props, level = 0, create = false) {
   if (!node) {
     if (create) {
       // node can't have any prototype function.
-      node = vm[propN] = Object.create(null);
+      node = vm[propN] = createEmptyObject();
       Object.assign(node, {
         [VM_LISTENERS_TM]: null,
         [VM_LISTENERS_HANDLERS]: [],
-        [VM_LISTENERS_CHILDREN]: Object.create(null)
+        [VM_LISTENERS_CHILDREN]: createEmptyObject()
       });
     } else {
       return null;
@@ -45,17 +46,19 @@ function walkGetNode(vm, props, level = 0, create = false) {
   }
 }
 
-export function vmAddListener(vm, prop, handler) {
+function getNode(vm, prop, create = false) {
   const props = isArray(prop) ? prop : prop.split('.');
-  if (props.length === 0) return;
-  const node = walkGetNode(vm[VM_LISTENERS], props, 0, true);
+  if (props.length === 0) return null;
+  return walkGetNode(vm[VM_LISTENERS], props, 0, create);
+}
+
+export function vmAddListener(vm, prop, handler) {
+  const node = getNode(vm, prop, true);
   arrayPushIfNotExist(node[VM_LISTENERS_HANDLERS], handler);
 }
 
 export function vmRemoveListener(vm, prop, handler) {
-  const props = isArray(prop) ? prop : prop.split('.');
-  if (props.length === 0) return;
-  const node = walkGetNode(vm[VM_LISTENERS], props, 0, false);
+  const node = getNode(vm, prop);
   if (!node) return;
   if (!handler) node[VM_LISTENERS_HANDLERS].length = 0; // remove all
   else arrayRemove(node[VM_LISTENERS_HANDLERS], handler);
@@ -107,10 +110,9 @@ function loopNotify(node) {
     loopNotify(children[k]);
   }
 }
+
 export function vmNotifyChanged(vm, prop) {
-  const props = isArray(prop) ? prop : prop.split('.');
-  if (props.length === 0) return;
-  const node = walkGetNode(vm[VM_LISTENERS], props, 0, false);
+  const node = getNode(vm, prop);
   if (!node) return;
   loopNotify(node);
 }

@@ -5,6 +5,7 @@ import {
   UPDATE_IF_NEED,
   UPDATE,
   ROOT_NODES,
+  CONTEXT,
 } from '../core/component';
 
 import {
@@ -26,9 +27,9 @@ export class SwitchComponent extends Component {
     this[UPDATE_IF_NEED]();
   }
   [RENDER]() {
-    return renderSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test);
+    return renderSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test, this[CONTEXT]);
   }
   [UPDATE]() {
-    updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test);
+    updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test, this[CONTEXT]);
   }
 }

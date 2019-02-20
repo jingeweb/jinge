@@ -2,7 +2,8 @@ import {
   typeOf,
   instanceOf,
   isNumber,
-  isArray
+  isArray,
+  isObject
 } from '../util';
 import {
   VM_PARENTS,
@@ -16,6 +17,9 @@ import {
   VM_NOTIFY,
   vmAddMessengerInterface
 } from './notify';
+import {
+  isComponent
+} from '../core/component';
 
 function notifyPropChanged(vm, prop) {
   if (VM_NOTIFY in vm) {
@@ -92,6 +96,7 @@ const ArrayFns = {
   reverse: 2,
   sort: 2,
   fill: 2,
+  filter: 1,
   slice: 1,
   concat: 1,
   map: 1
@@ -141,9 +146,10 @@ function wrapProxy(vm, isArr, addMessengerInterface) {
 
 export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false) {
   if (plainObjectOrArray === null) return plainObjectOrArray;
-  if (typeOf(plainObjectOrArray) === 'object') {
+  if (isObject(plainObjectOrArray)) {
     // already been ViewModel
     if (VM_PARENTS in plainObjectOrArray) return plainObjectOrArray;
+    if (isComponent(plainObjectOrArray)) return wrapComponent(plainObjectOrArray);
 
     if (instanceOf(plainObjectOrArray, Boolean) || instanceOf(plainObjectOrArray, RegExp)) {
       plainObjectOrArray[VM_PARENTS] = VM_EMPTY_PARENTS;
@@ -154,7 +160,9 @@ export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false)
       return wrapProxy(plainObjectOrArray, true, addMessengerInterface);
     } else {
       for(const k in plainObjectOrArray) {
-        wrapProp(plainObjectOrArray, k);
+        if (isPublicProp(k)) {
+          wrapProp(plainObjectOrArray, k);
+        }
       }
       return wrapProxy(plainObjectOrArray, false, addMessengerInterface);
     }

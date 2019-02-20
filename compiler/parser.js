@@ -3,6 +3,7 @@ const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
 const path = require('path');
 const { TemplateParser } = require('./template');
+
 const { prependTab } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
 const jingeUtilFile = path.resolve(__dirname, '../src/util/index.js');
@@ -112,6 +113,7 @@ class ComponentParser {
   }
   constructor(options) {
     this.jingeBase = options.jingeBase;
+    this.resourcePath = options.resourcePath;
     this.webpackLoaderContext = options.webpackLoaderContext;
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
     const defaultVms = {
@@ -130,7 +132,7 @@ class ComponentParser {
       }
     }
     this.vmReflections = defaultVms;
-    this.componentAliases = options.componentAliases;
+    this.componentAlias = options.componentAlias;
     this.vmLocals = new Map();
     this.isProduction = !!options.isProduction;
     this.tabSize = options.tabSize;
@@ -140,9 +142,10 @@ class ComponentParser {
     this._replaces = null;
     this._needRemoveSymbolDesc = false;
     this._constructorImports = null;
+
     this._templateGlobalImports = null;
     this._templateLocalImports = [];
-    this._templateAliasImports = null;
+    this._templateAliasImports = [];
   }
   _walkAcorn(node, visitors) {
     const baseVisitor = acornWalk.base;
@@ -388,20 +391,24 @@ import {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
     const result = TemplateParser._parse(tpl, {
+      baseLinePosition: arg.loc.start.line,
+      resourcePath: this.resourcePath,
       tabSize: guessTabSize,
       wrapCode: false,
-      componentAliases: this.componentAliases
+      componentAlias: this.componentAlias
     });
-    if (this._templateGlobalImports && this._templateGlobalImports !== result.globalImports) {
+    if (!this._templateGlobalImports) {
+      this._templateGlobalImports = result.globalImports;
+    } else if (this._templateGlobalImports !== result.globalImports) {
       throw new Error('impossible?!');
     }
-    if (this._templateAliasImports && this._templateAliasImports !== result.aliasImports) {
-      throw new Error('impossible?!');
+    if (result.aliasImports.trim()) {
+      this._templateAliasImports.push(result.aliasImports);
     }
-    if (!this._templateGlobalImports) this._templateGlobalImports = result.globalImports;
-    if (!this._templateAliasImports) this._templateAliasImports = result.aliasImports;
     
-    this._templateLocalImports.push(result.localImports);
+    if (result.localImports.trim()) {
+      this._templateLocalImports.push(result.localImports);
+    }
 
     let code = result.renderFn;
     if (st.loc.start.column > 0) {
@@ -479,7 +486,7 @@ import {
     let output = '';
     if (this._constructorImports) output += this._constructorImports + '\n';
     if (this._templateGlobalImports) output += this._templateGlobalImports + '\n';
-    if (this._templateAliasImports) output += this._templateAliasImports;
+    if (this._templateAliasImports.length > 0) output += this._templateAliasImports.join('\n') + '\n';
     if (this._templateLocalImports.length > 0) output += this._templateLocalImports.join('\n') + '\n';
     for (let i = 0; i < this._replaces.length; i++) {
       const r = this._replaces[i];
