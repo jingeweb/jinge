@@ -285,7 +285,7 @@ export class Component extends Messenger {
     if (rns.has(ref)) {
       throw new Error(`ref name '${ref}' of component '${this.constructor.name}' is dulplicated.`);
     }
-    rns[ref] = el;
+    rns.set(ref, el);
     if (relatedComponent === this) return;
     const rvrs = getOrCreateMap(relatedComponent, RELATED_VM_REFS);
     let rs = rvrs.get(this);
@@ -299,7 +299,7 @@ export class Component extends Messenger {
     if (this[STATE] !== STATE_RENDERED) {
       console.error(`Warning: call getChild before component '${this.constructor.name}' is rendered will get nothing, try put getChild into afterRender lifecycle hook.`);
     }
-    return this[REF_NODES] ? this[REF_NODES][ref] : null;
+    return this[REF_NODES] ? this[REF_NODES].get(ref) : null;
   }
   afterRender() {
     // life time hook
