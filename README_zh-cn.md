@@ -1,5 +1,13 @@
 # jinge
 
+## 示例
+
+|  demo |  link  |
+| ---  | ----|
+| basic demos | https://github.com/YuhangGe/jinge-demos |
+| todo-mvc    | https://github.com/YuhangGe/jinge-demos/tree/dev/08-todo-mvc|
+
+
 ## 引言
 
 `jinge` 是一款基于 `Messenger`, `Proxy` 和 `Compiler` 的前端 mvvm 框架。其中：
@@ -34,7 +42,7 @@ jinge 框架诞生于长期的使用其它框架进行的业务项目的研发�
 
 在某些场景下，在 view 层直接渲染函数调用的返回值，可以让 controller 层的代码更精简。
 
-前文所述的数据绑定和更新方案，在 jinge 框架中具体实现时，暂时无法处理对函数调用的返回值的监听，因此主动牺牲了在 view 模板中直接渲染函数调用返回值的能力。
+但前文所述的数据绑定和更新方案，在 jinge 框架中具体实现时，暂时无法处理对函数调用的返回值的监听，因此主动牺牲了在 view 模板中直接渲染函数调用返回值的能力。
 
 具体来讲，主流框架(react/angular/vue)在更新 view 层时，都会完整地触发 render 重绘逻辑，因此在 view 模板中可以直接渲染函数调用的返回值，该函数调用在每次重绘时都会被触发，因此可以实现对返回值的监听和更新 view。
 
