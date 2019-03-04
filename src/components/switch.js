@@ -10,6 +10,7 @@ import {
 
 import {
   renderSwitch,
+  notifySwitch,
   updateSwitch
 } from './if';
 
@@ -31,5 +32,6 @@ export class SwitchComponent extends Component {
   }
   [UPDATE]() {
     updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test, this[CONTEXT]);
+    notifySwitch(this, this.test);
   }
 }

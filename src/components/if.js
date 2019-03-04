@@ -50,6 +50,9 @@ export function renderSwitch(acs, roots, value, context) {
   return el[RENDER]();
 }
 
+export function notifySwitch(ctx, value) {
+  ctx.notify('updated', value);
+}
 
 export function updateSwitch(acs, roots, value, context) {
   const renderFn = getRenderFn(acs, value);
@@ -117,5 +120,6 @@ export class IfComponent extends Component {
   }
   [UPDATE]() {
     updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.expect, this[CONTEXT]);
+    notifySwitch(this, this.expect);
   }
 }
