@@ -77,20 +77,27 @@ class JingeTemplateParser {
     //   console.log(t.text);
     //   return  t.text;
     // }));
-    // process.exit(0);
     // debugger;
     const parser = new TemplateParser(tokens);
-    // parser.removeErrorListeners();
-    // parser.addErrorListener({
-    //   syntaxError(recognizer, offendingSymbol, ...args) {
-    //     debugger;
-    //     console.log(...args);
-    //   },
-    //   reportContextSensitivity() {},
-    //   reportAttemptingFullContext() {},
-    //   reportAmbiguity() {}
-    // });
+    let meetErr = null;
+    parser.removeErrorListeners();
+    parser.addErrorListener({
+      syntaxError(recognizer, offendingSymbol, line, column) {
+        if (!meetErr) meetErr = {line, column};
+      },
+      reportContextSensitivity() {},
+      reportAttemptingFullContext() {},
+      reportAmbiguity() {}
+    });
     const tree = parser.html();
+    if (meetErr) {
+      this._logParseError(source, meetErr, 'syntax of template is error.');
+      return {
+        aliasImports: '',
+        imports: '',
+        renderFn: replaceTplStr(TPL.ERROR, {ID: RND_ID})
+      };
+    }
     const visitor = new TemplateVisitor({
       source: source,
       baseLinePosition: this.baseLinePosition,
@@ -99,7 +106,27 @@ class JingeTemplateParser {
       alias: this.alias,
       rndId: RND_ID
     });
-    return visitor.visit(tree);
+    try {
+      return visitor.visit(tree);
+    } catch(ex) {
+      return {
+        aliasImports: '',
+        imports: '',
+        renderFn: replaceTplStr(TPL.ERROR, {ID: RND_ID})
+      };
+    }
+  }
+  _logParseError(source, tokenPosition, msg) {
+    let idx = -1;
+    for(let i = 0; i < tokenPosition.line - 1; i++) {
+      idx = source.indexOf('\n', idx + 1);
+    }
+    idx = idx + 1;
+    const eidx = source.indexOf('\n', idx);
+    console.error(`Error occur at line ${tokenPosition.line + this.baseLinePosition - 1}, column ${tokenPosition.column}:
+  > ${source.substring(idx, eidx > idx ? eidx : source.length)}
+  > ${this.resourcePath}
+  > ${msg}`);
   }
 }
 

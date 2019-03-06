@@ -61,9 +61,15 @@ class TemplateVisitor extends TemplateParserVisitor {
     });
     this._alias = {};
     this._aliasImports = {};
+    this._aliasLocalMap = {};
     for (const source in alias) {
       const m = alias[source];
+      if (!this._aliasLocalMap[source]) this._aliasLocalMap[source] = {};
       Object.keys(m).map(c => {
+        const rid = crypto.randomBytes(4).toString('hex');
+        if (!(c in this._aliasLocalMap[source])) {
+          this._aliasLocalMap[source][c] = c === 'default' ? `Component_${rid}` : `${c}_${rid}`;
+        }
         const as = Array.isArray(m[c]) ? m[c] : [m[c]];
         as.forEach(a => this._alias[a] = [c, source]);
       });
@@ -74,8 +80,10 @@ class TemplateVisitor extends TemplateParserVisitor {
     for(let i = 0; i < tokenPosition.line - 1; i++) {
       idx = this._source.indexOf('\n', idx + 1);
     }
+    idx = idx + 1;
+    const eidx = this._source.indexOf('\n', idx);
     console.error(`Error occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
-  > ${this._source.substring(idx + 1, this._source.indexOf('\n', idx + 1))}
+  > ${this._source.substring(idx, eidx > idx ? eidx : this._source.length)}
   > ${this._resourcePath}
   > ${msg}`);
   }
@@ -630,7 +638,7 @@ ${body}
     return {
       renderFn: this._gen_render(elements, 0),
       aliasImports: Object.keys(this._aliasImports).map(source => {
-        return `import { ${this._aliasImports[source].map(c => `${c} as ${c}_${this._tplId}`).join(', ')} } from '${source}';`;
+        return `import { ${this._aliasImports[source].map(c => `${c} as ${this._aliasLocalMap[source][c]}`).join(', ')} } from '${source}';`;
       }).join('\n'),
       imports: this._importOutputCodes.join('\n')
     };
@@ -701,7 +709,7 @@ ${body}
         if (arr.indexOf(c) < 0) {
           arr.push(c);
         }
-        return this._parse_component_ele(etag, `${c}_${this._tplId}`, ctx);
+        return this._parse_component_ele(etag, this._aliasLocalMap[source][c], ctx);
       }
 
       if (HTMLTags.indexOf(etag) < 0) {

@@ -31,6 +31,7 @@ import {
   removeChild,
   replaceChild
 } from '../dom';
+import { wrapComponent } from '../viewmodel/proxy';
 
 export const TEMPLATE_RENDER = Symbol('template_render');
 export const RENDER = Symbol('render');
@@ -176,6 +177,8 @@ export class Component extends Messenger {
      *   ref elements of parent component.
      */
     this[RELATED_VM_REFS] = null;
+
+    return wrapComponent(this);
   }
   [VM_ON](prop, handler, componentCtx) {
     vmAddListener(this, prop, handler);

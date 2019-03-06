@@ -8,7 +8,7 @@ const { prependTab } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
 const jingeUtilFile = path.resolve(__dirname, '../src/util/index.js');
 
-function _n_wrap() {
+function _n_wrap(attrArgName) {
   return {
     'type': 'VariableDeclaration',
     'declarations': [
@@ -21,14 +21,12 @@ function _n_wrap() {
         'init': {
           'type': 'CallExpression',
           'callee': {
-            'type': 'Identifier',
-            'name': `wrapComponent_${RND_ID}`
+            'type': 'Super',
           },
-          'arguments': [
-            {
-              'type': 'ThisExpression'
-            }
-          ]
+          'arguments': [ {
+            'type': 'Identifier',
+            'name': attrArgName
+          }]
         }
       }
     ],
@@ -116,24 +114,24 @@ class ComponentParser {
     this.resourcePath = options.resourcePath;
     this.webpackLoaderContext = options.webpackLoaderContext;
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
-    const defaultVms = {
+    const defaultBase = {
       Component: [
         path.resolve(__dirname, '../src/index.js'),
         path.resolve(__dirname, '../src/core/component.js')
       ]
     };
-    const vms = options.vmRelfections || {};
-    for (const n in vms) {
-      const v = Array.isArray(vms[n]) ? vms[n] : [vms[n]];
-      if (n in defaultVms) {
-        defaultVms[n] = defaultVms[n].concat(v);
+    const cbase = options.componentBase || {};
+    for (const n in cbase) {
+      const v = Array.isArray(cbase[n]) ? cbase[n] : [cbase[n]];
+      if (n in defaultBase) {
+        defaultBase[n] = defaultBase[n].concat(v);
       } else {
-        defaultVms[n] = v;
+        defaultBase[n] = v;
       }
     }
-    this.vmReflections = defaultVms;
+    this.componentBase = defaultBase;
     this.componentAlias = options.componentAlias;
-    this.vmLocals = new Map();
+    this.componentBaseLocals = new Map();
     this.isProduction = !!options.isProduction;
     this.tabSize = options.tabSize;
     if (typeof this.tabSize !== 'number' || this.tabSize <= 0) {
@@ -166,9 +164,9 @@ class ComponentParser {
       const spec = node.specifiers[i];
       const type = spec.type;
       let imported = '';
-      if (type === 'ImportDefaultSpecifier' || type === 'ImportNamespaceSpecifier') {
+      if (type === 'ImportDefaultSpecifier') {
         // `import a from 'xx'` -> const a = xx;
-        imported = spec.local.name;
+        imported = 'default';
       } else if (type === 'ImportSpecifier') {
         // `import { a as b } from 'xx' -> const b = xx.a;
         imported = spec.imported.name;
@@ -187,7 +185,7 @@ class ComponentParser {
           this._needRemoveSymbolDesc = true;
         }
       }
-      if (imported in this.vmReflections) {
+      if (imported in this.componentBase) {
         if (!source) {
           source = await new Promise((resolve, reject) => {
             this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
@@ -196,8 +194,8 @@ class ComponentParser {
             });
           });
         }
-        if (this.vmReflections[imported].indexOf(source) >= 0) {
-          this.vmLocals.set(spec.local.name, true);
+        if (this.componentBase[imported].indexOf(source) >= 0) {
+          this.componentBaseLocals.set(spec.local.name, true);
           return true;
         }
       }
@@ -206,7 +204,7 @@ class ComponentParser {
   }
   walkClass(node) {
     const sc = node.superClass;
-    if (sc.type !== 'Identifier' || !this.vmLocals.has(sc.name)) {
+    if (sc.type !== 'Identifier' || !this.componentBaseLocals.has(sc.name)) {
       /* TODO: need to support more cases? */
       return;
     }
@@ -224,30 +222,6 @@ class ComponentParser {
         c |= 2;
         if (c === 3) break;
       }
-    }
-    if ((c & 1) === 0) {
-      // constructor not found, insert.
-      this._addConstructorImports();
-      this._replaces.push({
-        start: node.body.start + 1,
-        end: node.body.start + 1,
-        code: `
-  constructor(attrs) {
-    super(attrs);
-    if (attrs !== null && typeof attrs === 'object') {
-      const props = Object.keys(attrs);
-      props.forEach(p => this[p] = attrs[p]);
-
-      const vm_${RND_ID} = wrapComponent_${RND_ID}(this);
-      props.filter(k => /^[a-zA-Z]/.test(k)).forEach(k => {
-        attrs[VM_ON_${RND_ID}](k, () => vm_${RND_ID}[k] = attrs[k]);
-      });
-      return vm_${RND_ID};
-    } else {
-      return wrapComponent_${RND_ID}(this);      
-    }
-  }`
-      });
     }
   }
   _addConstructorImports() {
@@ -298,13 +272,14 @@ import {
       }
       const expr = stmt.expression;
       if (expr.type === 'CallExpression') {
-        newBody.push(replaceThis(stmt));
         if (expr.callee.type === 'Super') {
           if (expr.arguments.length === 0 || expr.arguments[0].name !== an) {
             throw new Error(`constructor of ${ClassName} must pass first argument '${an}' to super-class`);
           }
           foundSupper = true;
-          newBody.push(_n_wrap());
+          newBody.push(_n_wrap(an));
+        } else {
+          newBody.push(replaceThis(stmt));
         }
       } else if (expr.type === 'AssignmentExpression') {
         if (expr.left.type !== 'MemberExpression' || expr.left.object.type !== 'ThisExpression') {

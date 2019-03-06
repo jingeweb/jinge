@@ -7,7 +7,7 @@ const TEXT_CONST = `(() => {
 const EMPTY = `function(component) {
   const el = createComment_$ID$(STR_EMPTY_$ID$);
   component[ROOT_NODES_$ID$].push(el);
-  return el;
+  return [el];
 }`;
 
 const PUSH_ROOT_ELE = 'component[ROOT_NODES_$ID$].push(el);';
@@ -25,6 +25,13 @@ $WATCH$
 
 const PARAMETER = '(component[ARG_COMPONENTS_$ID$][$ARG_USE$]$DEFAULT$)(component)';
 
+const ERROR = `function(component) {
+  const el = createElement_$ID$('span', {style: 'color: red !important;'});
+  el.textContent = 'template parsing failed! please check webpack log.';
+  component[ROOT_NODES_$ID$].push(el);
+  return [el];
+}`;
+
 module.exports = {
   SET_REF_ELE,
   PUSH_ROOT_ELE,
@@ -32,5 +39,6 @@ module.exports = {
   TEXT_CONST,
   TEXT_EXPR,
   EMPTY,
+  ERROR,
   PARAMETER
 };
