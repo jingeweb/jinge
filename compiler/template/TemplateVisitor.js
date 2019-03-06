@@ -56,6 +56,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         IfComponent: 'if',
         ForComponent: 'for',
         SwitchComponent: 'switch',
+        BindHtmlComponent: 'bind-html',
         Component: ['argument', 'parameter']
       }
     });

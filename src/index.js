@@ -8,6 +8,9 @@ export {
   SwitchComponent
 } from './components/switch';
 export {
+  BindHtmlComponent
+} from './components/html';
+export {
   Component
 } from './core/component';
 export {
