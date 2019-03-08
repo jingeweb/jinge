@@ -21,7 +21,7 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is message/event related attribute type */
   'on',
   /* bellow is compiler related attribute types */
-  'vm', 'arg', 'ref'
+  'vm', 'vm-pass', 'vm-use', 'arg-pass', 'arg-use', 'ref'
 ];
 
 function mergeAlias(src, dst) {
@@ -76,17 +76,17 @@ class TemplateVisitor extends TemplateParserVisitor {
       });
     }
   }
-  _logParseError(tokenPosition, msg) {
+  _logParseError(tokenPosition, msg, type = 'Error') {
     let idx = -1;
     for(let i = 0; i < tokenPosition.line - 1; i++) {
       idx = this._source.indexOf('\n', idx + 1);
     }
     idx = idx + 1;
     const eidx = this._source.indexOf('\n', idx);
-    console.error(`Error occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
+    console.error(`${type} occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
   > ${this._source.substring(idx, eidx > idx ? eidx : this._source.length)}
   > ${this._resourcePath}
-  > ${msg}`);
+  > ${msg}\n`);
   }
   _throwParseError(tokenPosition, msg) {
     this._logParseError(tokenPosition, msg);
@@ -236,6 +236,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       argAttrs: [],
       listeners: [],
       vms: [],
+      vmPass: [],
       argPass: null,
       ref: null,
       argUse: null
@@ -244,6 +245,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     const argAttrs = {};
     const listeners = {};
     const vms = [];
+    const vmPass = [];
     const pVms = this._vms;
     let argPass = null;
     let argUse = null;
@@ -273,55 +275,68 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
+      if (a_category === 'vm') a_category = 'vm-use';
+      else if (a_category === 's') a_category = 'str';
+      else if (a_category === 'e') a_category = 'expr';
+
       const atv = attrCtx.ATTR_VALUE();
       let aval = atv ? atv.getText().trim() : '';
       // extract from quote
       if (aval) aval = aval.substr(1, aval.length - 2).trim();
 
-      if (a_category === 'vm') {
-        if (mode === 'html') throw new Error('vm type atrribute can\'t be used on html element.');
-        if (!aval) throw new Error('vm type attribute require reflect variable name.');
-        if (!/^[\w\d$_]+$/.test(aval)) throw new Error('vm type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
-        if (pVms.find(v => v.name === aval) || vms.find(v => v.name === aval)) throw new Error('vm type attribute reflect varibale name has been declared: ' + aval);
-        vms.push({ name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1 });
+      if (a_category === 'vm-use') {
+        if (!aval) this._throwParseError(ctx.start, 'vm-use type attribute require reflect variable name.');
+        if (!/^[\w\d$_]+$/.test(aval) || !/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
+        if (vms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use type attribute name dulipcated: ' + aval);
+        if (pVms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use attribute reflect vairiable name has been declared before.');
+        vms.push({name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1});
         return;
       }
 
-      if (a_category === 'arg') {
-        if (mode === 'html') throw new Error('arg type atrribute can\'t be used on html element.');
-        if (a_name !== 'pass' && a_name !== 'use') throw new Error('arg type attribute only support name: "arg:pass" or "arg:use"');
-        if (argPass || argUse) throw new Error('arg type attribute can only be used once!');
-        if (parentInfo.sub === 'argument' || parentInfo.sub === 'parameter') {
-          throw new Error('if parent component has arg type attribute, child component can\'t also have arg type attribue.');
+      if (a_category === 'vm-pass') {
+        if (mode === 'html') this._throwParseError(ctx.start, 'vm-pass attribute can\'t be used on html element');
+        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
+        if (vmPass.find(v => v.name === a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
+        vmPass.push({name: a_name, expr: this._parse_expr(aval)});
+      }
+
+      if (a_category === 'arg-pass') {
+        if (argPass) this._throwParseError(ctx.start, 'arg-pass: attribute can only be used once!');
+        if (parentInfo.sub === 'argument') {
+          this._throwParseError(ctx.start, 'if parent component has arg-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
         }
-        if (a_name === 'pass') {
-          if (parentInfo.type !== 'component') throw new Error('"arg:pass" attribute can only be used on root child of Component element.');
-          argPass = aval;
-        } else {
-          argUse = aval;
+        if (parentInfo.type !== 'component') {
+          this._throwParseError(ctx.start, 'arg-pass type attribute can only be used as root child of Component element.');
         }
+        argPass = a_name;
+        return;
+      }
+
+      if (a_category === 'arg-use') {
+        if (argUse) throw new Error('arg-use type attribute can only be used once!');
+        argUse = a_name;
         return;
       }
 
       if (a_category === 'on') {
         if (!a_name) throw new Error('event name is required!');
         if (a_name in listeners) throw new Error('event name is dulplicated: ' + a_name);
-        listeners[a_name] = this._parse_listener(aval, mode);
+        listeners[a_name] = [aval, mode];
         return;
       }
 
       if (a_name in constAttrs || a_name in argAttrs) throw new Error('dulplicated attribute:', a_name);
       if (!aval) {
         if (a_category === 'expr') {
-          throw new Error('Attribute with expression type must have value.');
+          this._throwParseError(ctx.start, 'Attribute with expression type must have value.');
         }
         constAttrs[a_name] = atv ? '' : true;
         return;
       }
 
-      if (a_category === 'expr' || a_category === 'e') {
+      if (a_category === 'expr') {
         // TODO: if expression is const，handle it as 'constAttrs'
-        argAttrs[a_name] = this._parse_expr(aval, ctx);
+        argAttrs[a_name] = aval; // this._parse_expr(aval, ctx);
         return;
       }
 
@@ -331,52 +346,257 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
 
       const es = [];
-      const paths = [];
-      const addPath = p => {
-        if (!paths.find(ep => ep.vm === p.vm && ep.n === p.n)) paths.push(p);
-      };
+      let moreThanOne = false;
       AttributeValueParser.parse(aval).forEach(it => {
         if (it.type === 'TEXT') {
           es.push(JSON.stringify(it.value));
         } else if (it.value) {
-          const result = this._parse_expr(it.value, attrCtx);
-          result.paths.forEach(addPath);
-          es.push(`(${result.expr})`);
+          es.push(moreThanOne ? `(${it.value})` : it.value);
         }
+        moreThanOne = true;
       });
-
-      argAttrs[a_name] = {
-        expr: es.length > 1 ? '\'\' + ' + es.join(' + ') : es[0],
-        paths
-      };
+      argAttrs[a_name] = es.length === 1 ? es[0] : es.join(' + ');
     });
 
     function obj2arr(obj) {
       return Object.keys(obj).map(k => [k, obj[k]]);
     }
 
+    /*
+     * The logic is so complex that I have to write 
+     * Chinese comment to keep myself not forget it.
+     */
 
-    if (argPass && argUse) throw new Error('arg:pass and arg:use attribute cannot be both used');
+    /**
+     * 
+     * # arg-pass:, arg-use:, vm-pass:, vm-use:
+     * 
+     * ## 基本说明
+     * 
+     * #### arg-pass:
+     * 
+     * 该属性指定要将外部元素传递到组件的内部渲染中。比如：
+     * 
+     * ````html
+     * <SomeComponent>
+     * <argument arg-pass:a>
+     *  <span>hello</span>
+     * </argument>
+     * </SomeComponent>
+     * ````
+     * 
+     * 以上代码会将 <argument> 节点内的所有内容，按 key="a" 传递给
+     * SomeComponent 组件。SomeComponent 组件在渲染时，可获取到该外部传递进
+     * 来的元素。
+     * 
+     * 对于 html 元素，arg-pass 属性本质上是给它包裹了一个父组件，比如：
+     *   `<span arg-pass:a>hello</span>` 等价于：
+     *   `<argument arg-pass:a><span>hello</span></argument>`，
+     * 
+     * 对于 Component 元素，arg-pass 属性会让编译器忽略该组件的任何性质（或者理解成，
+     *   任何有 arg-pass 属性的组件都会被替换成 <argument> 空组件）。
+     * 
+     * 对任何组件元素来说，如果它没有任何根子节点包含 arg-pass 属性，则编译器会
+     *   默认将所有根子节点包裹在 <argument arg-pass:default> 里。比如：
+     *   `<SomeComponent><span>hello</span>Good<span>world</span></SomeComponent>`
+     *   等价于：
+     *   ````html
+     *   <SomeComponent>
+     *   <argument arg-pass:default>
+     *     <span>hello</span>Good<span>world</span>
+     *   </argument>
+     *   </SomeComponent>
+     *   ````
+     * 
+     * #### vm-use:
+     * 
+     * vm-use: 可以简化写成 vm: 。
+     * 
+     * 只有 arg-pass: 属性存在时，才能使用 vm-use: 属性。vm-use: 用于指定要通过 arg-pass: 传递到组件内部去的
+     * 外部元素，在组件内部被渲染时，可以使用哪些组件内部提供的渲染参数；因此脱离 arg-pass: 属性，vm-use: 属性没有意义。
+     * 
+     * 但为了代码的简介性，当 Component 元素没有根子节点有 arg-pass: 属性（即，它的所有根子节点
+     * 被当作默认的 <argument arg-pass:default>）时，
+     * 这个组件`可以只有 vm-use: 而没有 arg-pass: 属性`。
+     * 这种情况属于语法糖，本质上等价于在其默认的 <argument arg-pass:default> 上添加了这些 vm-use:。比如：
+     * `<SomeComponent vm-use:a="b"><span>${b}</span></SomeComponent>` 等价于：
+     * `<SomeComponent><argument arg-pass:default vm-use:a="b"><span>${b}</span></argument></SomeComponent>`
+     * 
+     * 一个典型的实际例子是 <for> 循环。<for> 是 ForComponent 组件的别名，
+     * 该组件自身的渲染逻辑，是循环渲染通过 arg-pass:default 传递进来的外部元素。
+     * 结合上文，常见的代码 `<for e:loop="list" vm:each="item">${item}</for>` 等价于：
+     * ````html
+     * <!-- import {ForComponent} from 'jinge' -->
+     * <ForComponent e:loop="list">
+     * <argument arg-pass:default vm-use:each="item">${item}</argument>
+     * </ForComponent>
+     * ````
+     * 
+     * 其中，vm 是 vm-use 的简化写法。
+     * 
+     * #### arg-use:
+     * 
+     * 指定该组件在自己的内部渲染中，使用哪些通过 arg-pass: 传递进来的外部元素。
+     * 以上文 arg-pass: 属性下的代码为例， SomeComponent 组件的模板里，
+     * 可以这样使用：
+     * 
+     * ````html
+     * <!-- SomeComponent.html -->
+     * <parameter arg-use:a />
+     * <parameter arg-use:b>
+     *   <span>default text</span>
+     * </parameter>
+     * ````
+     * 
+     * 通过跟 arg-pass: 一致的 key="a"，实现了 arg-use: 和 arg-pass: 的关联，
+     * 将外部的元素渲染到自身内部。如果 arg-use: 属性的组件，还有子节点，则这些子节点
+     * 代表外部没有传递对应 key 的外部元素时，要默认渲染的元素。
+     * 
+     * 以上代码最终渲染的结果是 `<span>hello</span><span>default text</span>`。
+     * 
+     * 对于 html 元素，arg-use: 属性本质上是给它包裹了一个父组件，比如：
+     *   `<span arg-use:a>default</span>` 等价于：
+     *   `<parameter arg-use:a><span>default</span></parameter>`，
+     * 
+     * 对于 Component 元素，arg-use: 属性会让编译器忽略该组件的任何性质（或者理解成，
+     *   任何有 arg-use: 属性的组件都会被替换成 <parameter> 空组件）。
+     * 
+     * #### vm-pass:
+     * 
+     * 只有 arg-use: 属性存在时，才能使用 vm-pass: 属性。vm-pass: 用于指定要向外部通过 arg-pass: 传递进来的
+     * 外部元素传递过去哪些渲染参数，因此脱离 arg-use: 属性，vm-pass: 属性没有意义。
+     * 
+     * 比如常见的 <for> 循环，即 ForComponent 组件，会向外部元素传递 'each' 和 'index' 两
+     * 个渲染参数。但对 ForComponent 组件，这种传递是直接在 js 逻辑里写的，而没有
+     * 直接通过 vm-pass: 属性（因为 ForComponent 组件自身没有模板）。
+     * 
+     * 如下是在模板中传递渲染参数的示例：
+     * 
+     * ````html
+     * <!-- SomeComponent.html -->
+     * <div><parameter arg-use:a vm-pass:xx="name + '_oo' ">hello, ${name}</parameter></div>
+     * ````
+     * 
+     * 以上代码会向外部组件传递名称为 xx 的渲染参数，这个参数的值是 `name + 'oo'` 这个表达式
+     * 的结果。表达式里的 name 是该组件的 property。当 name 发生变化时，向外传递的 xx 也会更新并
+     * 通知外部组件重新渲染。
+     * 
+     * 以下是使用 SomeComponent 组件时的用法：
+     * 
+     * ````html
+     * <!-- app.html -->
+     * <SomeComponent>
+     *   <p arg-pass:a vm-use:xx="yy">override ${yy}</p>
+     * </SomeComponent>
+     * ````
+     * 
+     * 假设 SomeComponent 的 name 是 'jinge'，则 app.html 最终渲染出来是
+     * `<p>override jinge_oo</p>`
+     * 
+     * ## 补充说明
+     * 
+     * #### arg-pass: 和 arg-use: 不能同时使用。
+     * 
+     * 对于 Component 元素，arg-pass: 和 arg-use: 同时存在具有歧义，
+     *   编译器无法知道到底是处理成 pass 还是 use。
+     * 对于 html 元素，arg-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
+     *   比如：`<span arg-pass:a arg-use:c>hello</span>` 可以设计为等价于：
+     * 
+     * ````html
+     * <argument arg-pass:a>
+     *   <parameter arg-use:b>
+     *     <span>hello</span>
+     *   </parameter>
+     * </argument/>
+     * ````
+     * 
+     * 但这种等价仍然肯有一定的隐晦性。由于这种使用场景很少，
+     * 因此不提供这个场景的简化写法。对于 Component 和 html 元素，
+     * 统一都不支持 arg-pass: 和 arg-use: 同时使用。
+     *
+     */
 
+    // arg-pass: 属性和 arg-use: 属性不能同时存在，详见上面的注释。
+    if (argPass && argUse) {
+      this._throwParseError(ctx.start, 'arg-pass and arg-use attribute can\' be both used on same element');
+    }
+    
+    // html 元素上的必须有 arg-pass: 属性，才能有 vm-use: 属性
+    // component 元素可以只有 vm-use: 属性，但需要满足上面注释里详细描述的条件，这个条件的检测在之后的代码逻辑里。
+    if (vms.length > 0 && !(argPass) && mode === 'html') {
+      this._throwParseError(ctx.start, 'vm-use attribute require arg-pass attribute on html element. see https://[todo]');
+    }
+
+    // vm-pass: 属性必须用在有 arg-use: 属性的元素上。
+    if (vmPass.length > 0 && !argUse) {
+      this._throwParseError(ctx.start, 'vm-pass attribute require arg-use attribute');
+    }
+    // vm-use: 属性不能用在有 arg-use: 属性的元素上。
+    if (argUse && vms.length > 0) {
+      this._throwParseError(ctx.start, 'vm-use attribute can\'t be used with arg-use attribute');
+    }
+
+    /**
+     * 如果 html 元素上有 arg-pass: 和 vm-use: ，则该元素等价于被包裹在
+     * arg-pass: 和 vm-use: 的 <argument> 组件里。这种情况下，html 元素上
+     * 的其它表达式值属性，是可以使用该 vm-use: 引入的渲染参数的。因此，要将这些参数
+     * 先添加到参数列表里，再进行 _parse_expr 或 _parse_listener，
+     * parse 结束后，再恢复参数列表。比如如下代码：
+     * 
+     * ````html
+     * <SomeComponent>
+     *   <p arg-pass:a vm-use:xx="yy" class="c1 ${yy}">override ${yy}</p>
+     * </SomeComponent>
+     * ````
+     * 
+     * 等价于：
+     * 
+     * ````html
+     * <SomeComponent>
+     * <argument arg-pass:a vm-use:xx="yy">
+     *   <p class="c1 ${yy}">override ${yy}</p>
+     * </argument>
+     * </SomeComponent>
+     * ````
+     * 
+     * 其中的，`class="c1 ${yy}"` 使用了 `vm-use:xx="yy"` 引入的渲染参数。
+     * 
+     */
+    if (mode === 'html' && vms.length > 0) {
+      this._vms = pVms.slice().concat(vms);
+    }
     const rtn = {
       constAttrs: obj2arr(constAttrs),
-      argAttrs: obj2arr(argAttrs),
+      argAttrs: obj2arr(argAttrs).map(at => {
+        const e = this._parse_expr(at[1], ctx);
+        at[1] = e;
+        return at;
+      }),
       listeners: obj2arr(listeners).map(lis => {
-        lis[1].code = lis[1].code.replace(/(^[\s;]+)|([\s;]+$)/g, '').replace(/[\r\n]/g, ';').replace(/;+/g, ';');
-        lis[1].code = lis[1].code.replace(/\{\s*;+/g, '{');
+        const l = this._parse_listener(...lis[1]);
+        l.code = l.code.replace(/(^[\s;]+)|([\s;]+$)/g, '')
+          .replace(/[\r\n]/g, ';').replace(/;+/g, ';')
+          .replace(/\{\s*;+/g, '{');
+        lis[1] = l;
         return lis;
       }),
       vms,
+      vmPass,
       argPass,
       argUse,
       ref
     };
+    if (mode === 'html' && vms.length > 0) {
+      this._vms = pVms;
+    }
 
-    if ((argPass || argUse) && (
-      rtn.constAttrs.length > 0 || rtn.argAttrs.length > 0 || rtn.listeners.length > 0
-      || rtn.vms.length > 0 || ref
-    )) throw new Error('if a component has type attribute(ie. arg:pass or arg:use), it can\'t have any other attribute');
-
+    if ((argPass || argUse) && mode !== 'html' && (
+      rtn.constAttrs.length > 0 || rtn.argAttrs.length > 0
+      || rtn.listeners.length > 0
+    )) {
+      this._throwParseError(ctx.start, 'once used arg-pass or arg-use attribute, value attribute or messenger attribute can\'t be used on Component element. see https://[todo]');
+    }
+  
     return rtn;
   }
   _parse_html_ele(etag, ctx) {
@@ -425,9 +645,49 @@ return el;`, true) + '\n})()';
     } else {
       code = `${ce}(\n${this._prependTab(arr.join(',\n'))}\n)`;
     }
+
+    const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
+    const rtnEl = {type: 'html', value: code};
+
+    if (result.argUse) {
+      return this._parse_arg_use_parameter(
+        [rtnEl], result.argUse, result.vmPass, vmLevel
+      );
+    }
+    if (result.argPass) {
+      return {
+        type: 'component',
+        sub: 'argument',
+        argPass: result.argPass,
+        value: this._gen_render([rtnEl], vmLevel)
+      };
+    }
     return {
       type: 'html',
       value: code
+    };
+  }
+  _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel) {
+    let vmPassInitCode = '';
+    let vmPassSetCode = '';
+    let vmPassWatchCode = '';
+    if (vmPass.length > 0) {
+      vmPass.forEach((vp, i) => {
+        vmPassInitCode += `${vp.name}: null, `;
+        vmPassSetCode += `const wfn_${i} = () => attrs.${vp.name} = ${vp.expr.code};\nwfn_${i}();\n`;
+        vmPassWatchCode += `${vp.expr.paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, wfn_${i}, component);`).join('\n')}\n`;
+      });
+    }
+    return {
+      type: 'component',
+      sub: 'parameter',
+      value: this._replace_tpl(TPL.PARAMETER, {
+        VM_PASS_INIT: vmPassInitCode,
+        VM_PASS_SET: vmPassSetCode,
+        VM_PASS_WATCH: vmPassWatchCode,
+        ARG_USE: argUse,
+        DEFAULT: elements.length > 0 ? this._gen_render(elements, vmLevel) : ''
+      })
     };
   }
   _assert_arg_pass(elements, Component) {
@@ -435,14 +695,14 @@ return el;`, true) + '\n})()';
     const args = {};
     elements.forEach(el => {
       if (el.type === 'component' && el.sub === 'argument') {
-        if (found < 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg:pass attribute or all of them do not contain arg:pass attribute`);
+        if (found < 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
         if (el.argPass in args) {
-          throw new Error(`arg:pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
+          throw new Error(`arg-pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
         }
         args[el.argPass] = true;
         found = 1;
       } else {
-        if (found > 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg:pass attribute or all of them do not contain arg:pass attribute`);
+        if (found > 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
         found = -1;
       }
     });
@@ -451,34 +711,67 @@ return el;`, true) + '\n})()';
   _parse_component_ele(tag, Component, ctx) {
     const result = this._parse_attrs('component', Component, ctx, this._parent);
     if (tag === 'argument' && !result.argPass) {
-      throw new Error('<argument> component require "arg:pass" attribute.');
+      this._throwParseError(ctx. start, '<argument> component require "arg-pass:" attribute.');
     }
     if (tag === 'parameter' && !result.argUse) {
-      throw new Error('<parameter> component require "arg:use" attribute.');
+      this._throwParseError(ctx. start, '<parameter> component require "arg-use:" attribute.');
+    }
+    /**
+     * 
+     * I have to write Chinese comment to keep myself not forget.
+     * 
+     * 为什么把 arg-pass:/arg-use: 用在除了 <argument>/<parameter> 外的其它组件上时，
+     * 需要打印告警？且只打印告警并不抛出错误？
+     * 
+     * arg-pass: 和 arg-use: 都是编译属性，编译器会将有该属性的组件都当成
+     * 是空组件，即忽略组件的其它性质。因此，为了避免误操作带来的隐藏 bug，
+     * 对于不符合最佳实践（即，arg-pass: 始终和 <argument> 搭配，
+     * arg-use: 始终和 <parameter 搭配）的编码会提示告警。
+     * 
+     * 但 <argument> 和 <parameter> 都只是一个别名，都对应的是 EmptyComponent 组件。在 jinge
+     * 框架层面，所有组件都是平等的，因此没有特殊组件。因此 jinge 的模板语法层面，
+     * 将 arg-pass: 或 arg-use: 用在其它组件上时也是平等的合法的。并且，内置的组件
+     * 别名，是可以通过配置被覆盖的，也就是存在 <argument> 不是指向内置的 EmptyComponent 组件
+     * 而是指定用户自己定义的组件的情况，这种时候用户就会将 arg-pass: 和其它他自己定义的空组件配合使用。
+     * 
+     * 未来会考虑提供 webpack 参数来主动禁用告警信息。
+     */
+    if (result.argPass && tag !== 'argument') {
+      this._logParseError(ctx.start, `compiler treats any Component with arg-pass: attribute as empty component. We suggest you to use <argument arg-pass:${result.argPass}> instead of <${tag} arg-pass:${result.argPass}>`, 'Warning');
+    }
+    if (result.argUse && tag !== 'parameter') {
+      this._logParseError(ctx.start, `compiler treats any Component with arg-use: attribute as empty component. We suggest you to use <parameter arg-use:${result.argUse}> instead of <${tag} arg-use:${result.argUse}>`, 'Warning');
+    }
+    
+    /**
+     * for 组件也是一个标准组件，并没有特殊性，且组件别名也可以被覆盖。因此只给予避免踩杭的告警，
+     * 而不是抛出错误。
+     */
+    if (tag === 'for' && !result.vms.find(v => v.reflect === 'each')) {
+      this._logParseError(ctx.start, '<for> component require vm:each attribute.', 'Warning');
     }
     let elements = this._visit_child_nodes(ctx, result.vms, {
       type: 'component',
-      sub: result.argPass ? 'argument' : (result.argUse ? 'parameter' : 'normal'),
+      sub: (result.argPass || result.vms.length > 0) ? 'argument' : (
+        result.argUse ? 'parameter' : 'normal'
+      ),
       vms: result.vms
     });
     const hasArg = this._assert_arg_pass(elements, tag);
+    if (result.vms.length > 0 && !result.argPass && hasArg) {
+      this._throwParseError(ctx.start, 'if component has vm-use: attribute but do not have arg-pass: attribute, it\'s root child can\'t have vm-pass: attribute.');
+    }
     const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
     if (result.argUse) {
-      if (hasArg || result.vms.length > 0) throw new Error('impossible?!');
-      return {
-        type: 'component',
-        sub: 'parameter',
-        value: this._replace_tpl(TPL.PARAMETER, {
-          ARG_USE: JSON.stringify(result.argUse),
-          DEFAULT: elements.length > 0 ? ` || ${this._gen_render(elements, vmLevel)}` : ''
-        })
-      };
+      return this._parse_arg_use_parameter(
+        elements, result.argUse, result.vmPass, vmLevel
+      );
     }
 
     if (result.argPass) {
       if (elements.length === 0) {
-        throw new Error(`<${tag}>: component with "arg:pass" attribute must have children`);
+        this._throwParseError(ctx.start, `<${tag}>: component with "arg:pass" attribute must have children`);
       }
       return {
         type: 'component',
@@ -488,15 +781,13 @@ return el;`, true) + '\n})()';
       };
     }
 
-    if (elements.length > 0) {
-      if (!hasArg) {
-        elements = [{
-          type: 'component',
-          sub: 'argument',
-          argPass: 'default',
-          value: this._gen_render(elements, vmLevel)
-        }];
-      }
+    if (elements.length > 0 && !hasArg) {
+      elements = [{
+        type: 'component',
+        sub: 'argument',
+        argPass: 'default',
+        value: this._gen_render(elements, vmLevel)
+      }];
     }
 
     const attrs = [];
@@ -527,6 +818,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
   }
   
   _parse_expr(txt, ctx) {
+    // console.log(txt);
     txt = txt.trim();
     /*
      * if expression startsWith '{', we treat it as ObjectExpression.
@@ -719,7 +1011,7 @@ ${body}
       return this._parse_html_ele(etag, ctx);
     }
     if (!(etag in this._imports)) {
-      throw new Error(`Component '${etag}' not found. Forgot to import it on the top?`);
+      this._throwParseError(ctx.start, `Component '${etag}' not found. Forgot to import it on the top?`);
     }
     return this._parse_component_ele(etag, this._imports[etag], ctx);
   }
@@ -747,6 +1039,9 @@ ${body}
       for (let i = 0; i < node.specifiers.length; i++) {
         const spec = node.specifiers[i];
         const local = spec.local.name;
+        if (!/^[A-Z]/.test(local)) {
+          this._throwParseError(ctx.start, `Component name must be starts with upper case letter A-Z, but got '${local}'`);
+        }
         if (local in this._imports) {
           console.log(`Warning: dulpilcated imported local name '${local}' will be ignore. see https://[todo]`);
           console.log(' >', this._resourcePath);

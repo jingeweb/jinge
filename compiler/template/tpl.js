@@ -23,7 +23,20 @@ $WATCH$
   return el;
 })()`;
 
-const PARAMETER = '(component[ARG_COMPONENTS_$ID$][$ARG_USE$]$DEFAULT$)(component)';
+const PARAMETER = `...(() => {
+  const vm_0_ac = vm_0[ARG_COMPONENTS_$ID$];
+  const renderFn = vm_0_ac ? vm_0_ac['$ARG_USE$'] : $DEFAULT$;
+  const attrs = wrapViewModel_$ID$({
+    $VM_PASS_INIT$
+    [ARG_COMPONENTS_$ID$]: {
+      [STR_DEFAULT_$ID$]: renderFn || ${EMPTY}
+    }
+  });
+$VM_PASS_SET$
+  const el = new Component_$ID$(attrs);
+$VM_PASS_WATCH$
+  return el[RENDER_$ID$]()
+})()`;
 
 const ERROR = `function(component) {
   const el = createElement_$ID$('span', {style: 'color: red !important;'});

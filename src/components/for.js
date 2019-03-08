@@ -8,7 +8,8 @@ import {
   DESTROY,
   isComponent,
   getFirstHtmlDOM,
-  CONTEXT
+  CONTEXT,
+  onAfterRender
 } from '../core/component';
 import {
   isArray,
@@ -41,10 +42,12 @@ const EMP_ARR = [];
 // let DEBUG_INC = 0;
 
 export class ForEachComponent extends Component {
-  constructor(attrs, item, index) {
+  constructor(attrs, item, index, isLast) {
     super(attrs);
     this.each = item;
     this.index = index;
+    this.isFirst = index === 0;
+    this.isLast = isLast;
   }
   [RENDER]() {
     const renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
@@ -53,17 +56,17 @@ export class ForEachComponent extends Component {
   }
 }
 
-function createEl(item, i, itemRenderFn, context) {
+function createEl(item, i, isLast, itemRenderFn, context) {
   return new ForEachComponent(wrapViewModel({
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: itemRenderFn
     }
-  }), item, i);
+  }), item, i, isLast);
 }
 
-function appendRenderEach(item, i, itemRenderFn, roots, context) {
-  const el = createEl(item, i, itemRenderFn, context);
+function appendRenderEach(item, i, isLast, itemRenderFn, roots, context) {
+  const el = createEl(item, i, isLast, itemRenderFn, context);
   roots.push(el);
   return el[RENDER]();
 }
@@ -90,7 +93,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
     if (keyName !== KEY_INDEX) {
       keys.push(prepare_key(item, i, tmpKeyMap, keyName));  
     }
-    result.push(...appendRenderEach(item, i, itemRenderFn, roots, context));
+    result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context));
   });
   return result;
 }
@@ -184,16 +187,23 @@ export class ForComponent extends Component {
       for(let i = 0; i < nl; i++) {
         if (i < ol) {
           const el = roots[i];
-          if (newItems[i] !== el.each) {
-            el.each = newItems[i];
+          // console.log(i, nl, el.isLast, i === nl - 1);
+          if (el.isFirst !== (i === 0)) el.isFirst = (ni === 0);
+          if (el.isLast !== (i === nl - 1)) {
+            el.isLast = (i === nl - 1);
           }
+          if (el.index !== i) el.index = i;
+          if (el.each !== newItems[i]) el.each = newItems[i];
         } else {
           if (!$f) $f = createFragment();
-          appendChild($f, ...appendRenderEach(newItems[i], i, itemRenderFn, roots, ctx));
+          appendChild($f, ...appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx));
         }
       }
       if ($f) {
         appendChild($parent, $f);
+        for(let i = ol; i < nl; i++) {
+          onAfterRender(roots[i]);
+        }
       }
       if (nl >= ol) return;
       for(let i = nl; i < ol; i++) {
@@ -207,6 +217,7 @@ export class ForComponent extends Component {
     if (ol === 0) {
       const rs = renderItems(newItems, itemRenderFn, roots, oldKeys, keyName);
       appendChild($parent, createFragment(rs));
+      roots.forEach(el => onAfterRender(el));
       return;
     }
 
@@ -238,17 +249,24 @@ export class ForComponent extends Component {
       }
       if (oi >= ol) {
         let $f = null;
+        const cei = newRoots.length;
         for(; ni < nl; ni++) {
-          const el = createEl(newItems[ni], ni, itemRenderFn, ctx);
+          const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
           if (!$f) $f = createFragment();
           appendChild($f, ...el[RENDER]());
           newRoots.push(el);
         }
-        if ($f) appendChild($parent, $f);
+        if ($f) {
+          appendChild($parent, $f);
+          for(let i = cei; i < newRoots.length; i++) {
+            onAfterRender(newRoots[i]);
+          }
+        }
         break;
       }
       const oldKey = oldKeys[oi];
       let $f = null;
+      let $nes = null;
       while(ni < nl) {
         const newKey = newKeys[ni];
         if (newKey === oldKey) break;
@@ -263,10 +281,14 @@ export class ForComponent extends Component {
         }
         if (!$f) $f = createFragment();
         if (!reuseEl) {
-          reuseEl = createEl(newItems[ni], ni, itemRenderFn, ctx);
+          reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
           appendChild($f, ...reuseEl[RENDER]());
+          if (!$nes) $nes = [];
+          $nes.push(reuseEl);
         } else {
           loopAppend($f, reuseEl);
+          if (reuseEl.isFirst !== (ni === 0)) reuseEl.isFirst = (ni === 0);
+          if (reuseEl.isLast !== (ni === nl - 1)) reuseEl.isLast = (ni === nl - 1);
           if (reuseEl.index !== ni) reuseEl.index = ni;
           if (reuseEl.each !== newItems[ni]) reuseEl.each = newItems[ni];
         }
@@ -278,12 +300,16 @@ export class ForComponent extends Component {
       }
       const el = roots[oi];
       $f && insertBefore($parent, $f, getFirstHtmlDOM(el));
+      $nes && $nes.forEach(el => onAfterRender(el));
+      if (el.isFirst !== (ni === 0)) el.isFirst = (ni === 0);
+      if (el.isLast !== (ni === nl - 1)) el.isLast = (ni === nl - 1);
       if (el.index !== ni) el.index = ni;
       if (el.each !== newItems[ni]) el.each = newItems[ni];
       newRoots.push(el);
       oi++;
       ni++;
     }
+
     this[ROOT_NODES] = newRoots;
     this[FOR_KEYS] = newKeys;
 

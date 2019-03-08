@@ -12,7 +12,7 @@
 
 `jinge` 是一款基于 `Messenger`, `Proxy` 和 `Compiler` 的前端 mvvm 框架。其中：
 
-* `Messenger` 代表消息驱动（本质即 EventEmmiter）。
+* `Messenger` 代表消息驱动（等价于 EventEmmiter）。
 * `Proxy` 是实现数据绑定的原理（依赖 es6 的 Proxy）。
 * `Compiler` 负责编译模板，以及处理组件对象（现阶段会处理构造函数）。
 

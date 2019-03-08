@@ -52,9 +52,8 @@ export function createElementWithChild(tag, attrs, child) {
   return $e;
 }
 
-let DEBUG_INC = 0;
 export function createComment(data) {
-  return document.createComment(data + (DEBUG_INC++).toString());
+  return document.createComment(data);
 }
 
 function prepareNewNode(newNode) {
