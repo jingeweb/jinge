@@ -398,13 +398,18 @@ import {
   }
   async parse(code) {
     const comments = [];
-    const tree = Parser.parse(code, {
-      ranges: true,
-      locations: true,
-      ecmaVersion: 2019,
-      sourceType: 'module',
-      onComment: comments
-    });
+    let tree;
+    try {
+      tree = Parser.parse(code, {
+        ranges: true,
+        locations: true,
+        ecmaVersion: 2019,
+        sourceType: 'module',
+        onComment: comments
+      });
+    } catch(ex) {
+      throw new Error(ex.message + ' @ ' + this.resourcePath);
+    }
     tree.comments = comments;
     let needHandleComponent = false;
     

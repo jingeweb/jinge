@@ -17,5 +17,9 @@ export {
   wrapViewModel as VM
 } from './viewmodel/proxy';
 export {
+  vmWatch,
+  vmUnwatch
+} from './viewmodel/notify';
+export {
   bootstrap
 } from './core/bootstrap';

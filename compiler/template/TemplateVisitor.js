@@ -21,7 +21,7 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is message/event related attribute type */
   'on',
   /* bellow is compiler related attribute types */
-  'vm', 'vm-pass', 'vm-use', 'arg-pass', 'arg-use', 'ref'
+  'vm', 'vm-pass', 'vm-use', 'arg', 'arg-pass', 'arg-use', 'ref'
 ];
 
 function mergeAlias(src, dst) {
@@ -155,6 +155,13 @@ class TemplateVisitor extends TemplateParserVisitor {
         };
       }
     }
+
+    const dealId = node => {
+      const varName = node.name;
+      const vmVar = this._vms.find(v => v.name === varName);
+      const level = vmVar ? vmVar.level : 0;
+      node.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
+    };
     this._walkAcorn(block, {
       Identifier: node => {
         if (node.name === 'args') return false;
@@ -162,10 +169,7 @@ class TemplateVisitor extends TemplateParserVisitor {
           node.name = 'args[0]';
           return false;
         }
-        const varName = node.name;
-        const vmVar = this._vms.find(v => v.name === varName);
-        const level = vmVar ? vmVar.level : 0;
-        node.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
+        dealId(node);
         return false;
       },
       CallExpression: node => {
@@ -193,20 +197,17 @@ class TemplateVisitor extends TemplateParserVisitor {
           }
         });
       },
-      MemberExpression: node => {
-        const obj = node.object;
-        if (obj.type !== 'Identifier') return;
-        if (obj.name === 'args') return false;
-        if (mode === 'html' && obj.name === '$event') {
-          obj.name = 'args[0]';
-          return false;
-        }
-        const varName = obj.name;
-        const vmVar = this._vms.find(v => v.name === varName);
-        const level = vmVar ? vmVar.level : 0;
-        obj.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
-        return false;
-      },
+      // MemberExpression: node => {
+      //   const obj = node.object;
+      //   if (obj.type !== 'Identifier') return;
+      //   if (obj.name === 'args') return false;
+      //   if (mode === 'html' && obj.name === '$event') {
+      //     obj.name = 'args[0]';
+      //     return false;
+      //   }
+      //   dealId(obj);
+      //   return false;
+      // },
       IfStatement: node => {
         if (node.consequent.type !== 'BlockStatement') {
           node.consequent = {
@@ -275,7 +276,8 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (a_category === 'vm') a_category = 'vm-use';
+      if (a_category === 'arg') a_category = 'arg-pass';
+      else if (a_category === 'vm') a_category = 'vm-use';
       else if (a_category === 's') a_category = 'str';
       else if (a_category === 'e') a_category = 'expr';
 
@@ -298,6 +300,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (vmPass.find(v => v.name === a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
         vmPass.push({name: a_name, expr: this._parse_expr(aval)});
+        return;
       }
 
       if (a_category === 'arg-pass') {
@@ -817,6 +820,205 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
     };
   }
   
+  _parse_expr_memeber_node(memExpr, startLine) {
+
+    const paths = [];
+    let computed = -1;
+    let root = null;
+    const walk = node => {
+      const objectExpr = node.object;
+      const propertyExpr = node.property;
+      if (node.computed) {
+        if (propertyExpr.type === 'Literal') {
+          paths.unshift({
+            type: 'const',
+            value: propertyExpr.value
+          });
+          if (computed < 0) computed = 0;
+        } else {
+          computed = 1;
+          paths.unshift({
+            type: 'computed',
+            value: node
+          });
+        }
+      } else {
+        if (propertyExpr.type !== 'Identifier') {
+          throw node.loc.start;
+        } else {
+          paths.unshift({
+            type: 'const',
+            value: propertyExpr.name
+          });
+        }
+      }
+      if (objectExpr.type === 'Identifier') {
+        root = objectExpr;
+        paths.unshift({
+          type: 'const',
+          value: objectExpr.name
+        });
+      } else {
+        if (objectExpr.type !== 'MemberExpression') {
+          throw node.loc.start;
+        } else {
+          walk(objectExpr);
+        }
+      }
+    };
+    
+    try {
+      walk(memExpr);      
+    } catch(loc) {
+      this._throwParseError({
+        line: startLine + loc.line - 1,
+        column: loc.column
+      }, 'expression not support. see https://[todo]');
+    }
+    return {
+      root,
+      memExpr,
+      computed,
+      paths
+    };
+  }
+  _parse_expr_node(info, expr, levelPath) {
+    const computedMemberExprs = [];
+    const watchPaths = [];
+    const addPath = p => {
+      if (!watchPaths.find(ep => ep.vm === p.vm && ep.n === p.n)) watchPaths.push(p);
+    };
+    const convert = (root, props, computed = -1) => {
+      const varName = root.name;
+      const vmVar = this._vms.find(v => v.name === varName);
+      const level = vmVar ? vmVar.level : 0;
+      root.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
+      if (varName.startsWith('_')) {
+        // do not need watch private property.
+        return;
+      }
+      if (vmVar) {
+        props[0] = vmVar.reflect;
+      }
+      addPath({
+        vm: `vm_${level}`,
+        n: JSON.stringify(
+          computed >= 0 ? props : props.join('.')
+        )
+      });
+    };
+
+    this._walkAcorn(expr, {
+      CallExpression: node => {
+        this._throwParseError({
+          line: info.startLine + node.loc.start.line - 1,
+          column: node.loc.start.column
+        }, 'Function call is not allowed in expression');
+      },
+      Identifier: node => {
+        convert(node, [node.name]);
+        return false;
+      },
+      MemberExpression: node => {
+        const mn = this._parse_expr_memeber_node(node, info.startLine);
+        if (mn.computed < 1) {
+          convert(mn.root, mn.paths.map(mp => mp.value), mn.computed);
+        } else {
+          computedMemberExprs.push(mn);
+        }
+        return false;
+      }
+    });
+
+    const levelId = levelPath.join('_');
+    const parentLevelId = levelPath.slice(0, levelPath.length - 1).join('_');
+
+    const genCode = () => `function _calc_${levelId}() {
+  _${levelId} = ${escodegen.generate(expr)};
+}
+_calc_${levelId}();
+function _update_${levelId}() {
+  _calc_${levelId}();
+  _notify_${parentLevelId}();
+}
+${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, component);`).join('\n')}
+`;
+    if (computedMemberExprs.length === 0) {
+      if (levelPath.length === 1) {
+        return `const fn = () => ${this._replace_tpl(info.renderCode, { EXPR: escodegen.generate(expr) })};
+${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn, component);`).join('\n')}
+fn();`;
+      } else {
+        return genCode();
+      }
+    } else {
+      let outputCode = '';
+      computedMemberExprs.forEach((cm, i) => {
+        const lv = levelPath.slice().concat([i]);
+        const lv_id = lv.join('_');
+        const __p = [];
+        cm.paths.forEach((cmp, j) => {
+          if (cmp.type === 'const') {
+            __p.push(JSON.stringify(cmp.value));
+            return;
+          }
+          const llv = lv.slice().concat([j]);
+          outputCode += this._parse_expr_node(info, cmp.value.property, llv) + '\n';
+          cmp.value.property = {
+            type: 'Identifier',
+            name: `_${llv.join('_')}`
+          };
+          __p.push('_' + llv.join('_'));
+        });
+        const vmVar = this._vms.find(v => v.name === cm.root.name);
+        const level = vmVar ? vmVar.level : 0;
+        cm.root.name = `vm_${level}.${vmVar ? vmVar.reflect : cm.root.name}`;
+
+        outputCode += `function _calc_${lv_id}() {
+  _${lv_id} = ${escodegen.generate(cm.memExpr)};
+}
+function _update_${lv_id}() {
+  _calc_${lv_id}();
+  _watch_${levelId}();
+}
+function _watch_${lv_id}() {
+  const _np =	[${__p.join(', ')}];
+  const _eq = _${lv_id}_p && arrayEqual_${this._id}(_${lv_id}_p, _np);
+  if (_${lv_id}_p && !_eq) {
+    ${cm.root.name}[VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id});
+  }
+  if (!_${lv_id}_p || !_eq) {
+    _${lv_id}_p = _np;
+		${cm.root.name}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id});
+  }
+}
+_watch_${lv_id}();
+`;
+        cm.memExpr.type = 'Identifier';
+        cm.memExpr.name = `_${lv_id}`;
+      });
+
+      if (levelPath.length === 1) {
+        outputCode += `const _update_0 = () => ${this._replace_tpl(info.renderCode, { EXPR: escodegen.generate(expr) })};
+${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_0, component);`).join('\n')}
+_update_0();`;
+      } else {
+        outputCode += `function _calc_${levelId}() {
+  _${levelId} = ${escodegen.generate(expr)};
+}
+_calc_${levelId}();
+function _update_${levelId}() {
+  _calc_${levelId}();
+  _notify_${parentLevelId}();
+}
+${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, component);`).join('\n')}
+`;
+      }
+
+      return outputCode;
+    }
+
+  }
   _parse_expr(txt, ctx) {
     // console.log(txt);
     txt = txt.trim();
@@ -825,85 +1027,20 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
      * we wrap it into '()' to treat it as ObjectExpression.
      */
     if (txt[0] === '{') txt = '(' + txt + ')';
-    let expr = acorn.Parser.parse(txt, {
-      // ranges: true,
+    const expr = acorn.Parser.parse(txt, {
       locations: true,
     });
     if (expr.body.length > 1 || expr.body[0].type !== 'ExpressionStatement') {
       // console.log(ctx.start.line, this._baseLinePosition);
       this._throwParseError(ctx.start, 'expression only support single ExpressionStatement. see https://[todo].');
     }
-    expr = expr.body[0].expression;
 
-    const paths = [];
-    const addPath = p => {
-      if (!paths.find(ep => ep.vm === p.vm && ep.n === p.n)) paths.push(p);
+    const info = {
+      startLine: ctx.start.line,
+      renderCode: `setText_${this._id}(el, $EXPR$)`,
+      vars: [],
     };
-    this._walkAcorn(expr, {
-      CallExpression: node => {
-        /**
-         * KNOWN ISSUE: in injected template, ctx.start.column + ctx.start.text.length may not be correct column position.
-         */
-        const pos = {line: (node.loc.start.line - 1) + ctx.start.line, column: ctx.start.column + ctx.start.text.length + node.loc.start.column};
-        this._throwParseError(pos, `expression not support function call: '${txt.substring(node.start, node.end)}'. see https://[todo]`);
-      },
-      Identifier: node => {
-        const varName = node.name;
-        const vmVar = this._vms.find(v => v.name === varName);
-        const level = vmVar ? vmVar.level : 0;
-        node.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
-        if (!varName.startsWith('_')) {
-          addPath({
-            vm: `vm_${level}`,
-            n: JSON.stringify(vmVar ? vmVar.reflect : varName)
-          });
-        }
-        return false;
-      },
-      MemberExpression: node => {
-        let props = [];
-        const hasComputed = visitMem(node, props);
-        if (props.length < 2) throw new Error('impossible?!');
-        const fn = props[0].node;
-        const varName = fn.name;
-        const vmVar = this._vms.find(v => v.name === varName);
-        const level = vmVar ? vmVar.level : 0;
-        fn.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
-        props[0].v = vmVar ? vmVar.reflect : varName;
-        const privateIdx = props.findIndex(p => p.v.startsWith('_'));
-        if (privateIdx === 0) return false;
-        if (privateIdx > 0) props = props.slice(0, privateIdx);
-        addPath({
-          vm: `vm_${level}`,
-          n: JSON.stringify(
-            hasComputed ? props.map(p => p.v) : props.map(p => p.v).join('.')
-          )
-        });
-        return false;
-      }
-    });
-
-    function visitMem(node, props, isObject = false) {
-      if (node.type === 'Identifier') {
-        props.unshift({ node, v: node.name });
-        return false;
-      }
-      if (node.type === 'Literal') {
-        if (isObject) throw new Error('current version does not support Literal type object in member expression');
-        props.unshift({ node, v: node.value.toString() });
-        return true;
-      }
-      if (node.type !== 'MemberExpression') {
-        throw new Error('current version does not support computed member expression: ' + node.type);
-      }
-
-      return visitMem(node.property, props, false) || visitMem(node.object, props, true);
-    }
-    const dd = escodegen.generate(expr);
-    return {
-      expr: dd,
-      paths
-    };
+    return this._parse_expr_node(info, expr.body[0].expression, ['0']);
   }
   _join_elements(elements) {
     return elements.map(el => el.value).join(',\n');
@@ -950,10 +1087,6 @@ ${body}
     ctx.children.forEach(cn => {
       let txt = cn.getText();
       if (cn.ruleIndex === TemplateParser.RULE_htmlText) {
-        // const txt = cn.getText().replace(/`/g, '\\`');
-        // if (i === 0) txt = txt.trimLeft();
-        // if (i === last) txt = txt.trimRight();
-        // if (!txt) return;
         if (!txt.trim()) return;
         txt = JSON.stringify(txt);
         eles.push(this._parent.type === 'html' ? txt : this._replace_tpl(TPL.TEXT_CONST, {
@@ -965,8 +1098,9 @@ ${body}
         const result = this._parse_expr(txt, cn);
         eles.push(this._replace_tpl(TPL.TEXT_EXPR, {
           PUSH_ELE: this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '',
-          EXPR: result.expr,
-          WATCH: this._prependTab(result.paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn, component);`).join('\n'))
+          CODE: result,
+          // EXPR: result.outputCode,
+          // WATCH: this._prependTab(result.watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn, component);`).join('\n'))
         }));
       }
       return txt;
@@ -990,7 +1124,7 @@ ${body}
     const etag = ctx.htmlStartTag().getText();
     const endT = ctx.htmlEndTag();
     if (endT && endT.getText() !== etag) {
-      throw new Error(`close tag <${endT.getText()}> does not match open <${etag}>`);
+      this._throwParseError(endT.start, `close tag <${endT.getText()}> does not match open <${etag}>`);
     }
     if (/^[a-z\d-]+$/.test(etag)) {
       if (etag in this._alias) {
@@ -1025,6 +1159,7 @@ ${body}
     let tree;
     try {
       tree = acorn.Parser.parse(code, {
+        locations: true,
         sourceType: 'module'
       });
     } catch(ex) {
@@ -1039,13 +1174,17 @@ ${body}
       for (let i = 0; i < node.specifiers.length; i++) {
         const spec = node.specifiers[i];
         const local = spec.local.name;
-        if (!/^[A-Z]/.test(local)) {
-          this._throwParseError(ctx.start, `Component name must be starts with upper case letter A-Z, but got '${local}'`);
+        if (!/^[A-Z][a-zA-Z]+$/.test(local)) {
+          this._throwParseError({
+            line: ctx.start.line + spec.loc.start.line - 1,
+            column: spec.loc.start.column
+          }, 'Imported component name must match /^[A-Z][a-zA-Z]+$/. see https://[todo]');
         }
         if (local in this._imports) {
-          console.log(`Warning: dulpilcated imported local name '${local}' will be ignore. see https://[todo]`);
-          console.log(' >', this._resourcePath);
-          continue;
+          this._throwParseError({
+            line: ctx.start.line + spec.loc.start.line - 1,
+            column: spec.loc.start.column
+          }, 'Dulplicate imported component name: ' + local);
         } else {
           this._imports[local] = node.source.value === '.' ? local : `${local}_${this._tplId}`;
         }

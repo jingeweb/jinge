@@ -3,6 +3,7 @@ export * from './type';
 export * from './array';
 export * from './diff';
 export * from './const';
+export { default as config } from './config';
 
 export function Symbol(description) {
   return window.Symbol(description);

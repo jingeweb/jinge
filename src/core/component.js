@@ -24,7 +24,8 @@ import {
   isFunction,
   STR_DEFAULT,
   isObject,
-  isArray
+  isArray,
+  createEmptyObject
 } from '../util';
 import {
   getParent,
@@ -62,7 +63,7 @@ export const STATE_NAMES = [
 
 function copyContext(context) {
   if (!context) return null;
-  return Object.assign({}, context);
+  return Object.assign(createEmptyObject(), context);
 }
 
 export function onAfterRender(node) {
@@ -104,7 +105,7 @@ export class Component extends Messenger {
     }
     super();
     this[VM_PARENTS] = VM_EMPTY_PARENTS;
-    this[VM_LISTENERS] = {};
+    this[VM_LISTENERS] = new Map();
     this[CONTEXT] = attrs[CONTEXT];
     this[CONTEXT_STATE] = 0;
     this[ARG_COMPONENTS] = attrs[ARG_COMPONENTS];
@@ -266,7 +267,7 @@ export class Component extends Messenger {
       // we do not copy it by default until setContext function is called, because it unnecessary to waste memory if
       // child component do not modify the context.
       if (!this[CONTEXT]) {
-        this[CONTEXT] = {};
+        this[CONTEXT] = createEmptyObject();
       } else {
         this[CONTEXT] = copyContext(this[CONTEXT]);
       }

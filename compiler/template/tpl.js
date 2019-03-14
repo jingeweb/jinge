@@ -16,9 +16,7 @@ const SET_REF_ELE = 'vm_0[SET_REF_NODE_$ID$](\'$NAME$\', el, component)';
 
 const TEXT_EXPR = `(() => {
   const el = createTextNode_$ID$('');
-  const fn = () => setText_$ID$(el, $EXPR$);
-$WATCH$
-  fn();
+$CODE$
   $PUSH_ELE$
   return el;
 })()`;
