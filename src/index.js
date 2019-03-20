@@ -5,6 +5,9 @@ export {
   IfComponent
 } from './components/if';
 export {
+  ParameterComponent
+} from './components/parameter';
+export {
   SwitchComponent
 } from './components/switch';
 export {

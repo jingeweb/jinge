@@ -1,14 +1,6 @@
-const TEXT_CONST = `(() => {
-  const el = createTextNode_$ID$($VAL$);
-  component[ROOT_NODES_$ID$].push(el);
-  return el;
-})()`;
+const TEXT_CONST = 'textRenderFn_$ID$(component, $VAL$)';
 
-const EMPTY = `function(component) {
-  const el = createComment_$ID$(STR_EMPTY_$ID$);
-  component[ROOT_NODES_$ID$].push(el);
-  return [el];
-}`;
+const EMPTY = 'emptyRenderFn_$ID$';
 
 const PUSH_ROOT_ELE = 'component[ROOT_NODES_$ID$].push(el);';
 const PUSH_COM_ELE = 'component[NON_ROOT_COMPONENT_NODES_$ID$].push(el);';
@@ -27,21 +19,17 @@ const PARAMETER = `...(() => {
   const attrs = wrapViewModel_$ID$({
     $VM_PASS_INIT$
     [ARG_COMPONENTS_$ID$]: {
-      [STR_DEFAULT_$ID$]: renderFn || ${EMPTY}
+      [STR_DEFAULT_$ID$]: renderFn || emptyRenderFn_$ID$
     }
-  });
+  }, true);
 $VM_PASS_SET$
-  const el = new Component_$ID$(attrs);
+  const el = new ParameterComponent_$ID$(attrs, $VM_PASS_PARAM$);
 $VM_PASS_WATCH$
-  return el[RENDER_$ID$]()
+$PUSH_ELE$
+  return assertRenderResults_$ID$(el[RENDER_$ID$]());
 })()`;
 
-const ERROR = `function(component) {
-  const el = createElement_$ID$('span', {style: 'color: red !important;'});
-  el.textContent = 'template parsing failed! please check webpack log.';
-  component[ROOT_NODES_$ID$].push(el);
-  return [el];
-}`;
+const ERROR = 'errorRenderFn_$ID$(component)';
 
 module.exports = {
   SET_REF_ELE,

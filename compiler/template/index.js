@@ -13,10 +13,11 @@ const IMPORTS = (function() {
   const map = {
     'jinge/src/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createFragment,'
       + 'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
-    'jinge/src/viewmodel/notify': 'VM_ON,VM_NOTIFY',
-    'jinge/src/core/component': 'assertRenderResults,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
+    'jinge/src/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
+    'jinge/src/core/component': 'assertRenderResults,emptyRenderFn,errorRenderFn,textRenderFn,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
     'jinge/src/viewmodel/proxy': 'wrapViewModel',
-    'jinge/src/util': 'STR_EMPTY,STR_DEFAULT,arrayEqual'
+    'jinge/src/util': 'STR_EMPTY,STR_DEFAULT,arrayEqual',
+    'jinge/src/components/parameter': 'ParameterComponent'
   };
   const rtn = {
     code: '',

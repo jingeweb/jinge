@@ -25,14 +25,22 @@ import {
   STR_DEFAULT,
   isObject,
   isArray,
-  createEmptyObject
+  createEmptyObject,
+  arrayFindIndex,
+  arrayEqual,
+  STR_EMPTY
 } from '../util';
 import {
   getParent,
   removeChild,
-  replaceChild
+  replaceChild,
+  createComment,
+  createElement,
+  createTextNode
 } from '../dom';
-import { wrapComponent } from '../viewmodel/proxy';
+import {
+  wrapComponent
+} from '../viewmodel/proxy';
 
 export const TEMPLATE_RENDER = Symbol('template_render');
 export const RENDER = Symbol('render');
@@ -48,7 +56,8 @@ export const REF_NODES = Symbol('ref_nodes');
 export const SET_REF_NODE = Symbol('setChild');
 export const RELATED_VM_REFS = Symbol('related_refs');
 export const RELATED_VM_LISTENERS = Symbol('related_vm_listeners');
-export const RELATED_VM_ADD = Symbol('related_vm_add');
+export const RELATED_VM_ON = Symbol('related_vm_on');
+export const RELATED_VM_OFF = Symbol('related_vm_off');
 export const GET_STATE_NAME = Symbol('get_state_name');
 export const UPDATE = Symbol('update');
 export const UPDATE_IF_NEED = Symbol('update_if_need');
@@ -184,9 +193,9 @@ export class Component extends Messenger {
   [VM_ON](prop, handler, componentCtx) {
     vmAddListener(this, prop, handler);
     if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
-    componentCtx[RELATED_VM_ADD](this, prop, handler);
+    componentCtx[RELATED_VM_ON](this, prop, handler);
   }
-  [RELATED_VM_ADD](vm, prop, handler) {
+  [RELATED_VM_ON](vm, prop, handler) {
     const rvl = getOrCreateMap(this, RELATED_VM_LISTENERS);
     let hook = rvl.get(vm);
     if (!hook) {
@@ -195,8 +204,25 @@ export class Component extends Messenger {
     }
     hook.push([prop, handler]);
   }
-  [VM_OFF](prop, handler) {
-    return vmRemoveListener(this, prop, handler);
+  [RELATED_VM_OFF](vm ,prop, handler) {
+    const rvl = this[RELATED_VM_LISTENERS];
+    if (!rvl) return;
+    const hook = rvl.get(vm);
+    if (!hook) return;
+    const isPropArray = isArray(prop);
+    const i = arrayFindIndex(hook, it => {
+      if (handler === it[1] && (isPropArray ? arrayEqual(prop, it[0]) : prop === it[0])) {
+        return true;
+      } else {
+        return false;
+      }
+    });
+    if (i >= 0) hook.splice(i, 1);
+  }
+  [VM_OFF](prop, handler, componentCtx) {
+    vmRemoveListener(this, prop, handler);
+    if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
+    componentCtx[RELATED_VM_OFF](this, prop, handler);
   }
   [VM_CLEAR]() {
     vmClearListener(this);
@@ -351,4 +377,23 @@ export function getFirstHtmlDOM(el) {
   if (!ns || ns.length === 0) assert_fail();
   if (isComponent(ns[0])) return getFirstHtmlDOM(ns[0]);
   else return ns[0];
+}
+
+export function emptyRenderFn(component)  {
+  const el = createComment(STR_EMPTY);
+  component[ROOT_NODES].push(el);
+  return [el];
+}
+
+export function errorRenderFn(component) {
+  const el = createElement('span', {style: 'color: red !important;'});
+  el.textContent = 'template parsing failed! please check webpack log.';
+  component[ROOT_NODES].push(el);
+  return [el];
+}
+
+export function textRenderFn(component, txtContent) {
+  const el = createTextNode(txtContent);
+  component[ROOT_NODES].push(el);
+  return el;
 }

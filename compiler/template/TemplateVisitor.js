@@ -287,19 +287,22 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (aval) aval = aval.substr(1, aval.length - 2).trim();
 
       if (a_category === 'vm-use') {
-        if (!aval) this._throwParseError(ctx.start, 'vm-use type attribute require reflect variable name.');
-        if (!/^[\w\d$_]+$/.test(aval) || !/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
-        if (vms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use type attribute name dulipcated: ' + aval);
-        if (pVms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use attribute reflect vairiable name has been declared before.');
+        if (!a_name) this._throwParseError(ctx.start, 'vm-use type attribute require reflect variable name.');
+        if (!aval) aval = a_name;
+        if (!/^[\w\d$_]+$/.test(aval)) this._throwParseError(ctx.start, 'vm-use type attribute value must match /^[\\w\\d$_]+$/, but got: ' + aval);
+        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/, but got: ' + a_name);
+        if (vms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use type attribute name dulipcated: ' + a_name);
+        if (pVms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use attribute reflect vairiable name"' + a_name + '" has been declared in parent context.');
         vms.push({name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1});
         return;
       }
 
       if (a_category === 'vm-pass') {
         if (mode === 'html') this._throwParseError(ctx.start, 'vm-pass attribute can\'t be used on html element');
+        if (!aval) this._throwParseError(ctx.start, 'vm-pass type attribute require attribute value');
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (vmPass.find(v => v.name === a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
-        vmPass.push({name: a_name, expr: this._parse_expr(aval)});
+        vmPass.push({name: a_name, expr: aval});
         return;
       }
 
@@ -338,8 +341,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
 
       if (a_category === 'expr') {
-        // TODO: if expression is const，handle it as 'constAttrs'
-        argAttrs[a_name] = aval; // this._parse_expr(aval, ctx);
+        argAttrs[a_name] = aval;
         return;
       }
 
@@ -571,7 +573,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     const rtn = {
       constAttrs: obj2arr(constAttrs),
       argAttrs: obj2arr(argAttrs).map(at => {
-        const e = this._parse_expr(at[1], ctx);
+        const e = this._parse_expr(at[1], ctx).join('\n');
         at[1] = e;
         return at;
       }),
@@ -584,7 +586,10 @@ class TemplateVisitor extends TemplateParserVisitor {
         return lis;
       }),
       vms,
-      vmPass,
+      vmPass: vmPass.map(vp => {
+        vp.expr = this._parse_expr(vp.expr, ctx);
+        return vp;
+      }),
       argPass,
       argUse,
       ref
@@ -621,25 +626,33 @@ const el = ${ce}(
 ${this._prependTab(arr.join(',\n'))}
 );
 ${result.argAttrs.map((at, i) => {
-    let setFn = null;
-
     if (at[0] in HTML_BOOL_IDL_ATTRS) {
       const attr = HTML_BOOL_IDL_ATTRS[at[0]];
       if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
-        setFn = `() => el[JINGE_CONSTS_${this._id}.HTML_ATTR_${at[0]}] = !!(${at[1].expr})`;
+        return this._replace_tpl(at[1], {
+          REL_COM: 'component',
+          ROOT_INDEX: i.toString(),
+          RENDER_START: `el[JINGE_CONSTS_$ID$.HTML_ATTR_${at[0]}] = !!(`,
+          RENDER_END: ');'
+        });
       }
     } else if (at[0] in HTML_COMMON_IDL_ATTRS) {
       const attr = HTML_COMMON_IDL_ATTRS[at[0]];
       if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
-        setFn = `() => el[JINGE_CONSTS_${this._id}.HTML_ATTR_${at[0]}] = ${at[1].expr}`;
+        return this._replace_tpl(at[1], {
+          REL_COM: 'component',
+          ROOT_INDEX: i.toString(),
+          RENDER_START: `el[JINGE_CONSTS_$ID$.HTML_ATTR_${at[0]}] = `,
+          RENDER_END: ';'
+        });
       }
     }
-    if (!setFn) {
-      setFn = `() => setAttribute_${this._id}(el, "${at[0]}", ${at[1].expr})`;
-    }
-    return `const fn_${i} = ${setFn};
-${at[1].paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_${i}, component);
-fn_${i}();`).join('\n')}`;
+    return this._replace_tpl(at[1], {
+      REL_COM: 'component',
+      ROOT_INDEX: i.toString(),
+      RENDER_START: `setAttribute_$ID$(el, "${at[0]}", `,
+      RENDER_END: ');'
+    });
   }).join('\n')}
 ${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
 ${setRefCode}
@@ -674,11 +687,21 @@ return el;`, true) + '\n})()';
     let vmPassInitCode = '';
     let vmPassSetCode = '';
     let vmPassWatchCode = '';
+    const vmPassParamCode = [];
     if (vmPass.length > 0) {
       vmPass.forEach((vp, i) => {
         vmPassInitCode += `${vp.name}: null, `;
-        vmPassSetCode += `const wfn_${i} = () => attrs.${vp.name} = ${vp.expr.code};\nwfn_${i}();\n`;
-        vmPassWatchCode += `${vp.expr.paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, wfn_${i}, component);`).join('\n')}\n`;
+        vmPassSetCode += this._replace_tpl(vp.expr.slice(0, 3).join('\n'), {
+          ROOT_INDEX: i.toString(),
+          RENDER_START: `attrs.${vp.name} = `,
+          RENDER_END: ';',
+          REL_COM: 'el'
+        });
+        vmPassWatchCode += this._replace_tpl(vp.expr.slice(3).join('\n'), {
+          ROOT_INDEX: i.toString(),
+          REL_COM: 'el'
+        });
+        vmPassParamCode.push(vp.name);
       });
     }
     return {
@@ -686,10 +709,12 @@ return el;`, true) + '\n})()';
       sub: 'parameter',
       value: this._replace_tpl(TPL.PARAMETER, {
         VM_PASS_INIT: vmPassInitCode,
-        VM_PASS_SET: vmPassSetCode,
-        VM_PASS_WATCH: vmPassWatchCode,
+        VM_PASS_SET: this._prependTab(vmPassSetCode),
+        VM_PASS_WATCH: this._prependTab(vmPassWatchCode),
+        VM_PASS_PARAM: JSON.stringify(vmPassParamCode),
+        PUSH_ELE: this._prependTab(this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE)),
         ARG_USE: argUse,
-        DEFAULT: elements.length > 0 ? this._gen_render(elements, vmLevel) : ''
+        DEFAULT: elements.length > 0 ? this._prependTab(this._gen_render(elements, vmLevel)) : 'null'
       })
     };
   }
@@ -803,9 +828,12 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${this._prependTab(attrs.join(',\n'), true)}
 }, true);
-${result.argAttrs.map((at, i) => `const fn_${i} = () => attrs.${at[0]} = ${at[0].startsWith('_') ? at[1].expr : `wrapViewModel_${this._id}(${at[1].expr})`};
-${at[1].paths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_${i}, component);`).join('\n')}
-fn_${i}();`).join('\n')}
+${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
+    REL_COM: 'component',
+    ROOT_INDEX: i.toString(),
+    RENDER_START: `attrs.${at[0]} = ${at[0].startsWith('_') ? '' : 'wrapViewModel_$ID$('}`,
+    RENDER_END: at[0].startsWith('_') ? ';' : ');'
+  })).join('\n')}
 `;
     return {
       type: 'component',
@@ -933,37 +961,42 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
     const levelId = levelPath.join('_');
     const parentLevelId = levelPath.slice(0, levelPath.length - 1).join('_');
 
-    const genCode = () => `function _calc_${levelId}() {
-  _${levelId} = ${escodegen.generate(expr)};
-}
-_calc_${levelId}();
-function _update_${levelId}() {
-  _calc_${levelId}();
-  _notify_${parentLevelId}();
-}
-${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, component);`).join('\n')}
-`;
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
-        return `const fn = () => ${this._replace_tpl(info.renderCode, { EXPR: escodegen.generate(expr) })};
-${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn, component);`).join('\n')}
-fn();`;
+        return ['', `const fn_$ROOT_INDEX$ = () => $RENDER_START$${escodegen.generate(expr)}$RENDER_END$`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
-        return genCode();
+        return [`let _${levelId};`, `function _calc_${levelId}() {
+  _${levelId} = ${escodegen.generate(expr)};
+}`, `_calc_${levelId}();`, `function _update_${levelId}() {
+  _calc_${levelId}();
+  _notify_${parentLevelId}();
+  _update_${parentLevelId}();
+}`, `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
       }
     } else {
-      let outputCode = '';
+      const assignCodes = [];
+      const calcCodes = [];
+      const initCodes = [];
+      const updateCodes = [];
+      const watchCodes = [];
       computedMemberExprs.forEach((cm, i) => {
-        const lv = levelPath.slice().concat([i]);
+        const lv = levelPath.slice().concat([i.toString()]);
         const lv_id = lv.join('_');
         const __p = [];
-        cm.paths.forEach((cmp, j) => {
+        let __si = 0;
+        assignCodes.push(`let _${lv_id};\nlet _${lv_id}_p;`);
+        cm.paths.forEach((cmp) => {
           if (cmp.type === 'const') {
             __p.push(JSON.stringify(cmp.value));
             return;
           }
-          const llv = lv.slice().concat([j]);
-          outputCode += this._parse_expr_node(info, cmp.value.property, llv) + '\n';
+          const llv = lv.slice().concat([(__si++).toString()]);
+          const [_ac, _cc, _ic, _uc, _wc] = this._parse_expr_node(info, cmp.value.property, llv);
+          _ac && assignCodes.push(_ac);
+          _cc && calcCodes.push(_cc);
+          _ic && initCodes.push(_ic);
+          _uc && updateCodes.unshift(_uc);
+          _wc && watchCodes.push(_wc);
           cmp.value.property = {
             type: 'Identifier',
             name: `_${llv.join('_')}`
@@ -974,48 +1007,55 @@ fn();`;
         const level = vmVar ? vmVar.level : 0;
         cm.root.name = `vm_${level}.${vmVar ? vmVar.reflect : cm.root.name}`;
 
-        outputCode += `function _calc_${lv_id}() {
+        calcCodes.push(`function _calc_${lv_id}() {
   _${lv_id} = ${escodegen.generate(cm.memExpr)};
-}
-function _update_${lv_id}() {
+}`);
+        updateCodes.unshift(`function _update_${lv_id}() {
   _calc_${lv_id}();
-  _watch_${levelId}();
+  _update_${levelId}();
 }
-function _watch_${lv_id}() {
+function _notify_${lv_id}() {
   const _np =	[${__p.join(', ')}];
   const _eq = _${lv_id}_p && arrayEqual_${this._id}(_${lv_id}_p, _np);
   if (_${lv_id}_p && !_eq) {
-    ${cm.root.name}[VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id});
+    vm_${level}[VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-		${cm.root.name}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id});
+		vm_${level}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
-}
-_watch_${lv_id}();
-`;
+}`);
+        initCodes.push(`_calc_${lv_id}();`);
+        watchCodes.push(`_notify_${lv_id}();`);
         cm.memExpr.type = 'Identifier';
         cm.memExpr.name = `_${lv_id}`;
       });
 
       if (levelPath.length === 1) {
-        outputCode += `const _update_0 = () => ${this._replace_tpl(info.renderCode, { EXPR: escodegen.generate(expr) })};
-${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_0, component);`).join('\n')}
-_update_0();`;
+        calcCodes.push(`function _calc_${levelId}() {
+  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$
+}`);
+        initCodes.push(`_calc_${levelId}();`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
-        outputCode += `function _calc_${levelId}() {
+        calcCodes.push(`function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
-}
-_calc_${levelId}();
-function _update_${levelId}() {
+}`);
+        updateCodes.unshift(`function _update_${levelId}() {
   _calc_${levelId}();
   _notify_${parentLevelId}();
-}
-${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, component);`).join('\n')}
-`;
+}`);
+        initCodes.push(`_calc_${levelId}();`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
-
-      return outputCode;
+      
+      return [
+        assignCodes.join('\n'),
+        calcCodes.join('\n'),
+        initCodes.join('\n'),
+        updateCodes.join('\n'),
+        watchCodes.join('\n')
+      ];
     }
 
   }
@@ -1037,10 +1077,9 @@ ${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, co
 
     const info = {
       startLine: ctx.start.line,
-      renderCode: `setText_${this._id}(el, $EXPR$)`,
       vars: [],
     };
-    return this._parse_expr_node(info, expr.body[0].expression, ['0']);
+    return this._parse_expr_node(info, expr.body[0].expression, ['$ROOT_INDEX$']);
   }
   _join_elements(elements) {
     return elements.map(el => el.value).join(',\n');
@@ -1095,12 +1134,15 @@ ${body}
       } else {
         txt = txt.substring(2, txt.length - 1).trim(); // extract from '${}'
         if (!txt) return;
-        const result = this._parse_expr(txt, cn);
+        const result = this._replace_tpl(this._parse_expr(txt, cn).join('\n'), {
+          REL_COM: 'component',
+          ROOT_INDEX: '0',
+          RENDER_START: 'setText_$ID$(el, ',
+          RENDER_END: ');'
+        });
         eles.push(this._replace_tpl(TPL.TEXT_EXPR, {
           PUSH_ELE: this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '',
-          CODE: result,
-          // EXPR: result.outputCode,
-          // WATCH: this._prependTab(result.watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn, component);`).join('\n'))
+          CODE: this._prependTab(result)
         }));
       }
       return txt;
@@ -1174,7 +1216,7 @@ ${body}
       for (let i = 0; i < node.specifiers.length; i++) {
         const spec = node.specifiers[i];
         const local = spec.local.name;
-        if (!/^[A-Z][a-zA-Z]+$/.test(local)) {
+        if (!/^[A-Z][a-zA-Z]*$/.test(local)) {
           this._throwParseError({
             line: ctx.start.line + spec.loc.start.line - 1,
             column: spec.loc.start.column
@@ -1192,7 +1234,7 @@ ${body}
           // skip import XX from '.', which means Component used is in same file.
           continue;
         }
-        spec.local.name += `_${this._tplId}`;
+        spec.local = { type: 'Identifier', name: spec.local.name + `_${this._tplId}` };
         specifiers.push(spec);
       }
       if (specifiers.length > 0) {
