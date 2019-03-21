@@ -47,6 +47,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._source = opts.source;
     this._resourcePath = opts.resourcePath;
     this._baseLinePosition = opts.baseLinePosition || 1;
+    this._isProdMode = opts.isProduction;
     this._imports = {};
     this._importOutputCodes = [];
     this._needHandleComment = true;
@@ -708,6 +709,7 @@ return el;`, true) + '\n})()';
       type: 'component',
       sub: 'parameter',
       value: this._replace_tpl(TPL.PARAMETER, {
+        VM_DEBUG_NAME: this._isProdMode ? '' : `[VM_DEBUG_NAME_${this._id}]: "attrs_of_<parameter>",`,
         VM_PASS_INIT: vmPassInitCode,
         VM_PASS_SET: this._prependTab(vmPassSetCode),
         VM_PASS_WATCH: this._prependTab(vmPassWatchCode),
@@ -824,10 +826,11 @@ return el;`, true) + '\n})()';
     if (elements.length > 0) attrs.push(`[ARG_COMPONENTS_${this._id}]: {
 ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT_${this._id}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
 }`);
-    const vmAttrs = `const attrs = wrapViewModel_${this._id}({
+    const vmAttrs = `const attrs = wrapAttrs_${this._id}({
+${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${this._prependTab(attrs.join(',\n'), true)}
-}, true);
+});
 ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
     REL_COM: 'component',
     ROOT_INDEX: i.toString(),
@@ -963,7 +966,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
-        return ['', `const fn_$ROOT_INDEX$ = () => $RENDER_START$${escodegen.generate(expr)}$RENDER_END$`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
+        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
         return [`let _${levelId};`, `function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1036,6 +1039,7 @@ function _notify_${lv_id}() {
   $RENDER_START$${escodegen.generate(expr)}$RENDER_END$
 }`);
         initCodes.push(`_calc_${levelId}();`);
+        updateCodes.unshift(`function _update_${levelId}() { _calc_${levelId}(); }`);
         watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
         calcCodes.push(`function _calc_${levelId}() {
@@ -1216,11 +1220,11 @@ ${body}
       for (let i = 0; i < node.specifiers.length; i++) {
         const spec = node.specifiers[i];
         const local = spec.local.name;
-        if (!/^[A-Z][a-zA-Z]*$/.test(local)) {
+        if (!/^[A-Z][a-zA-Z\d]*$/.test(local)) {
           this._throwParseError({
             line: ctx.start.line + spec.loc.start.line - 1,
             column: spec.loc.start.column
-          }, 'Imported component name must match /^[A-Z][a-zA-Z]+$/. see https://[todo]');
+          }, 'Imported component name must match /^[A-Z][a-zA-Z\\d]+$/. see https://[todo]');
         }
         if (local in this._imports) {
           this._throwParseError({

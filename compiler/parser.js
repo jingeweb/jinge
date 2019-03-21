@@ -4,7 +4,7 @@ const escodegen = require('escodegen');
 const path = require('path');
 const { TemplateParser } = require('./template');
 
-const { prependTab } = require('./util');
+const { prependTab, isString, isArray, arrayIsEqual } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
 const jingeUtilFile = path.resolve(__dirname, '../src/util/index.js');
 
@@ -23,7 +23,7 @@ function _n_wrap(attrArgName) {
           'callee': {
             'type': 'Super',
           },
-          'arguments': [ {
+          'arguments': [{
             'type': 'Identifier',
             'name': attrArgName
           }]
@@ -89,17 +89,21 @@ function _n_vm(idx, stmt, an, props) {
             'name': `VM_ON_${RND_ID}`
           }
         },
-        'arguments': [
-          {
-            'type': 'Literal',
-            'value': prop,
-            'raw': JSON.stringify(prop)
-          },
-          {
-            'type': 'Identifier',
-            'name': `fn_${RND_ID}_${idx}`
-          }
-        ]
+        'arguments': [isArray(prop) ? {
+          'type': 'ArrayExpression',
+          'elements': prop.map(p => ({
+            type: 'Literal',
+            value: p,
+            raw: JSON.stringify(p)
+          }))
+        } : {
+          'type': 'Literal',
+          'value': prop,
+          'raw': JSON.stringify(prop)
+        }, {
+          'type': 'Identifier',
+          'name': `fn_${RND_ID}_${idx}`
+        }]
       }
     };
   }));
@@ -236,6 +240,59 @@ import {
 `;
     }
   }
+
+  _parse_mem_path(memExpr, attrsName) {
+    const paths = [];
+    let computed = -1;
+    let root = null;
+    const walk = node => {
+      const objectExpr = node.object;
+      const propertyExpr = node.property;
+      if (node.computed) {
+        if (propertyExpr.type === 'Literal') {
+          paths.unshift(propertyExpr.value);
+          if (computed < 0) computed = 0;
+        } else {
+          computed = 1;
+          paths.unshift(null);
+        }
+      } else {
+        if (propertyExpr.type !== 'Identifier') {
+          throw new Error('not support');
+        } else {
+          paths.unshift(propertyExpr.name);
+        }
+      }
+      if (objectExpr.type === 'Identifier') {
+        root = objectExpr;
+        paths.unshift(objectExpr.name);
+      } else {
+        if (objectExpr.type !== 'MemberExpression') {
+          throw new Error('not support');
+        } else {
+          walk(objectExpr);
+        }
+      }
+    };
+
+    try {
+      walk(memExpr);
+    } catch (ex) {
+      return null;
+    }
+
+    if (root.name !== attrsName) {
+      return null;
+    }
+
+    if (computed > 0) {
+      console.error('Warning: computed member expression is not supported.');
+      console.error(`  > ${this.resourcePath}, line ${memExpr.loc.start.line}`);
+      return null;
+    }
+
+    return computed < 0 ? paths.slice(1).join('.') : paths.slice(1);
+  }
   walkConstructor(node, ClassName) {
     const fn = node.value;
     const an = fn.params.length === 0 ? null : fn.params[0].name;
@@ -289,23 +346,13 @@ import {
         if (!foundSupper) throw new Error('can\'t use \'this\' before call super().');
         const props = [];
         const addProp = p => {
-          if (props.indexOf(p) < 0) props.push(p);
+          if (isString(p) && props.indexOf(p) < 0) props.push(p);
+          if (isArray(p) && !props.find(sp => arrayIsEqual(sp, p))) props.push(p);
         };
         this._walkAcorn(expr.right, {
-          MemberExpression: mem => {
-            if (mem.object.name !== an) return false;
-            const p = mem.property;
-            if (p.type === 'Identifier') {
-              if (!p.name.startsWith('_')) {
-                addProp(p.name);
-              }
-            } else if (p.type === 'Literal') {
-              if (!('' + p.value).startsWith('_')) {
-                addProp(p.value);
-              }
-            } else {
-              throw new Error('unsupport type.');
-            }
+          MemberExpression: node => {
+            const paths = this._parse_mem_path(node, an);
+            if (paths) addProp(paths);
             return false;
           }
         });
@@ -335,7 +382,7 @@ import {
       newCode = prependTab(newCode, false, node.loc.start.column);
       newCode = '{\n' + newCode;
     }
-    this._addConstructorImports();   
+    this._addConstructorImports();
     this._replaces.push({
       start: fn.body.start,
       end: fn.body.end,
@@ -380,7 +427,7 @@ import {
     if (result.aliasImports.trim()) {
       this._templateAliasImports.push(result.aliasImports);
     }
-    
+
     if (result.localImports.trim()) {
       this._templateLocalImports.push(result.localImports);
     }
@@ -407,12 +454,12 @@ import {
         sourceType: 'module',
         onComment: comments
       });
-    } catch(ex) {
+    } catch (ex) {
       throw new Error(ex.message + ' @ ' + this.resourcePath);
     }
     tree.comments = comments;
     let needHandleComponent = false;
-    
+
     this._replaces = [];
     for (let i = 0; i < tree.body.length; i++) {
       const n = tree.body[i];

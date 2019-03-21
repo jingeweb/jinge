@@ -16,12 +16,13 @@ $CODE$
 const PARAMETER = `...(() => {
   const vm_0_ac = vm_0[ARG_COMPONENTS_$ID$];
   const renderFn = vm_0_ac ? vm_0_ac['$ARG_USE$'] : $DEFAULT$;
-  const attrs = wrapViewModel_$ID$({
+  const attrs = wrapAttrs_$ID$({
+    $VM_DEBUG_NAME$
     $VM_PASS_INIT$
     [ARG_COMPONENTS_$ID$]: {
       [STR_DEFAULT_$ID$]: renderFn || emptyRenderFn_$ID$
     }
-  }, true);
+  });
 $VM_PASS_SET$
   const el = new ParameterComponent_$ID$(attrs, $VM_PASS_PARAM$);
 $VM_PASS_WATCH$

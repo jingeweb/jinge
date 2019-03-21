@@ -37,6 +37,14 @@ function isArray(v) {
   return v && Array.isArray(v);
 }
 
+function arrayIsEqual(arr1, arr2) {
+  if (arr1.length !== arr2.length) return false;
+  for(let i = 0; i < arr1.length; i++) {
+    if (arr1[i] !== arr2[i]) return false;
+  }
+  return true;
+}
+
 function isBoolean(v) {
   return typeof v === 'boolean' || v instanceof Boolean;
 }
@@ -72,6 +80,7 @@ module.exports = {
   isNumber,
   isRegExp,
   isArray,
+  arrayIsEqual,
   isBoolean,
   replaceTplStr,
   prependTab

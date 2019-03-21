@@ -4,10 +4,11 @@ import {
   arrayPushIfNotExist,
   Symbol,
   startsWith,
+  isString,
   createEmptyObject,
-  config
+  config,
+  setImmediate
 } from '../util';
-import { isString } from 'util';
 
 export const VM_NOTIFY = Symbol('vm_notify');
 export const VM_ON = Symbol('vm_on');
@@ -18,7 +19,6 @@ export const VM_LISTENERS_DBSTAR = Symbol('**');
 export const VM_LISTENERS = Symbol('vm_listeners');
 export const VM_LISTENERS_ID = Symbol('vm_listenrs_id');
 export const VM_LISTENERS_PARENT = Symbol('vm_listeners_parent');
-export const VM_LISTENERS_TM = Symbol('vm_listeners_tm');
 export const VM_LISTENERS_HANDLERS = Symbol('vm_listeners_handlers');
 
 function loopCreateNode(vm, props, level = 0) {
@@ -34,7 +34,6 @@ function loopCreateNode(vm, props, level = 0) {
     Object.assign(node, {
       [VM_LISTENERS_PARENT]: vm,
       [VM_LISTENERS_ID]: propN,
-      [VM_LISTENERS_TM]: null,
       [VM_LISTENERS_HANDLERS]: [],
       [VM_LISTENERS]: new Map()
     });
@@ -98,14 +97,10 @@ function loopClearNode(node) {
   node[VM_LISTENERS].forEach(sn => loopClearNode(sn));
   node[VM_LISTENERS].clear();
 
-  if (node[VM_LISTENERS_TM]) {
-    clearImm(node[VM_LISTENERS_TM]);
-  }
   node[VM_LISTENERS_HANDLERS].length = 0;
 
   node[VM_LISTENERS_ID] = 
     node[VM_LISTENERS_PARENT] =
-    node[VM_LISTENERS_TM] =
     node[VM_LISTENERS_HANDLERS] = null;
 }
 export function vmClearListener(vm) {
@@ -122,26 +117,33 @@ export function vmAddMessengerInterface(vm) {
   vm[VM_CLEAR] = () => vmClearListener(vm);
 }
 
-const setImm = window.setImmediate || window.setTimeout;
-const clearImm = window.clearImmediate || window.clearTimeout;
 
-function loopHandle(node) {
-  if (node[VM_LISTENERS_TM]) {
-    clearImm(node[VM_LISTENERS_TM]);
-    node[VM_LISTENERS_TM] = null;
+const _handleTasks = new Map();
+function _handleOnce(handler, propPath) {
+  const _has = _handleTasks.has(handler);
+  _handleTasks.set(handler, propPath);
+  if (_has) {
+    return;
   }
-  if (node[VM_LISTENERS_HANDLERS].length > 0) {
-    if (config.vmSyncNotify) {
-      node[VM_LISTENERS_HANDLERS].forEach(handler => handler());
-    } else {
-      node[VM_LISTENERS_TM] = setImm(() => {
-        node[VM_LISTENERS_TM] = null;
-        node[VM_LISTENERS_HANDLERS].forEach(handler => handler());
-      });
+  setImmediate(() => {
+    try {
+      handler(_handleTasks.get(handler));
+    } finally {
+      _handleTasks.delete(handler);
     }
+  });
+}
+
+function loopHandle(propPath, node, once) {
+  if (node[VM_LISTENERS_HANDLERS].length > 0) {
+    node[VM_LISTENERS_HANDLERS].forEach(handler => {
+      once ? _handleOnce(handler, propPath) : handler(propPath);
+    });
   }
   const children = node[VM_LISTENERS];
-  children.size > 0 && children.forEach(c => loopHandle(c));
+  children.size > 0 && children.forEach(c => {
+    loopHandle(propPath, c);
+  });
 }
 
 function loopNotify(vm, props, level = 0) {
@@ -150,7 +152,7 @@ function loopNotify(vm, props, level = 0) {
   let node = lis.get(propN);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(node);
+      loopHandle(props, node, !config.vmDebug);
     } else {
       loopNotify(node, props, level + 1);
     }
@@ -158,14 +160,14 @@ function loopNotify(vm, props, level = 0) {
   node = lis.get(VM_LISTENERS_STAR);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(node);
+      loopHandle(props, node, false);
     } else {
       loopNotify(node, props, level + 1);
     }
   }
   node = lis.get(VM_LISTENERS_DBSTAR);
   if (node) {
-    loopHandle(node);
+    loopHandle(props, node, false);
   }
 }
 

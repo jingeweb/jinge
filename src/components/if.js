@@ -18,12 +18,15 @@ import {
   insertBefore
 } from '../dom';
 import {
-  wrapViewModel
+  wrapAttrs
 } from '../viewmodel/proxy';
 import {
   STR_DEFAULT,
   STR_EMPTY
 } from '../util';
+import {
+  VM_DEBUG_NAME
+} from '../viewmodel/common';
 
 
 function getRenderFn(acs, value) {
@@ -31,7 +34,8 @@ function getRenderFn(acs, value) {
 }
 
 function createEl(renderFn, context) {
-  return new Component(wrapViewModel({
+  return new Component(wrapAttrs({
+    [VM_DEBUG_NAME]: 'attrs_of_<if>',
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: renderFn

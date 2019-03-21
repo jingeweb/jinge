@@ -1,6 +1,7 @@
 export const STR_DEFAULT = 'default';
 export const STR_JINGE = 'jinge';
 export const STR_EMPTY = 'empty';
+export const STR_LENGTH = 'length';
 
 export const HTML_ATTR_checked = 'checked';
 export const HTML_ATTR_disabled = 'disabled';

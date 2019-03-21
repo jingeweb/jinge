@@ -10,8 +10,7 @@ import {
   vmClearListener
 } from '../viewmodel/notify';
 import {
-  VM_PARENTS,
-  VM_EMPTY_PARENTS
+  VM_PARENTS
 } from '../viewmodel/common';
 import {
   Messenger
@@ -113,8 +112,8 @@ export class Component extends Messenger {
       throw new Error('First argument passed to Component constructor must be ViewModel with Messenger interface. See https://[todo]');
     }
     super();
-    this[VM_PARENTS] = VM_EMPTY_PARENTS;
-    this[VM_LISTENERS] = new Map();
+    this[VM_PARENTS] = null;
+    this[VM_LISTENERS] = null; 
     this[CONTEXT] = attrs[CONTEXT];
     this[CONTEXT_STATE] = 0;
     this[ARG_COMPONENTS] = attrs[ARG_COMPONENTS];
@@ -377,6 +376,14 @@ export function getFirstHtmlDOM(el) {
   if (!ns || ns.length === 0) assert_fail();
   if (isComponent(ns[0])) return getFirstHtmlDOM(ns[0]);
   else return ns[0];
+}
+
+export function getLastHtmlDOM(el) {
+  const ns = el[ROOT_NODES];
+  if (!ns || ns.length === 0) assert_fail();
+  const le = ns[ns.length - 1];
+  if (isComponent(le)) return getFirstHtmlDOM(le);
+  else return le;
 }
 
 export function emptyRenderFn(component)  {

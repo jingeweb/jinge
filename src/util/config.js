@@ -1,3 +1,3 @@
 export default {
-  vmSyncNotify: false
+  vmDebug: false
 };

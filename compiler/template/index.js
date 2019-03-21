@@ -14,8 +14,9 @@ const IMPORTS = (function() {
     'jinge/src/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createFragment,'
       + 'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
     'jinge/src/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
+    'jinge/src/viewmodel/common': 'VM_DEBUG_NAME',
     'jinge/src/core/component': 'assertRenderResults,emptyRenderFn,errorRenderFn,textRenderFn,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
-    'jinge/src/viewmodel/proxy': 'wrapViewModel',
+    'jinge/src/viewmodel/proxy': 'wrapViewModel,wrapAttrs',
     'jinge/src/util': 'STR_EMPTY,STR_DEFAULT,arrayEqual',
     'jinge/src/components/parameter': 'ParameterComponent'
   };
@@ -64,6 +65,7 @@ class JingeTemplateParser {
     this.alias = options.componentAlias;
     this.resourcePath = options.resourcePath;
     this.baseLinePosition = options.baseLinePosition || 1;
+    this.isProduction = options.isProduction;
   }
   parse(source) {
     if (!source.trim()) return {
@@ -101,6 +103,7 @@ class JingeTemplateParser {
     }
     const visitor = new TemplateVisitor({
       source: source,
+      isProduction: this.isProduction,
       baseLinePosition: this.baseLinePosition,
       resourcePath: this.resourcePath,
       tabSize: this.tabSize,
