@@ -5,6 +5,7 @@ export const STR_LENGTH = 'length';
 
 export const HTML_ATTR_checked = 'checked';
 export const HTML_ATTR_disabled = 'disabled';
+export const HTML_ATTR_selected = 'selected';
 export const HTML_ATTR_readOnly = 'readOnly';
 export const HTML_ATTR_autofocus = 'autofocus';
 export const HTML_ATTR_autocomplete = 'autocomplete';

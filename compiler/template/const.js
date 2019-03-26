@@ -24,6 +24,9 @@ const HTML_BOOL_IDL_ATTRS = {
   checked: {
     tags: ['input']
   },
+  selected: {
+    tags: ['option']
+  },
   multiple: {
     tags: ['input', 'select']
   },
@@ -40,7 +43,7 @@ const HTML_BOOL_IDL_ATTRS = {
  */
 const HTML_COMMON_IDL_ATTRS = {
   value: {
-    tags: ['button', 'input', 'option', 'progress']
+    tags: ['button', 'input', 'option', 'progress', 'select']
   }
 };
 

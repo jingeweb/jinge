@@ -120,12 +120,14 @@ function array_fill_reverse_sort(target, fn, arg) {
   return target[VM_WRAPPER_PROXY];
 }
 
-function _array_wrap_sub(arr) {
+function _array_wrap_sub(arr, wrapEachItem = false) {
   const rtn = wrapProxy(arr, true);
   handleVMDebug(arr);
   arr.forEach((it, i) => {
     if (isViewModel(it)) {
       addVMParent(it, arr, i);
+    } else if (wrapEachItem) {
+      arr[i] = loopWrapVM(it);
     }
   });
   return rtn;
@@ -265,7 +267,7 @@ const ArrayFns = {
     return _array_wrap_sub(target.slice(si, ei));
   },
   map(target, fn) {
-    return _array_wrap_sub(target.map(fn));
+    return _array_wrap_sub(target.map(fn), true);
   }
 };
 
