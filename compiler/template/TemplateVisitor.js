@@ -1009,7 +1009,9 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
         const vmVar = this._vms.find(v => v.name === cm.root.name);
         const level = vmVar ? vmVar.level : 0;
         cm.root.name = `vm_${level}.${vmVar ? vmVar.reflect : cm.root.name}`;
-
+        if (vmVar) {
+          __p[0] = `'${vmVar.reflect}'`;
+        }
         calcCodes.push(`function _calc_${lv_id}() {
   _${lv_id} = ${escodegen.generate(cm.memExpr)};
 }`);

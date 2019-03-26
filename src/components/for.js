@@ -161,7 +161,7 @@ export class ForComponent extends Component {
       this[FOR_KEY_NAME] = new Function(KEY_EACH, `return ${kn}`);
       // console.log('loop.*.' + kn.slice(5));
       const propCount = kn.split('.').length + 1;
-      console.log(propCount);
+      // console.log(propCount);
       vmWatch(this, 'loop.*.' + kn.slice(5), propPath => {
         if (propPath.length !== propCount || this[FOR_UPDATE_TM]) {
           // ignore if it's parent path
@@ -308,13 +308,11 @@ export class ForComponent extends Component {
     const ctx = this[CONTEXT];
     const firstEl = roots[0]; // if ol === 0, firstEl is comment, else is component
     const $parent = getParent(ol === 0 ? firstEl : getFirstHtmlDOM(firstEl));
-    if (ol === 0) {
-      removeChild($parent, firstEl);
-      roots.length = 0;
-    }
 
     if (keyName === KEY_INDEX) {
       let $f = null;
+      if (ol === 0) roots.length = 0;
+
       for(let i = 0; i < nl; i++) {
         if (i < ol) {
           updateEl(roots[i], i, newItems);
@@ -330,11 +328,15 @@ export class ForComponent extends Component {
           onAfterRender(roots[i]);
         }
       }
+      if (ol === 0) {
+        removeChild($parent, firstEl);
+      }
       if (nl >= ol) return;
       for(let i = nl; i < ol; i++) {
         roots[i][DESTROY]();
       }
       roots.splice(nl);
+
       return;
     }
 

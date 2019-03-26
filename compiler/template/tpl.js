@@ -15,7 +15,7 @@ $CODE$
 
 const PARAMETER = `...(() => {
   const vm_0_ac = vm_0[ARG_COMPONENTS_$ID$];
-  const renderFn = vm_0_ac ? vm_0_ac['$ARG_USE$'] : $DEFAULT$;
+  const renderFn = vm_0_ac && vm_0_ac['$ARG_USE$'] ? vm_0_ac['$ARG_USE$'] : $DEFAULT$;
   const attrs = wrapAttrs_$ID$({
     $VM_DEBUG_NAME$
     $VM_PASS_INIT$
