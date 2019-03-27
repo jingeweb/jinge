@@ -2,6 +2,7 @@ node_modules
 /.idea
 /.tmp
 /.vscode
+.antlr
 **/.DS_Store
 .jshintignore
 .jshintrc

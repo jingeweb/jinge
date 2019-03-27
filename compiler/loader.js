@@ -16,7 +16,6 @@ function jingeLoader(source) {
     componentBase: opts.componentBase,
     isProduction: this._compiler.options.mode === 'production'
   }).then(result => {
-    // if (resourcePath.endsWith('.html')) console.log(result.code)
     callback(null, result.code, result.map || null, result.ast ? {
       webpackAST: result.ast
     } : null);

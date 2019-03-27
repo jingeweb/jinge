@@ -2,7 +2,7 @@
   "name": "jinge",
   "version": "0.0.0",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
     "lint": "eslint --fix .",
     "validate": "npm ls"

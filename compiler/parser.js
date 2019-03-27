@@ -6,7 +6,7 @@ const { TemplateParser } = require('./template');
 
 const { prependTab, isString, isArray, arrayIsEqual } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
-const jingeUtilFile = path.resolve(__dirname, '../src/util/index.js');
+const jingeUtilFile = path.resolve(__dirname, '../util/index.js');
 
 function _n_wrap(attrArgName) {
   return {
@@ -120,8 +120,8 @@ class ComponentParser {
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
     const defaultBase = {
       Component: [
-        path.resolve(__dirname, '../src/index.js'),
-        path.resolve(__dirname, '../src/core/component.js')
+        path.resolve(__dirname, '../index.js'),
+        path.resolve(__dirname, '../core/component.js')
       ]
     };
     const cbase = options.componentBase || {};
@@ -233,10 +233,10 @@ class ComponentParser {
       this._constructorImports = `
 import {
   VM_ON as VM_ON_${RND_ID}
-} from '${this.jingeBase}/src/viewmodel/notify';
+} from '${this.jingeBase}/viewmodel/notify';
 import {
   wrapComponent as wrapComponent_${RND_ID}
-} from '${this.jingeBase}/src/viewmodel/proxy';
+} from '${this.jingeBase}/viewmodel/proxy';
 `;
     }
   }
