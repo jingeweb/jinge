@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
   "main": "index.js",
   "scripts": {
@@ -23,14 +23,14 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "dependencies": {
-    "acorn": "^6.1.0",
+    "acorn": "^6.1.1",
     "acorn-walk": "^6.1.1",
     "antlr4": "^4.7.2",
     "escodegen": "^1.11.1",
     "html-tags": "^2.0.0"
   },
   "devDependencies": {
-    "eslint": "^5.14.1",
+    "eslint": "^5.15.3",
     "precommit-hook": "^3.0.0"
   },
   "pre-commit": [
