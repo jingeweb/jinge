@@ -2,7 +2,7 @@
 
 > A Messenger, Proxy and Compiler based MVVM framework.
 
-[中文](./README_zh-cn.md) | English
+[中文](https://github.com/YuhangGe/jinge/blob/dev/README_zh-cn.md) | English
 
 ## Demo
 
