@@ -6,9 +6,12 @@ import {
   startsWith,
   isString,
   createEmptyObject,
-  config,
   setImmediate
 } from '../util';
+import {
+  config,
+  CFG_VM_DEBUG
+} from '../config';
 
 export const VM_NOTIFY = Symbol('vm_notify');
 export const VM_ON = Symbol('vm_on');
@@ -152,7 +155,7 @@ function loopNotify(vm, props, level = 0) {
   let node = lis.get(propN);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(props, node, !config.vmDebug);
+      loopHandle(props, node, !config[CFG_VM_DEBUG]);
     } else {
       loopNotify(node, props, level + 1);
     }

@@ -5,7 +5,6 @@ import {
   isNumber,
   isArray,
   isObject,
-  config,
   assert_fail,
   STR_LENGTH
 } from '../util';
@@ -23,6 +22,10 @@ import {
   vmAddMessengerInterface,
   VM_LISTENERS
 } from './notify';
+import {
+  CFG_VM_DEBUG,
+  config
+} from '../config';
 
 export const VM_WRAPPER_PROXY = Symbol('proxy');
 
@@ -358,7 +361,7 @@ export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false)
 
 
 function handleVMDebug(vm) {
-  if (!config.vmDebug) return;
+  if (!config[CFG_VM_DEBUG]) return;
   let _di = window._VM_DEBUG;
   if (!_di) _di = window._VM_DEBUG = {id: 0, vms: []};
   vm[VM_DEBUG_ID] = _di.id++;

@@ -54,6 +54,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._parent = { type: 'component', sub: 'normal' };
     const alias = mergeAlias(opts.alias, {
       jinge: {
+        I18nComponent: 'i18n',
         IfComponent: 'if',
         ForComponent: 'for',
         SwitchComponent: 'switch',

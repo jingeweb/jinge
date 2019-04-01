@@ -7,6 +7,7 @@ const { TemplateParser } = require('./template');
 const { prependTab, isString, isArray, arrayIsEqual } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
 const jingeUtilFile = path.resolve(__dirname, '../util/index.js');
+const jingeUtilCommonFile = path.resolve(__dirname, '../util/common.js');
 
 function _n_wrap(attrArgName) {
   return {
@@ -185,7 +186,7 @@ class ComponentParser {
             });
           });
         }
-        if (source === jingeUtilFile) {
+        if (source === jingeUtilFile || source === jingeUtilCommonFile) {
           this._needRemoveSymbolDesc = true;
         }
       }
