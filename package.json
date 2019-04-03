@@ -26,8 +26,12 @@
     "acorn": "^6.1.1",
     "acorn-walk": "^6.1.1",
     "antlr4": "^4.7.2",
+    "clean-css": "^4.2.1",
     "escodegen": "^1.11.1",
-    "html-tags": "^2.0.0"
+    "html-tags": "^2.0.0",
+    "postcss": "^7.0.14",
+    "postcss-prettify": "^0.3.4",
+    "postcss-selector-parser": "^6.0.2"
   },
   "devDependencies": {
     "eslint": "^5.15.3",

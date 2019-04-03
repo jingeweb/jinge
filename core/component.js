@@ -16,6 +16,9 @@ import {
   Messenger
 } from './messenger';
 import {
+  manager as StyleManager, CSTYLE_ADD, CSTYLE_DEL, CSTYLE_ATTACH
+} from './style';
+import {
   Symbol,
   isDOMNode,
   instanceOf,
@@ -105,6 +108,9 @@ export class Component extends Messenger {
    * compiler will auto transform the `template` getter's return value from String to Render Function.
    */
   static get template() {
+    return null;
+  }
+  static get style() {
     return null;
   }
   constructor(attrs) {
@@ -233,11 +239,13 @@ export class Component extends Messenger {
     throw new Error('abstract method');
   }
   [RENDER]() {
-    let renderFn = this.constructor.template;
+    const Clazz = this.constructor;
+    let renderFn = Clazz.template;
     if (!renderFn && this[ARG_COMPONENTS]) {
       renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
     }
     if (!isFunction(renderFn)) assert_fail();
+    StyleManager[CSTYLE_ADD](Clazz.style);
     return renderFn(this);
   }
   [RENDER_TO_DOM]($targetDOM) {
@@ -245,7 +253,9 @@ export class Component extends Messenger {
     if (this[STATE] !== STATE_INITIALIZE) {
       assert_fail();
     }
-    replaceChild(getParent($targetDOM), this[RENDER](), $targetDOM);
+    const rr = assertRenderResults(this[RENDER]());
+    StyleManager[CSTYLE_ATTACH]();
+    replaceChild(getParent($targetDOM), rr, $targetDOM);
     onAfterRender(this);
   }
   [DESTROY](removeDOM = true) {
@@ -259,8 +269,15 @@ export class Component extends Messenger {
       component[DESTROY](false);
     });
     this[ROOT_NODES].forEach(node => {
-      if (isComponent(node)) node[DESTROY](false);
+      if (isComponent(node)) {
+        node[DESTROY](false);
+      }
     });
+
+    // remove component style
+    StyleManager[CSTYLE_DEL](this.constructor.style);
+
+    // clear properties
     this[STATE] = STATE_DESTROIED;
     this[RELATED_VM_LISTENERS] =
       this[NON_ROOT_COMPONENT_NODES] =
@@ -268,6 +285,7 @@ export class Component extends Messenger {
       this[ARG_COMPONENTS] =
       this[CONTEXT] = null;
     
+    // remove dom
     if (removeDOM) {
       removeRootNodes(this);
     }

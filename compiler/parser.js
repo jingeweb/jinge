@@ -118,6 +118,11 @@ class ComponentParser {
     this.jingeBase = options.jingeBase;
     this.resourcePath = options.resourcePath;
     this.webpackLoaderContext = options.webpackLoaderContext;
+    this.componentStyleStore = options.componentStyleStore;
+    this._store = {
+      templates: new Map(),
+      styles: new Map()
+    };
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
     const defaultBase = {
       Component: [
@@ -169,14 +174,33 @@ class ComponentParser {
       const spec = node.specifiers[i];
       const type = spec.type;
       let imported = '';
+      let local = '';
       if (type === 'ImportDefaultSpecifier') {
         // `import a from 'xx'` -> const a = xx;
         imported = 'default';
+        local = spec.local.name;
       } else if (type === 'ImportSpecifier') {
         // `import { a as b } from 'xx' -> const b = xx.a;
         imported = spec.imported.name;
+        local = spec.local.name;
       }
       if (!imported) continue;
+      if (/\.(css|less|scss|html)$/.test(node.source.value)) {
+        if (!source) {
+          source = await new Promise((resolve, reject) => {
+            this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+        }
+        if (/\.htm(l?)$/.test(node.source.value)) {
+          this._store.templates.set(local, source);
+        } else {
+          this._store.styles.set(local, source);
+        }
+        return false;
+      }
       if (this.isProduction && imported === 'Symbol') {
         if (!source) {
           source = await new Promise((resolve, reject) => {
@@ -214,19 +238,41 @@ class ComponentParser {
       return;
     }
 
-    let c = 0;
+    let tplNode;
+    let styNode;
+
     for (let i = 0; i < node.body.body.length; i++) {
       const mem = node.body.body[i];
       if (mem.type !== 'MethodDefinition') continue;
       if (mem.kind === 'constructor') {
         this.walkConstructor(mem, node.id.name);
-        c |= 1;
-        if (c === 3) break;
-      } else if (mem.kind === 'get' && mem.static && mem.key.name === 'template') {
-        this.walkTemplate(mem);
-        c |= 2;
-        if (c === 3) break;
+      } else if (mem.kind === 'get' && mem.static) {
+        if (mem.key.name === 'template') {
+          // this.walkTemplate(mem);
+          tplNode = mem;
+        } else if (mem.key.name === 'style') {
+          styNode = mem;
+        }
       }
+    }
+
+    let styInfo;
+    if (styNode) {
+      const source = this.walkStyle(styNode);
+      const sts = this.componentStyleStore.styles;
+      styInfo = sts.get(source);
+      if (styInfo && styInfo.component !== this.resourcePath) {
+        throw new Error(`style file '${source}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
+      }
+      styInfo = {
+        component: this.resourcePath,
+        styleId: this.componentStyleStore.genId()
+      };
+      sts.set(source, styInfo);
+    }
+
+    if (tplNode) {
+      this.walkTemplate(tplNode, styInfo);
     }
   }
   _addConstructorImports() {
@@ -390,7 +436,18 @@ import {
       code: newCode
     });
   }
-  walkTemplate(node) {
+  walkStyle(node) {
+    if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
+    const st = node.value.body.body[0];
+    if (st.type !== 'ReturnStatement') {
+      throw new Error('static getter `style` must return directly.');
+    }
+    if (st.argument.type !== 'Identifier' || !this._store.styles.has(st.argument.name)) {
+      throw new Error('static getter `style` must return variable imported on file topest level.');
+    }
+    return this._store.styles.get(st.argument.name);
+  }
+  walkTemplate(node, styInfo) {
     if (node.value.body.body.length === 0) throw new Error('static getter `template` must return.');
     const st = node.value.body.body[0];
     if (st.type !== 'ReturnStatement') {
@@ -404,6 +461,25 @@ import {
     const arg = st.argument;
     let tpl = '';
     if (arg.type === 'Identifier') {
+      if (!this._store.templates.has(arg.name)) {
+        throw new Error('static getter `template` must return variable imported on file topest level.');
+      }
+      const source = this._store.templates.get(arg.name);
+      const tps = this.componentStyleStore.templates;
+      const tplInfo = tps.get(source);
+      if (!tplInfo) {
+        tps.set(source, {
+          component: this.resourcePath,
+          styleId: styInfo ? styInfo.styleId : null
+        });
+        return;
+      }
+      if (tplInfo.styleId && this.resourcePath !== tplInfo.component) {
+        throw new Error(`template file '${source}' has been attached by component with scoped style '${tplInfo.component}', can't be used in '${this.resourcePath}'`);
+      }
+      if (styInfo && this.resourcePath !== styInfo.component) {
+        throw new Error(`template file '${source}' has been attached by component '${tplInfo.component}', can't be use in '${this.resourcePath}' as this component has scoped style.`);
+      }
       return;
     } else if (arg.type === 'Literal') {
       tpl = arg.value;
@@ -413,7 +489,10 @@ import {
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
+
     const result = TemplateParser._parse(tpl, {
+      componentStyleStore: this.componentStyleStore,
+      componentStyleId: styInfo ? styInfo.styleId : null,
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
       tabSize: guessTabSize,
@@ -467,7 +546,6 @@ import {
       if (n.type === 'ImportDeclaration') {
         if ((await this.walkImport(n))) {
           needHandleComponent = true;
-          break;
         }
       }
       // in production mode, we remove symbol description to decrease file size

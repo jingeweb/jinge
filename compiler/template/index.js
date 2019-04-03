@@ -66,6 +66,10 @@ class JingeTemplateParser {
     this.resourcePath = options.resourcePath;
     this.baseLinePosition = options.baseLinePosition || 1;
     this.isProduction = options.isProduction;
+    const info = options.componentStyleStore.templates.get(this.resourcePath);
+    this.componentStyleId = options.componentStyleId || (
+      info ? info.styleId : null
+    );
   }
   parse(source) {
     if (!source.trim()) return {
@@ -108,7 +112,8 @@ class JingeTemplateParser {
       resourcePath: this.resourcePath,
       tabSize: this.tabSize,
       alias: this.alias,
-      rndId: RND_ID
+      rndId: RND_ID,
+      componentStyleId: this.componentStyleId
     });
     try {
       return visitor.visit(tree);

@@ -2,10 +2,20 @@ import {
   RENDER_TO_DOM,
   isComponent
 } from './component';
-import { assert_fail, createEmptyObject } from '../util';
-import { config, CFG_VM_DEBUG } from '../config';
-import { wrapAttrs } from '../viewmodel/proxy';
-import { VM_DEBUG_NAME } from '../viewmodel/common';
+import {
+  assert_fail,
+  createEmptyObject
+} from '../util';
+import {
+  config,
+  CFG_VM_DEBUG
+} from '../config';
+import {
+  wrapAttrs
+} from '../viewmodel/proxy';
+import {
+  VM_DEBUG_NAME
+} from '../viewmodel/common';
 
 export function bootstrap(Component, dom) {
   if (dom === document.body) {

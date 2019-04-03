@@ -46,6 +46,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._tabSize = opts.tabSize || 2;
     this._source = opts.source;
     this._resourcePath = opts.resourcePath;
+    this._componentStyleId = opts.componentStyleId;
     this._baseLinePosition = opts.baseLinePosition || 1;
     this._isProdMode = opts.isProduction;
     this._imports = {};
@@ -615,9 +616,13 @@ class TemplateVisitor extends TemplateParserVisitor {
     const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
-    const ce = `${result.constAttrs.length > 0 ? 'createElement' : 'createElementWithoutAttrs'}_${this._id}`;
+    const constAttrs = result.constAttrs;
+    if (this._componentStyleId) {
+      constAttrs.unshift([this._componentStyleId, '']);
+    }
+    const ce = `${constAttrs.length > 0 ? 'createElement' : 'createElementWithoutAttrs'}_${this._id}`;
     const arr = [`"${etag}"`];
-    if (result.constAttrs.length > 0) {
+    if (constAttrs.length > 0) {
       arr.push('{\n' + this._prependTab(result.constAttrs.map(at => `${at[0]}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}');
     }
     arr.push(this._join_elements(elements));
