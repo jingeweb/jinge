@@ -1,16 +1,12 @@
 import {
   Component,
   RENDER,
-  ARG_COMPONENTS,
   UPDATE_IF_NEED,
-  UPDATE,
-  ROOT_NODES,
-  CONTEXT,
+  UPDATE
 } from '../core/component';
 
 import {
   renderSwitch,
-  notifySwitch,
   updateSwitch
 } from './if';
 
@@ -18,20 +14,20 @@ export class SwitchComponent extends Component {
   constructor(attrs) {
     super(attrs);
     this.test = attrs.test;
+    this.trans = attrs.transition;
   }
   get test() {
-    return this._t;
+    return this._v;
   }
   set test(v) {
-    if (this._t === v) return;
-    this._t = v;
+    if (this._v === v) return;
+    this._v = v;
     this[UPDATE_IF_NEED]();
   }
   [RENDER]() {
-    return renderSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test, this[CONTEXT]);
+    return renderSwitch(this);
   }
   [UPDATE]() {
-    updateSwitch(this[ARG_COMPONENTS], this[ROOT_NODES], this.test, this[CONTEXT]);
-    notifySwitch(this, this.test);
+    updateSwitch(this);
   }
 }

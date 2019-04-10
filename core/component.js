@@ -44,6 +44,7 @@ import {
   wrapComponent
 } from '../viewmodel/proxy';
 
+export const NOTIFY_TRANSITION = Symbol('notify_transition');
 export const TEMPLATE_RENDER = Symbol('template_render');
 export const RENDER = Symbol('render');
 export const RENDER_TO_DOM = Symbol('render_to_dom');
@@ -402,6 +403,13 @@ export function getLastHtmlDOM(el) {
   const le = ns[ns.length - 1];
   if (isComponent(le)) return getFirstHtmlDOM(le);
   else return le;
+}
+
+export function operateRootHtmlDOM(fn, el, ...args) {
+  if (!isComponent(el)) return fn(el, ...args);
+  el[ROOT_NODES].forEach(ce => {
+    operateRootHtmlDOM(fn, ce, ...args);    
+  });
 }
 
 export function emptyRenderFn(component)  {

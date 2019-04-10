@@ -11,6 +11,12 @@ export {
   ParameterComponent
 } from './components/parameter';
 export {
+  ToggleClassComponent
+} from './components/class';
+export {
+  HideComponent
+} from './components/hide';
+export {
   SwitchComponent
 } from './components/switch';
 export {

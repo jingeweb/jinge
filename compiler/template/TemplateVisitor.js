@@ -59,7 +59,9 @@ class TemplateVisitor extends TemplateParserVisitor {
         IfComponent: 'if',
         ForComponent: 'for',
         SwitchComponent: 'switch',
+        HideComponent: 'hide',
         BindHtmlComponent: 'bind-html',
+        ToggleClassComponent: 'toggle-class',
         Component: ['argument', 'parameter']
       }
     });
@@ -130,7 +132,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._vms = r.vms;
     this._parent = r.parent;
   }
-  _parse_listener(str, mode) {
+  _parse_listener(str, mode, tag) {
     const tree = acorn.Parser.parse(`function _() {\n ${str} \n}`);
     const block = tree.body[0].body;
     if (block.type !== 'BlockStatement') throw new Error('unimpossible?!');
@@ -230,7 +232,8 @@ class TemplateVisitor extends TemplateParserVisitor {
     let code = escodegen.generate(tree, { indent: '' });
     code = code.substring(14, code.length - 1);
     return {
-      code
+      code,
+      tag
     };
   }
   _parse_attrs(mode, tag, ctx, parentInfo) {
@@ -260,9 +263,17 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (attr_data.length > 2) throw new Error('bad attribute format.');
 
       let [a_category, a_name] = attr_data;
+      let a_tag = null;
       if (attr_data.length === 1) {
         a_name = a_category;
         a_category = 'str';
+      }
+      if (a_category.startsWith('on|')) {
+        a_tag = {};
+        a_category.substring(3).split(',').forEach(t => {
+          a_tag[t.trim()] = true;
+        });
+        a_category = 'on';
       }
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
         throw new Error('unkown attribute type ' + a_category);
@@ -330,7 +341,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (a_category === 'on') {
         if (!a_name) throw new Error('event name is required!');
         if (a_name in listeners) throw new Error('event name is dulplicated: ' + a_name);
-        listeners[a_name] = [aval, mode];
+        listeners[a_name] = [aval, mode, a_tag];
         return;
       }
 
@@ -661,7 +672,7 @@ ${result.argAttrs.map((at, i) => {
       RENDER_END: ');'
     });
   }).join('\n')}
-${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
+${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${pushEleCode}
 return el;`, true) + '\n})()';
@@ -850,7 +861,7 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
       value: '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
 const el = new ${Component}(attrs);
-${result.listeners.map(lt => `el.on('${lt[0]}', function(...args) {${lt[1].code}})`).join('\n')}
+${result.listeners.map(lt => `el.on('${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
 return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()'

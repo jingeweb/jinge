@@ -32,7 +32,7 @@ export class I18nComponent extends Component {
     return class I18n_${prefix.replace(/\./g, '_')} extends BaseI18n {
       constructor(attrs) {
         const vm = super(attrs);
-        this._pf = '${prefix}';
+        this._f = '${prefix}';
         return vm;
       }
     }`)(I18nComponent);
@@ -44,23 +44,17 @@ export class I18nComponent extends Component {
   constructor(attrs) {
     if (!attrs.key) throw new Error('I18n component require attribute "key"');
     super(attrs);
-    this._pf = ''; // prefix
-    this._uI = null;  // update immediate
+    this._f = ''; // prefix
+    this._i = null;  // update immediate
     this.key = attrs.key;
+    this.p = attrs.params;
 
-    this._pa = Object.keys(attrs).length > 1 ? attrs : null;
-
-    if (this._pa) {
-      vmWatch(this._pa, '**', propPath => {
-        if (propPath[0] === 'key') return;
-        this._u();
-      });
-    }
+    vmWatch(this, 'p.**', () => {
+      this._u();
+    });
   }
   beforeDestroy() {
-    if (this._pa) {
-      vmUnwatch(this._pa);
-    }
+    vmUnwatch(this, 'p.**');
   }
   get key() {
     return this._k;
@@ -71,13 +65,13 @@ export class I18nComponent extends Component {
     this._u();
   }
   _t() {
-    return i18n((this._pf ? `${this._pf}.` : '') + this.key, this._pa);
+    return i18n((this._f ? `${this._f}.` : '') + this.key, this.p);
   }
   _u() {
     if (this[STATE] !== STATE_RENDERED) return;
-    if (this._uI) clearImmediate(this._uI);
-    this._uI = setImmediate(() => {
-      this._uI = null;
+    if (this._i) clearImmediate(this._i);
+    this._i = setImmediate(() => {
+      this._i = null;
       this[UPDATE]();
     });
   }

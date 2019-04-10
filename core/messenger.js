@@ -49,6 +49,14 @@ export function clearHelper(listenersMap, notifyKey) {
   }
 }
 
+export function onceHelper(listenersMap, notifyKey, listener) {
+  function onceListener(...args) {
+    listener(...args);
+    offHelper(listenersMap, notifyKey, onceListener);
+  }
+  onHelper(listenersMap, notifyKey, onceListener);
+}
+
 export class Messenger {
   constructor() {
     this[LISTENERS] = null;
@@ -56,12 +64,19 @@ export class Messenger {
   notify(eventName, ...args) {
     notifyHelper(this[LISTENERS], eventName, ...args);
   }
-  on(eventName, eventListener) {
+  on(eventName, eventListener, opts) {
     const me = this;
     if (!me[LISTENERS]) {
       me[LISTENERS] = new Map();
     }
-    onHelper(me[LISTENERS], eventName, eventListener);
+    if (opts) {
+      eventListener.tag = opts;
+    }
+    if (opts && opts.once) {
+      onceHelper(me[LISTENERS], eventName, eventListener);
+    } else {
+      onHelper(me[LISTENERS], eventName, eventListener);
+    }
   }
   off(eventName, eventListener) {
     offHelper(this[LISTENERS], eventName, eventListener);

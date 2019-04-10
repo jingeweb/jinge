@@ -122,10 +122,28 @@ export function removeClass($ele, className) {
   return toggleClass($ele, className, false);
 }
 
+export function replaceClass($ele, oldClass, newClass) {
+  return $ele.classList.replace(oldClass, newClass);
+}
+
 export function addEvent($element, eventName, handler, capture = false) {
   $element.addEventListener(eventName, handler, capture);
 }
 
 export function removeEvent($element, eventName, handler) {
   $element.removeEventListener(eventName, handler);
+}
+
+export function obj2class(obj) {
+  return Object.keys(obj).map(k => {
+    return obj[k] ? k : '';
+  }).join(' ');
+}
+
+export function getComputedStyle(el, p) {
+  return window.getComputedStyle(el, p);
+}
+
+export function getCSPropertyValue(cst, prop) {
+  return cst.getPropertyValue(prop);
 }
