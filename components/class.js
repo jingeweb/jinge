@@ -19,7 +19,6 @@ import {
   setImmediate,
   clearImmediate,
   raf,
-  caf
 } from '../util';
 import {
   vmWatch,
@@ -98,7 +97,6 @@ export class ToggleClassComponent extends Component {
       if (init) {
         this._t.set(k, [
           v ? TS_STATE_ENTERED : TS_STATE_LEAVED, // state
-          null,  // saved raf 
           null   // saved onEnd callback
         ]);
         v ? addClass(el, k) : removeClass(el, k);
@@ -119,67 +117,45 @@ export class ToggleClassComponent extends Component {
         // debugger;
         removeClass(el, k + (v ? TS_C_LEAVE : TS_C_ENTER));
         removeClass(el, k + (v ? TS_C_LEAVE_ACTIVE : TS_C_ENTER_ACTIVE));
-        if (t[1]) {
-          caf(t[1]);
-        } else {
-          removeEvent(el, TS_TRANSITION_END, t[2]);
-          removeEvent(el, TS_ANIMATION_END, t[2]);
-        }
+        removeEvent(el, TS_TRANSITION_END, t[1]);
+        removeEvent(el, TS_ANIMATION_END, t[1]);
+        t[1] = null;
         this.notify(TS_TRANSITION, v ? TS_LEAVE_CANCELLED : TS_ENTER_CANCELLED, k, el);
       }
-      addClass(el, k + (v ? TS_C_ENTER : TS_C_LEAVE));
+      const class_n = k + (v ? TS_C_ENTER : TS_C_LEAVE);
+      const class_a = k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
+      addClass(el, class_n);
       // force render
       getCSPropertyValue(
         getComputedStyle(el),
         'width'
       );
-      addClass(el, k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
+      addClass(el, class_a);
       const t_end = getDurationType(el);        
-      console.log(t_end);
       if (!t_end) {
-        removeClass(el, k + (v  ? TS_C_ENTER : TS_C_LEAVE));
+        removeClass(el, class_n);
+        removeClass(el, class_a);
         t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
         v ? addClass(el, k) : removeClass(el, k);
         return;
       }
-      this.notify(TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
-      t[0] = v ? TS_STATE_ENTERING : TS_STATE_LEAVING;
       const onEnd = () => {
         removeEvent(el, TS_TRANSITION_END, onEnd);
         removeEvent(el, TS_ANIMATION_END, onEnd);
-        removeClass(el, k + (v  ? TS_C_ENTER : TS_C_LEAVE));
-        removeClass(el, k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-        t[2] = null;
+        removeClass(el, class_n);
+        removeClass(el, class_a);
+        t[1] = null;
         t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
         v ? addClass(el, k) : removeClass(el, k);
         this.notify(TS_TRANSITION, v ? TS_AFTER_ENTER : TS_AFTER_LEAVE, k, el);
       };
-      t[2] = onEnd;
+      t[0] = v ? TS_STATE_ENTERING : TS_STATE_LEAVING;
+      t[1] = onEnd;
       addEvent(el, t_end, onEnd);
+      this.notify(TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
       raf(() => {
         this.notify(TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
       });
-      // this.notify(TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
-      // addEvent(el, t_end, onEnd);
-      // addClass(el, k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-      // t[1] = raf(() => {
-      //   t[1] = null;
-      //   const onEnd = () => {
-      //     removeEvent(el, TS_TRANSITION_END, onEnd);
-      //     removeEvent(el, TS_ANIMATION_END, onEnd);
-      //     removeClass(el, k + (v  ? TS_C_ENTER : TS_C_LEAVE));
-      //     removeClass(el, k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-      //     t[2] = null;
-      //     t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
-      //     v ? addClass(el, k) : removeClass(el, k);
-      //     this.notify(TS_TRANSITION, v ? TS_AFTER_ENTER : TS_AFTER_LEAVE, k, el);
-      //   };
-      //   t[2] = onEnd;
-      //   this.notify(TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
-      //   addEvent(el, TS_TRANSITION_END, onEnd);
-      //   addEvent(el, TS_ANIMATION_END, onEnd);
-      //   addClass(el, k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-      // });
     });
   }
 }

@@ -29,8 +29,8 @@ import {
   STR_DEFAULT,
   STR_EMPTY,
   assert_fail,
-  caf,
-  raf
+  raf,
+  createEmptyObject
 } from '../util';
 import {
   VM_DEBUG_NAME
@@ -55,7 +55,8 @@ import {
   TS_C_ENTER,
   TS_C_LEAVE,
   TS_C_ENTER_ACTIVE,
-  TS_C_LEAVE_ACTIVE
+  TS_C_LEAVE_ACTIVE,
+  getDurationType
 } from '../core/transition';
 
 export const IF_STR_ELSE = 'else';
@@ -76,13 +77,12 @@ export function renderSwitch(component) {
   const value = component._v;
   const acs = component[ARG_COMPONENTS];
   if (component.ts && acs) {
-    const t = new Map();
+    const t = createEmptyObject();
     for(const k in acs) {
-      t.set(k, [
+      t[k] = [
         k === value ? TS_STATE_ENTERED : TS_STATE_LEAVED,
-        null, // element
-        null  // saved raf
-      ]);
+        null // element
+      ];
     }
     component._t = t;
     component._p = value;
@@ -138,14 +138,13 @@ function doUpdate(component) {
 
 function cancelTs(t, tn, e, onEnd) {
   const el = t[1];
+  if (el.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
   removeClass(el, tn + (e ? TS_C_ENTER : TS_C_LEAVE));
   removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-  if (t[2]) {
-    caf(t[2]);
-  } else {
-    removeEvent(el, TS_TRANSITION_END, onEnd);
-    removeEvent(el, TS_ANIMATION_END, onEnd);
-  }
+  removeEvent(el, TS_TRANSITION_END, onEnd);
+  removeEvent(el, TS_ANIMATION_END, onEnd);
 }
 function startTs(t, tn, e, onEnd) {
   const el = t[1];
@@ -153,37 +152,36 @@ function startTs(t, tn, e, onEnd) {
     raf(onEnd);
     return;
   }
-  addClass(el, tn + (e ? TS_C_ENTER : TS_C_LEAVE));
-  const cst = getComputedStyle(el);
-  let t_end = null;
-  if (getCSPropertyValue(cst, 'transition-duration') !== '0s') {
-    t_end = TS_TRANSITION_END;
-  } else if (getCSPropertyValue(cst, 'animation-duration') !== '0s') {
-    t_end = TS_ANIMATION_END;
-  }
+  const class_n = tn + (e ? TS_C_ENTER : TS_C_LEAVE);
+  const class_a = tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
+
+  addClass(el, class_n);
+  // force render
+  getCSPropertyValue(
+    getComputedStyle(el),
+    'width'
+  );
+  addClass(el, class_a);
+  const t_end = getDurationType(el);
+  // console.log(t_end);
   if (!t_end) {
     raf(onEnd);
     return;
   }
   t[0] = e ? TS_STATE_ENTERING : TS_STATE_LEAVING;
-  t[2] = raf(() => {
-    t[2] = null;
-    // this.notify(TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
-    addEvent(el, t_end, onEnd);
-    addClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-  });
+  addEvent(el, t_end, onEnd);
 }
 function updateSwitch_ts(component) {
   const value = component._v;
   const pv = component._p;
   const tn = component.ts;
-  let pt = component._t.get(pv);
+  let pt = component._t[pv];
   if (!pt) {
     pt = [
       TS_STATE_ENTERED,
       null, null
     ];
-    component._t.set(pv, pt);
+    component._t[pv] = pt;
   }
   // debugger;
   if (pt[0] === TS_STATE_ENTERING) {
@@ -202,12 +200,12 @@ function updateSwitch_ts(component) {
   }
 }
 
-function updateSwitch_ts_end(component) {
-  console.log('on end')
+export function updateSwitch_ts_end(component) {
+  // console.log('on end')
   const value = component._v;
   const pv = component._p;
   const tn = component.ts;
-  const pt = component._t.get(pv);
+  const pt = component._t[pv];
   const e = pt[0] === TS_STATE_ENTERING;
   const el = pt[1];
 
@@ -225,7 +223,7 @@ function updateSwitch_ts_end(component) {
   const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][value] : null;
   doUpdate(component, renderFn);
   component._p = value;
-  const ct = component._t.get(value);
+  const ct = component._t[value];
   const fd = getFirstHtmlDOM(component);
   if (fd === EMP_CMT) {
     ct[0] = TS_STATE_ENTERED;

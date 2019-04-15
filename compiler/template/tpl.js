@@ -30,7 +30,7 @@ $PUSH_ELE$
   return assertRenderResults_$ID$(el[RENDER_$ID$]());
 })()`;
 
-const ERROR = 'errorRenderFn_$ID$(component)';
+const ERROR = 'errorRenderFn_$ID$';
 
 module.exports = {
   SET_REF_ELE,

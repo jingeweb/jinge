@@ -118,6 +118,7 @@ class JingeTemplateParser {
     try {
       return visitor.visit(tree);
     } catch(ex) {
+      // console.error(ex);
       return {
         aliasImports: '',
         imports: '',

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
+const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
 const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
 const { TemplateParser } = require('./parser/TemplateParser');
 const { AttributeValueParser } = require('./AttributeValueParser');
@@ -737,19 +738,23 @@ return el;`, true) + '\n})()';
       })
     };
   }
-  _assert_arg_pass(elements, Component) {
+  _assert_arg_pass(tokenPosition, elements, Component) {
     let found = 0;
     const args = {};
     elements.forEach(el => {
       if (el.type === 'component' && el.sub === 'argument') {
-        if (found < 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+        if (found < 0) {
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+        }
         if (el.argPass in args) {
-          throw new Error(`arg-pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
+          this._throwParseError(tokenPosition, `arg-pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
         }
         args[el.argPass] = true;
         found = 1;
       } else {
-        if (found > 0) throw new Error(`children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+        if (found > 0) {
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+        }
         found = -1;
       }
     });
@@ -804,7 +809,7 @@ return el;`, true) + '\n})()';
       ),
       vms: result.vms
     });
-    const hasArg = this._assert_arg_pass(elements, tag);
+    const hasArg = this._assert_arg_pass(ctx.start, elements, tag);
     if (result.vms.length > 0 && !result.argPass && hasArg) {
       this._throwParseError(ctx.start, 'if component has vm-use: attribute but do not have arg-pass: attribute, it\'s root child can\'t have vm-pass: attribute.');
     }
@@ -1150,6 +1155,11 @@ ${body}
       let txt = cn.getText();
       if (cn.ruleIndex === TemplateParser.RULE_htmlText) {
         if (!txt.trim()) return;
+        try {
+          txt = HTMLEntities.decode(txt);
+        } catch(ex) {
+          this._throwParseError(ctx, ex.message);
+        }
         txt = JSON.stringify(txt);
         eles.push(this._parent.type === 'html' ? txt : this._replace_tpl(TPL.TEXT_CONST, {
           VAL: txt
