@@ -17,11 +17,53 @@ import {
 } from '../util';
 import {
   createTextNode,
-  setText
+  setText,
+  createElementWithoutAttrs,
+  getParent,
+  removeChild,
+  appendChild
 } from '../dom';
 import {
-  i18n
+  i18n,
+  messenger as i18nMessenger,
+  I18N_DATA_CHANGED,
+  _t as i18nRender
 } from '../core/i18n';
+
+function render() {
+  if (this._h) {
+    const $c = createElementWithoutAttrs('div');
+    $c.innerHTML = this._r();
+    this[ROOT_NODES].push(...$c.childNodes);
+  } else {
+    const el = createTextNode(this._r());
+    this[ROOT_NODES].push(el);
+  }
+  return this[ROOT_NODES];
+}
+
+function update() {
+  const roots = this[ROOT_NODES];
+  if (this._h) {
+    const p = getParent(roots[0]);
+    if (roots.length > 0) {
+      roots.forEach(n => removeChild(p, n));
+      roots.length = 0;
+    }
+    appendChild(p, this[RENDER]());
+  } else {
+    setText(roots[0], this._r());
+  }
+}
+
+function updateLater() {
+  if (this[STATE] !== STATE_RENDERED) return;
+  if (this._i) clearImmediate(this._i);
+  this._i = setImmediate(() => {
+    this._i = null;
+    this[UPDATE]();
+  });
+}
 
 const I18nComponentsCache = new Map();
 export class I18nComponent extends Component {
@@ -42,19 +84,21 @@ export class I18nComponent extends Component {
     return C;
   }
   constructor(attrs) {
-    if (!attrs.key) throw new Error('I18n component require attribute "key"');
+    if (!attrs.key) throw new Error('I18n component require attribute "key". see https://todo');
     super(attrs);
-    this._f = ''; // prefix
-    this._i = null;  // update immediate
     this.key = attrs.key;
     this.p = attrs.params;
+    this._h = !!attrs._html; // render html mode
+    this._f = ''; // prefix
 
-    vmWatch(this, 'p.**', () => {
-      this._u();
-    });
+    this._i = null;  // update immediate
+    this._ub = updateLater.bind(this);
+    vmWatch(this, 'p.**', this._ub);
+    i18nMessenger.on(I18N_DATA_CHANGED, this._ub);
   }
   beforeDestroy() {
-    vmUnwatch(this, 'p.**');
+    vmUnwatch(this, 'p.**', this._ub);
+    i18nMessenger.off(I18N_DATA_CHANGED, this._ub);
   }
   get key() {
     return this._k;
@@ -62,26 +106,41 @@ export class I18nComponent extends Component {
   set key(v) {
     if (this._k === v) return;
     this._k = v;
-    this._u();
+    updateLater.call(this);
   }
-  _t() {
-    return i18n((this._f ? `${this._f}.` : '') + this.key, this.p);
-  }
-  _u() {
-    if (this[STATE] !== STATE_RENDERED) return;
-    if (this._i) clearImmediate(this._i);
-    this._i = setImmediate(() => {
-      this._i = null;
-      this[UPDATE]();
-    });
+  /**
+   * render text
+   */
+  _r() {
+    return i18n((this._f ? `${this._f}.` : '') + this._k, this.p);
   }
   [RENDER]() {
-    const el = createTextNode(this._t());
-    this[ROOT_NODES].push(el);
-    return this[ROOT_NODES];
+    return render.call(this);
   }
   [UPDATE]() {
-    const el = this[ROOT_NODES][0];
-    setText(el, this._t());
+    update.call(this);
+  }
+}
+
+export class _TComponent extends Component {
+  constructor(attrs) {
+    super(attrs);
+    this.p = attrs.params;
+    this._t = attrs._text;
+    this._h = !!attrs._html; // render html mode
+    this._i = null;  // update immediate
+    vmWatch(this, 'p.**', updateLater.bind(this));
+  }
+  beforeDestroy() {
+    vmUnwatch(this, 'p.**');
+  }
+  _r() {
+    return i18nRender(this._t, this.p);
+  }
+  [RENDER]() {
+    return render.call(this);
+  }
+  [UPDATE]() {
+    update.call(this);
   }
 }

@@ -111,7 +111,7 @@ function _n_vm(idx, stmt, an, props) {
 }
 
 class ComponentParser {
-  static parse(content, options = {}) {
+  static parse(content, sourceMap, options = {}) {
     return (new ComponentParser(options)).parse(content);
   }
   constructor(options) {
@@ -119,6 +119,8 @@ class ComponentParser {
     this.resourcePath = options.resourcePath;
     this.webpackLoaderContext = options.webpackLoaderContext;
     this.componentStyleStore = options.componentStyleStore;
+    this._i18nManager = this.componentStyleStore.i18n;
+    this._i18nOptions = options.i18n;
     this._store = {
       templates: new Map(),
       styles: new Map()
@@ -142,13 +144,16 @@ class ComponentParser {
     this.componentBase = defaultBase;
     this.componentAlias = options.componentAlias;
     this.componentBaseLocals = new Map();
-    this.isProduction = !!options.isProduction;
+    this.needComporess = !!options.compress;
+    this.styleRequireScoped = !!options.styleRequireScoped;
     this.tabSize = options.tabSize;
     if (typeof this.tabSize !== 'number' || this.tabSize <= 0) {
       this.tabSize = 0; // zero means will guess it.
     }
+    this._constructorRanges = [];
     this._replaces = null;
     this._needRemoveSymbolDesc = false;
+    this._needHandleI18NTranslate = false;
     this._constructorImports = null;
 
     this._templateGlobalImports = null;
@@ -170,6 +175,22 @@ class ComponentParser {
   }
   async walkImport(node) {
     let source = null;
+    const _isHtml = /\.htm(?:l)?$/.test(node.source.value);
+    const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(node.source.value);
+
+    if (node.specifiers.length === 0) {
+      if (_isStyle) {
+        source = await new Promise((resolve, reject) => {
+          this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        });
+        this.componentStyleStore.extractStyles.set(source, {code: null});
+      }
+      return false;
+    }
+    let needHandleComponent = false;
     for (let i = 0; i < node.specifiers.length; i++) {
       const spec = node.specifiers[i];
       const type = spec.type;
@@ -184,8 +205,13 @@ class ComponentParser {
         imported = spec.imported.name;
         local = spec.local.name;
       }
-      if (!imported) continue;
-      if (/\.(css|less|scss|html)$/.test(node.source.value)) {
+
+      if (!imported) {
+        continue;
+      }
+     
+
+      if (_isHtml || _isStyle) {
         if (!source) {
           source = await new Promise((resolve, reject) => {
             this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
@@ -194,14 +220,31 @@ class ComponentParser {
             });
           });
         }
-        if (/\.htm(l?)$/.test(node.source.value)) {
+        if (_isHtml) {
           this._store.templates.set(local, source);
         } else {
+          // debugger;
           this._store.styles.set(local, source);
         }
         return false;
       }
-      if (this.isProduction && imported === 'Symbol') {
+
+      if (imported === '_t') {
+        if (node.source.value === 'jinge' && local !== '_t') {
+          /**
+           * 为了简化逻辑，要求从 jinge 中引入 _t 这个 i18n 翻译用途的函数时，
+           * 不能指定其它本地变量别名。即，
+           * import {_t} from 'jinge'  // correct!
+           * import {_t as someAlias} from 'jinge'  // wrong!
+           */
+          throw new Error('_t is preserve i18n symbole, can\'t have local alias name. see https://todo.');
+        }
+        if (local === '_t' && node.source.value === 'jinge') {
+          // console.log('found _t', this.resourcePath);
+          this._needHandleI18NTranslate = true;
+        }
+      }
+      if (this.needComporess && imported === 'Symbol') {
         if (!source) {
           source = await new Promise((resolve, reject) => {
             this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
@@ -214,8 +257,9 @@ class ComponentParser {
           this._needRemoveSymbolDesc = true;
         }
       }
-      if (imported in this.componentBase) {
+      if (!needHandleComponent && (imported in this.componentBase)) {
         if (!source) {
+          // console.log(this.webpackLoaderContext.context, node.source.value);
           source = await new Promise((resolve, reject) => {
             this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
               if (err) reject(err);
@@ -225,11 +269,11 @@ class ComponentParser {
         }
         if (this.componentBase[imported].indexOf(source) >= 0) {
           this.componentBaseLocals.set(spec.local.name, true);
-          return true;
+          needHandleComponent = true;
         }
       }
     }
-    return false;
+    return needHandleComponent;
   }
   walkClass(node) {
     const sc = node.superClass;
@@ -289,7 +333,7 @@ import {
   }
 
   _parse_mem_path(memExpr, attrsName) {
-    const paths = [];
+    let paths = [];
     let computed = -1;
     let root = null;
     const walk = node => {
@@ -331,16 +375,27 @@ import {
     if (root.name !== attrsName) {
       return null;
     }
-
     if (computed > 0) {
       console.error('Warning: computed member expression is not supported.');
       console.error(`  > ${this.resourcePath}, line ${memExpr.loc.start.line}`);
       return null;
     }
 
-    return computed < 0 ? paths.slice(1).join('.') : paths.slice(1);
+    paths = paths.slice(1);
+    const privateIdx = paths.findIndex(p => p.startsWith('_'));
+    if (privateIdx >= 0) return null;
+    return computed < 0 ? paths.join('.') : paths;
   }
   walkConstructor(node, ClassName) {
+
+    if (this._needHandleI18NTranslate) {
+      this.walkI18NTranslate(node, 1);
+      this._constructorRanges.push({
+        start: node.start,
+        end: node.end
+      });
+    }
+
     const fn = node.value;
     const an = fn.params.length === 0 ? null : fn.params[0].name;
     if (!an) throw new Error(`constructor of ${ClassName} must accept at least one argument.`);
@@ -437,6 +492,7 @@ import {
     });
   }
   walkStyle(node) {
+    // debugger;
     if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
     const st = node.value.body.body[0];
     if (st.type !== 'ReturnStatement') {
@@ -489,13 +545,13 @@ import {
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
-
     const result = TemplateParser._parse(tpl, {
       componentStyleStore: this.componentStyleStore,
       componentStyleId: styInfo ? styInfo.styleId : null,
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
       tabSize: guessTabSize,
+      i18n: this._i18nOptions,
       wrapCode: false,
       componentAlias: this.componentAlias
     });
@@ -523,6 +579,94 @@ import {
       code
     });
   }
+  walkI18NTranslate(rootNode, level) {
+    this._walkAcorn(rootNode, {
+      VariableDeclarator: node => {
+        if (node.init.type === 'Identifier' && node.init.name === '_t') {
+          throw new Error('_t is preserve i18n translate symbol. you can not assign it to another variable at line' + node.loc.start.line);
+        }
+      },
+      CallExpression: node => {
+        if (node.callee.type === 'Identifier' && node.callee.name === '_t') {
+          for(let i = 0; i < this._constructorRanges.length; i++) {
+            const r = this._constructorRanges[i];
+            if (node.start >= r.start && node.end <= r.end) {
+              // console.log('skip constructor');
+              return false;
+            }
+          }
+          const args = node.arguments;
+          if (args.length === 0 || args.length > 3) {
+            throw new Error('_t require count of arguments to be 1 to 3.');
+          }
+          let [text, params, key]  = args;
+          if (!text || text.type !== 'Literal' || typeof text.value !== 'string') {
+            throw new Error('_t require first argument to be literal string.');
+          } else {
+            text = text.value;
+          }
+          if (params && params.type === 'Literal' && typeof params.value === 'string') {
+            key = params;
+            params = null;
+          }
+          if (key) {
+            if (key.type !== 'Literal' || typeof key.value !== 'string') {
+              throw new Error('_t require parameter "key" to be literal string.');
+            }
+            key = key.value;
+            if (!/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/.test(key)) {
+              throw new Error('_t require parameter "key" to match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/');
+            }
+          }
+          if (params) {
+            if (params.type !== 'ObjectExpression') {
+              throw new Error('_t require parameter "params" to be Object.');
+            }
+          }
+
+          const info = {text, key, params};
+          const validateErr = this._i18nManager.validate(
+            this.resourcePath,
+            info,
+            this._i18nOptions
+          );
+          if (validateErr) {
+            throw new Error(validateErr);
+          }
+          if (level === 0) {
+            let code;
+            if (params) {
+              this.walkI18NTranslate(params, level + 1);
+              code = escodegen.generate({
+                type: 'CallExpression',
+                callee: {
+                  type: 'Identifier',
+                  name: '_t'
+                },
+                arguments: [{type: 'Literal', value: info.text}, params]
+              });
+            } else {
+              code = JSON.stringify(info.text);
+            }
+            this._replaces.push({
+              start: node.start,
+              end: node.end,
+              code
+            });
+          } else {
+            if (params) {
+              this.walkI18NTranslate(params, level + 1);
+              node.arguments = [{type: 'Literal', value: info.text}, params];
+            } else {
+              node.type = 'Literal',
+              node.value = info.text;
+            }
+          }
+          return false;
+        }
+      }
+    });
+  }
   async parse(code) {
     const comments = [];
     let tree;
@@ -539,7 +683,6 @@ import {
     }
     tree.comments = comments;
     let needHandleComponent = false;
-
     this._replaces = [];
     for (let i = 0; i < tree.body.length; i++) {
       const n = tree.body[i];
@@ -580,6 +723,9 @@ import {
       });
     }
 
+    if (this._needHandleI18NTranslate) {
+      this.walkI18NTranslate(tree, 0);
+    }
     if (this._replaces.length === 0) {
       return {
         code,
@@ -602,6 +748,9 @@ import {
     }
     if (start < code.length) output += code.substring(start);
     // console.log(output);
+    // if (this._needHandleI18NTranslate) {
+    //   console.log(this.resourcePath);
+    // }
     return {
       code: output
     };

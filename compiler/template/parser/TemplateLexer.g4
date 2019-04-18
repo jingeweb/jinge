@@ -26,14 +26,14 @@ mode TAG;
 
 TAG_SLASH: '/';
 TAG_NAME: TAG_NameStartChar TAG_NameChar* -> pushMode(ATTR);
-TAG_WHITESPACE: [ \t\r\n] -> skip;
+TAG_WHITESPACE: [ \t\r\n] -> channel(HIDDEN);
 
 mode ATTR;
 
 ATTR_NAME: ATTR_NameStartChar ATTR_NameChar*;
 ATTR_EQUAL: '=';
 ATTR_VALUE: DOUBLE_QUOTE_STRING | SINGLE_QUOTE_STRING;
-ATTR_WHITESPACE: [ \t\r\n] -> skip;
+ATTR_WHITESPACE: [ \t\r\n] -> channel(HIDDEN);
 ATTR_TAG_SLASH: '/';
 ATTR_TAG_CLOSE: '>' -> popMode,popMode; // double popMode to DEFAULT
 ATTR_TAG_SLASH_CLOSE: '/' [ \t]* '>' -> popMode,popMode; // double popMode to DEFAULT

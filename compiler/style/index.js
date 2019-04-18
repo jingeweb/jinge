@@ -35,22 +35,57 @@ const plugin = postcss.plugin('postcss-jinge-component-style', () => {
 });
 
 class CSSParser {
-  static parse(code, opts) {
-    const styleId = opts.componentStyleStore.styles.get(opts.resourcePath).styleId;
+  static parse(code, sourceMap, opts) {
+    const _store = opts.componentStyleStore;
+    const extractInfo = _store.extractStyles.get(opts.resourcePath);
+    if (extractInfo) {
+      return postcss([prettify]).process(code, {
+        from: opts.resourcePath,
+        map: sourceMap ? {
+          inline: false,
+          prev: sourceMap
+        } : false
+      }).then(result => {
+        extractInfo.map = result.map;
+        extractInfo.code = result.css;
+        return {
+          code: 'export default "Extract by JingeExtractPlugin";'
+        };
+      });
+    }
+    const styleId = _store.styles.get(opts.resourcePath).styleId;
     const plugins = [plugin];
-    if (!opts.isProduction) {
+    if (!opts.compress) {
       plugins.push(prettify);
     }
     return postcss(plugins).process(code, {
       from: opts.resourcePath,
-      styleId
+      styleId,
+      map: sourceMap ? {
+        inline: opts.extract ? false : true,
+        prev: sourceMap
+      } : false
     }).then(result => {
       let css = result.css;
-      if (css && opts.isProduction) {
+      let map = result.map;
+      if (css && opts.compress) {
         css = new CleanCSS().minify(css).styles;
+        // TODO: generate map
+        map = null;
+      }
+      if (opts.extract) {
+        const ecs = _store.extractComponentStyles.get(opts.resourcePath);
+        if (!ecs) {
+          _store.extractComponentStyles.set(opts.resourcePath, {
+            css, map
+          });
+        } else {
+          ecs.css = css;
+          ecs.map = map;
+        }
       }
       return {
-        code: `export default ${JSON.stringify({
+        code: opts.extract ? 'export default null;' : `export default ${JSON.stringify({
           css,
           id: styleId
         })};`

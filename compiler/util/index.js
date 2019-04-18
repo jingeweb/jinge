@@ -1,3 +1,6 @@
+const path = require('path');
+const crypto = require('crypto');
+
 /**
  * simple uuid
  */
@@ -69,6 +72,23 @@ function prependTab(str, replaceStartEndEmpty = false, spaceCount = 2) {
   str = str.replace(/\n\s*\n/g, '\n').replace(/\n\s*[^\s]/g, m => '\n' + spaces + m.substring(1));
   return str;
 }
+
+function calcTranslateId(info, file, opts) {
+  // if key startsWith '^', it means global id;
+  if (info.key && info.key.startsWith('^')) {
+    return info.key.slice(1);
+  }
+  let baseDir = opts.idBaseDir;
+  if (isFunction(baseDir)) baseDir = baseDir(file);
+  file = path.relative(baseDir, file);
+  if (!info.key) {
+    const hash = crypto.createHash('md5');
+    hash.update(info.text);
+    info.key = hash.digest('hex').substring(0, 8);
+  }
+  return file + '/' + info.key;
+}
+
 module.exports = {
   uuid,
   isSimpleType,
@@ -83,5 +103,6 @@ module.exports = {
   arrayIsEqual,
   isBoolean,
   replaceTplStr,
-  prependTab
+  prependTab,
+  calcTranslateId
 };

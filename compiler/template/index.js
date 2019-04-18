@@ -1,8 +1,6 @@
 
-const { TemplateParser } = require('./parser/TemplateParser');
-const { TemplateLexer } = require('./parser/TemplateLexer');
 const RND_ID = require('crypto').randomBytes(4).toString('hex');
-const antlr = require('antlr4/index');
+const helper = require('./helper');
 const { TemplateVisitor } = require('./TemplateVisitor');
 const {
   replaceTplStr
@@ -51,7 +49,7 @@ class JingeTemplateParser {
       renderFn: result.renderFn
     };
   }
-  static async parse(content, options = {}) {
+  static async parse(content, sourceMap, options = {}) {
     return new Promise((resolve, reject) => {
       try {
         resolve(JingeTemplateParser._parse(content, options));
@@ -65,7 +63,9 @@ class JingeTemplateParser {
     this.alias = options.componentAlias;
     this.resourcePath = options.resourcePath;
     this.baseLinePosition = options.baseLinePosition || 1;
-    this.isProduction = options.isProduction;
+    this.needCompress = options.needCompress;
+    this.i18nOptions = options.i18n;
+    this.i18nManager = options.componentStyleStore.i18n;
     const info = options.componentStyleStore.templates.get(this.resourcePath);
     this.componentStyleId = options.componentStyleId || (
       info ? info.styleId : null
@@ -78,25 +78,7 @@ class JingeTemplateParser {
       renderFn: replaceTplStr(TPL.EMPTY, {ID: RND_ID})
     };
 
-    const lexer = new TemplateLexer(new antlr.InputStream(source));
-    const tokens = new antlr.CommonTokenStream(lexer);
-    // console.log(lexer.getAllTokens().map(t => {
-    //   console.log(t.text);
-    //   return  t.text;
-    // }));
-    // debugger;
-    const parser = new TemplateParser(tokens);
-    let meetErr = null;
-    parser.removeErrorListeners();
-    parser.addErrorListener({
-      syntaxError(recognizer, offendingSymbol, line, column) {
-        if (!meetErr) meetErr = {line, column};
-      },
-      reportContextSensitivity() {},
-      reportAttemptingFullContext() {},
-      reportAmbiguity() {}
-    });
-    const tree = parser.html();
+    const [meetErr, tree] = helper.parse(source);
     if (meetErr) {
       this._logParseError(source, meetErr, 'syntax of template is error.');
       return {
@@ -107,7 +89,9 @@ class JingeTemplateParser {
     }
     const visitor = new TemplateVisitor({
       source: source,
-      isProduction: this.isProduction,
+      i18n: this.i18nOptions,
+      i18nManager: this.i18nManager,
+      needCompress: this.needCompress,
       baseLinePosition: this.baseLinePosition,
       resourcePath: this.resourcePath,
       tabSize: this.tabSize,

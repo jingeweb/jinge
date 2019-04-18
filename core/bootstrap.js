@@ -17,7 +17,7 @@ import {
   VM_DEBUG_NAME
 } from '../viewmodel/common';
 
-export function bootstrap(Component, dom) {
+export function bootstrap(Component, dom, attrs) {
   if (dom === document.body) {
     throw new Error('bootstrap dom cannot be document.body');
   }
@@ -26,6 +26,8 @@ export function bootstrap(Component, dom) {
    * we simple pass an empty attrs. 
    */
   const bootAttrs = createEmptyObject();
+  attrs && Object.assign(bootAttrs, attrs);
+
   if (config[CFG_VM_DEBUG]) {
     bootAttrs[VM_DEBUG_NAME] = 'attrs_of_<root>';
   }

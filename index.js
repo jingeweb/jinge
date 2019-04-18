@@ -2,10 +2,12 @@ export {
   ForComponent
 } from './components/for';
 export {
-  IfComponent
+  IfComponent,
+  SwitchComponent
 } from './components/if';
 export {
-  I18nComponent
+  I18nComponent,
+  _TComponent
 } from './components/i18n';
 export {
   ParameterComponent
@@ -16,9 +18,6 @@ export {
 export {
   HideComponent
 } from './components/hide';
-export {
-  SwitchComponent
-} from './components/switch';
 export {
   BindHtmlComponent
 } from './components/html';
@@ -33,12 +32,29 @@ export {
   vmUnwatch
 } from './viewmodel/notify';
 export {
+  _t,
   i18n,
   prefix as i18nPrefix,
-  registerData as registerI18nData
+  registerData as registerI18nData,
+  messenger as i18nMessenger,
+  I18N_DATA_CHANGED
 } from './core/i18n';
 export {
   bootstrap
 } from './core/bootstrap';
 
-export * from './config';
+import * as components from './components';
+import * as config from './config';
+import * as dom from './dom';
+import * as core from './core';
+import * as util from './util';
+import * as viewmodel from './viewmodel';
+
+export {
+  components,
+  config,
+  dom,
+  core,
+  util,
+  viewmodel
+};

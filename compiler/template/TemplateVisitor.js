@@ -4,6 +4,7 @@ const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
 const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
+const helper = require('./helper');
 const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
 const { TemplateParser } = require('./parser/TemplateParser');
 const { AttributeValueParser } = require('./AttributeValueParser');
@@ -22,7 +23,8 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is message/event related attribute type */
   'on',
   /* bellow is compiler related attribute types */
-  'vm', 'vm-pass', 'vm-use', 'arg', 'arg-pass', 'arg-use', 'ref'
+  'vm', 'vm-pass', 'vm-use', 'arg',
+  'arg-pass', 'arg-use', 'ref', '_t'
 ];
 
 function mergeAlias(src, dst) {
@@ -49,7 +51,9 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._resourcePath = opts.resourcePath;
     this._componentStyleId = opts.componentStyleId;
     this._baseLinePosition = opts.baseLinePosition || 1;
-    this._isProdMode = opts.isProduction;
+    this._isProdMode = opts.needCompress;
+    this._i18nOptions = opts.i18n;
+    this._i18nManager = opts.i18nManager;
     this._imports = {};
     this._importOutputCodes = [];
     this._needHandleComment = true;
@@ -276,6 +280,12 @@ class TemplateVisitor extends TemplateParserVisitor {
         });
         a_category = 'on';
       }
+      if (a_category.startsWith('_t|')) {
+        a_tag = {
+          key: a_category.substring(3)
+        };
+        a_category = '_t';
+      }
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
         throw new Error('unkown attribute type ' + a_category);
       }
@@ -327,31 +337,53 @@ class TemplateVisitor extends TemplateParserVisitor {
           this._throwParseError(ctx.start, 'if parent component has arg-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
         }
         if (parentInfo.type !== 'component') {
-          this._throwParseError(ctx.start, 'arg-pass type attribute can only be used as root child of Component element.');
+          this._throwParseError(attrCtx.start, 'arg-pass type attribute can only be used as root child of Component element.');
         }
         argPass = a_name;
         return;
       }
 
       if (a_category === 'arg-use') {
-        if (argUse) throw new Error('arg-use type attribute can only be used once!');
+        if (argUse) {
+          this._throwParseError(attrCtx.start, 'arg-use type attribute can only be used once!');
+        } 
         argUse = a_name;
         return;
       }
 
       if (a_category === 'on') {
-        if (!a_name) throw new Error('event name is required!');
-        if (a_name in listeners) throw new Error('event name is dulplicated: ' + a_name);
+        if (!a_name) {
+          this._throwParseError(attrCtx.start, 'event name is required!');
+        }
+        if (a_name in listeners) {
+          this._throwParseError(attrCtx, 'event name is dulplicated: ' + a_name);
+        }
         listeners[a_name] = [aval, mode, a_tag];
         return;
       }
 
       if (a_name in constAttrs || a_name in argAttrs) throw new Error('dulplicated attribute:', a_name);
       if (!aval) {
+        if (a_category === '_t') {
+          this._throwParseError(attrCtx.start, 'attribute with _t: type require non-empty value');
+        }
         if (a_category === 'expr') {
-          this._throwParseError(ctx.start, 'Attribute with expression type must have value.');
+          this._throwParseError(attrCtx.start, 'Attribute with expression type must have value.');
         }
         constAttrs[a_name] = atv ? '' : true;
+        return;
+      }
+
+      if (a_category === '_t') {
+        const info = {
+          key: a_tag ? a_tag.key : null,
+          text: aval
+        };
+        const validateErr = this._i18nManager.validate(this._resourcePath, info, this._i18nOptions);
+        if (validateErr) {
+          this._throwParseError(attrCtx.start, validateErr);
+        }
+        constAttrs[a_name] = info.text;
         return;
       }
 
@@ -760,6 +792,94 @@ return el;`, true) + '\n})()';
     });
     return found > 0;
   }
+  _parse_translate(ctx) {
+    if (this._underMode_T) {
+      this._throwParseError(ctx.start, '<_t> component cannot have <_t> child');
+    }
+    const attrCtxs = ctx.htmlAttribute();
+    const info = {
+      key: null,
+      ifLocale: null,
+    };
+    attrCtxs.forEach(attrCtx => {
+      let an = attrCtx.ATTR_NAME().getText().trim().split(':');
+      an = an.length > 1 ? an[1] : an[0];
+      if (an === 'if-locale') an = 'ifLocale';
+      let av = attrCtx.ATTR_VALUE();
+      av = av ? av.getText().trim() : '';
+      av = av ? av.substring(1, av.length - 1) : '';
+      if (!(an in info)) {
+        this._throwParseError(attrCtx.start, `attribute "${an}" is not support. see https://todo`);
+      }
+      if (info[an]) this._throwParseError(attrCtx.start, `dulpilcated attribute "${an}"`); 
+      if (!av) this._throwParseError(attrCtx.start, `attribute value of "${an}" must be non-empty.`);
+      if (an === 'ifLocale') {
+        info.ifLocale = av;
+        return;
+      }
+      if (info.ifLocale) {
+        this._throwParseError(attrCtx.start, `<_t/> can not both have attributes "if-locale" and "${an}". see https://todo`);
+      }
+      info[an] = av;
+    });
+   
+    let cnodes = ctx.htmlNode();
+    const { buildLocale, defaultLocale } = this._i18nOptions;
+    if (!info.ifLocale) {
+      info.text = cnodes.map(c => {
+        if (c.ruleIndex !== TemplateParser.RULE_htmlNode || c.children.length !== 1) throw new Error('unimpossible!?');
+        c = c.children[0];
+        if (c.ruleIndex === TemplateParser.RULE_htmlComment) return '';
+        if (c.ruleIndex === TemplateParser.RULE_htmlElement) {
+          // 尽管 antlr 里面已经使用 channel(HIDDEN) 而不是 skip，
+          // 仍然无法通过 getText() 返回带空格的完整数据。
+          // 因此此处使用 substring 直接截取。
+          return this._source.substring(c.start.start, c.stop.stop + 1);
+          // return c.getText();
+        }
+        if (c.ruleIndex !== TemplateParser.RULE_htmlTextContent) {
+          throw new Error('unimpossible?!');
+        }
+        return c.getText().replace(/[\s\n\r]+/g, ' ');
+      }).join('').trim();
+      if (!info.text && !info.key) return null;
+      const validateErr = this._i18nManager.validate(this._resourcePath, info, this._i18nOptions);
+      if (validateErr) {
+        this._throwParseError(ctx.start, validateErr);
+      }
+    }
+    if (info.ifLocale || buildLocale === defaultLocale) {
+      if (info.ifLocale && info.ifLocale !== buildLocale) {
+        return null;
+      }
+      if (cnodes.length === 0) return null;
+      this._underMode_T = true;
+      const results = cnodes.map(n => this.visitHtmlNode(n)).filter(el => !!el);
+      this._underMode_T = false;
+      return {
+        type: 'component',
+        sub: 'normal',
+        value: results.map(r => r.value).join(',\n')
+      };
+    }
+
+    const [err, tree] = helper.parse(info.text);
+    if (err) {
+      this._throwParseError(ctx.start, `grammar of html content under <_t> is wrong! check text of key "${info.key}" in "translate.${buildLocale}.csv".`);
+    }
+
+    cnodes = tree.htmlNode();
+    if (cnodes.length === 0) return null;
+    
+    this._underMode_T = true;
+    const results = cnodes.map(n => this.visitHtmlNode(n)).filter(el => !!el);
+    this._underMode_T = false;
+    return {
+      type: 'component',
+      sub: 'normal',
+      value: results.map(r => r.value).join(',\n')
+    };
+  }
   _parse_component_ele(tag, Component, ctx) {
     const result = this._parse_attrs('component', Component, ctx, this._parent);
     if (tag === 'argument' && !result.argPass) {
@@ -1158,7 +1278,7 @@ ${body}
         try {
           txt = HTMLEntities.decode(txt);
         } catch(ex) {
-          this._throwParseError(ctx, ex.message);
+          this._throwParseError(ctx.start, ex.message);
         }
         txt = JSON.stringify(txt);
         eles.push(this._parent.type === 'html' ? txt : this._replace_tpl(TPL.TEXT_CONST, {
@@ -1200,6 +1320,12 @@ ${body}
     const endT = ctx.htmlEndTag();
     if (endT && endT.getText() !== etag) {
       this._throwParseError(endT.start, `close tag <${endT.getText()}> does not match open <${etag}>`);
+    }
+    if (etag.startsWith('_')) {
+      if (etag !== '_t') {
+        this._throwParseError(ctx.start, 'html tag starts with "_" is compiler preserved tag name. Current version only support tag: "<_t>". see https://todo"');
+      }
+      return this._parse_translate(ctx);
     }
     if (/^[a-z\d-]+$/.test(etag)) {
       if (etag in this._alias) {

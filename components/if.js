@@ -8,7 +8,8 @@ import {
   ROOT_NODES,
   onAfterRender,
   getFirstHtmlDOM,
-  CONTEXT
+  CONTEXT,
+  isComponent
 } from '../core/component';
 import {
   createComment,
@@ -30,7 +31,8 @@ import {
   STR_EMPTY,
   assert_fail,
   raf,
-  createEmptyObject
+  createEmptyObject,
+  Symbol
 } from '../util';
 import {
   VM_DEBUG_NAME
@@ -59,9 +61,14 @@ import {
   getDurationType
 } from '../core/transition';
 
-export const IF_STR_ELSE = 'else';
+const IF_STR_ELSE = 'else';
+const T_MAP = Symbol('transition_map');
+const P_VAL = Symbol('previous_value');
+const OE_H = Symbol('on_end_handler');
 
-const EMP_CMT = createComment(STR_EMPTY);
+const C_VAL = Symbol('current_value');
+const ENABLE_TRANSITION = Symbol('enable_ts');
+const ON_TS_END = Symbol('on_ts_end');
 
 function createEl(renderFn, context) {
   return new Component(wrapAttrs({
@@ -73,8 +80,8 @@ function createEl(renderFn, context) {
   }, true));
 }
 
-export function renderSwitch(component) {
-  const value = component._v;
+function renderSwitch(component) {
+  const value = component[C_VAL];
   const acs = component[ARG_COMPONENTS];
   if (component.ts && acs) {
     const t = createEmptyObject();
@@ -84,14 +91,14 @@ export function renderSwitch(component) {
         null // element
       ];
     }
-    component._t = t;
-    component._p = value;
-    component._h = component._oe.bind(component);
+    component[T_MAP] = t;
+    component[P_VAL] = value;
+    component[OE_H] = component[ON_TS_END].bind(component);
   }
   const renderFn = acs ? acs[value] : null;
   const roots = component[ROOT_NODES];
   if (!renderFn) {
-    roots.push(EMP_CMT);
+    roots.push(createComment(STR_EMPTY));
     return roots;
   }
   const el = createEl(renderFn, component[CONTEXT]);
@@ -99,14 +106,14 @@ export function renderSwitch(component) {
   return el[RENDER]();
 }
 
-export function updateSwitch(component) {
-  if (component[ROOT_NODES][0] === EMP_CMT && (
-    !component[ARG_COMPONENTS] || !component[ARG_COMPONENTS][component._v]
+function updateSwitch(component) {
+  if (!isComponent(component[ROOT_NODES][0]) && (
+    !component[ARG_COMPONENTS] || !component[ARG_COMPONENTS][component[C_VAL]]
   )) {
     return;
   }
 
-  if (component._t) {
+  if (component[T_MAP]) {
     return updateSwitch_ts(component);
   }
   
@@ -116,15 +123,15 @@ export function updateSwitch(component) {
 function doUpdate(component) {
   const roots = component[ROOT_NODES];
   const el = roots[0];
-  const isC = el !== EMP_CMT;
+  const isC = isComponent(el);
   const fd = isC ? getFirstHtmlDOM(el) : el;
   const pa = getParent(isC ? fd : el);
-  const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][component._v] : null;
+  const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][component[C_VAL]] : null;
   const ne = renderFn ? createEl(renderFn, component[CONTEXT]) : null;
-  roots[0] = ne || EMP_CMT;
+  roots[0] = ne || createComment(STR_EMPTY);
   insertBefore(
     pa,
-    ne ? ne[RENDER]() : EMP_CMT,
+    ne ? ne[RENDER]() : roots[0],
     fd
   );
   if (isC) {
@@ -133,7 +140,7 @@ function doUpdate(component) {
     removeChild(pa, fd);
   }
   ne && onAfterRender(ne);
-  component.notify('case-switched', component._v);
+  component.notify('case-switched', component[C_VAL]);
 }
 
 function cancelTs(t, tn, e, onEnd) {
@@ -172,46 +179,46 @@ function startTs(t, tn, e, onEnd) {
   addEvent(el, t_end, onEnd);
 }
 function updateSwitch_ts(component) {
-  const value = component._v;
-  const pv = component._p;
-  const tn = component.ts;
-  let pt = component._t[pv];
+  const value = component[C_VAL];
+  const pv = component[P_VAL];
+  const tn = component[ENABLE_TRANSITION];
+  let pt = component[T_MAP][pv];
   if (!pt) {
     pt = [
       TS_STATE_ENTERED,
       null, null
     ];
-    component._t[pv] = pt;
+    component[T_MAP][pv] = pt;
   }
   // debugger;
   if (pt[0] === TS_STATE_ENTERING) {
     if (value === pv) return;
-    cancelTs(pt, tn, true, component._h);
-    startTs(pt, tn, false, component._h);
+    cancelTs(pt, tn, true, component[OE_H]);
+    startTs(pt, tn, false, component[OE_H]);
   } else if (pt[0] === TS_STATE_LEAVING) {
     if (value !== pv) return;
-    cancelTs(pt, tn, false, component._h);
-    startTs(pt, tn, true, component._h);
+    cancelTs(pt, tn, false, component[OE_H]);
+    startTs(pt, tn, true, component[OE_H]);
   } else if (pt[0] === TS_STATE_ENTERED) {
     pt[1] = getFirstHtmlDOM(component);
-    startTs(pt, tn, false, component._h);
+    startTs(pt, tn, false, component[OE_H]);
   } else if (pt[0] === TS_STATE_LEAVED) {
     assert_fail();
   }
 }
 
-export function updateSwitch_ts_end(component) {
+function updateSwitch_ts_end(component) {
   // console.log('on end')
-  const value = component._v;
-  const pv = component._p;
-  const tn = component.ts;
-  const pt = component._t[pv];
+  const value = component[C_VAL];
+  const pv = component[P_VAL];
+  const tn = component[ENABLE_TRANSITION];
+  const pt = component[T_MAP][pv];
   const e = pt[0] === TS_STATE_ENTERING;
   const el = pt[1];
 
   if (el.nodeType === Node.ELEMENT_NODE) {
-    removeEvent(el, TS_TRANSITION_END, component._h);
-    removeEvent(el, TS_ANIMATION_END, component._h);
+    removeEvent(el, TS_TRANSITION_END, component[OE_H]);
+    removeEvent(el, TS_ANIMATION_END, component[OE_H]);
     removeClass(el, tn + (e  ? TS_C_ENTER : TS_C_LEAVE));
     removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
   }
@@ -222,37 +229,63 @@ export function updateSwitch_ts_end(component) {
 
   const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][value] : null;
   doUpdate(component, renderFn);
-  component._p = value;
-  const ct = component._t[value];
+  component[P_VAL] = value;
+  const ct = component[T_MAP][value];
   const fd = getFirstHtmlDOM(component);
-  if (fd === EMP_CMT) {
+  if (fd.nodeType !== Node.ELEMENT_NODE) {
     ct[0] = TS_STATE_ENTERED;
     return;
   }
 
   ct[1] = fd; 
-  startTs(ct, tn, true, component._h);
+  startTs(ct, tn, true, component[OE_H]);
 }
 
 export class IfComponent extends Component {
   constructor(attrs) {
     super(attrs);
     this.expect = attrs.expect;
-    this.ts = attrs.transition; // enable transition
-    this._t = null;
-    this._p = null;
-    this._h = null;
+    this[ENABLE_TRANSITION] = attrs.transition; // enable transition
   }
   get expect() {
-    return this._v === STR_DEFAULT;
+    return this[C_VAL] === STR_DEFAULT;
   }
   set expect(v) {
     v = v ? STR_DEFAULT : IF_STR_ELSE;
-    if (this._v === v) return;
-    this._v = v;
+    if (this[C_VAL] === v) return;
+    this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
-  _oe() {
+  [ON_TS_END]() {
+    updateSwitch_ts_end(this);
+  }
+  [RENDER]() {
+    return renderSwitch(this);
+  }
+  [UPDATE]() {
+    updateSwitch(this);
+  }
+}
+
+export class SwitchComponent extends Component {
+  constructor(attrs) {
+    super(attrs);
+    this.test = attrs.test;
+    this[ENABLE_TRANSITION] = attrs.transition; // enable transition
+  }
+  get test() {
+    return this[C_VAL];
+  }
+  set test(v) {
+    const acs = this[ARG_COMPONENTS];
+    if (!acs || !(v in acs)) {
+      v = STR_DEFAULT;
+    }
+    if (this[C_VAL] === v) return;
+    this[C_VAL] = v;
+    this[UPDATE_IF_NEED]();
+  }
+  [ON_TS_END]() {
     updateSwitch_ts_end(this);
   }
   [RENDER]() {
