@@ -32,6 +32,9 @@ export {
   vmUnwatch
 } from './viewmodel/notify';
 export {
+  Messenger
+} from './core/messenger';
+export {
   _t,
   i18n,
   prefix as i18nPrefix,
