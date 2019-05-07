@@ -66,6 +66,7 @@ const T_MAP = Symbol('transition_map');
 const P_VAL = Symbol('previous_value');
 const OE_H = Symbol('on_end_handler');
 
+const C_BV = Symbol('current_branch_value');
 const C_VAL = Symbol('current_value');
 const ENABLE_TRANSITION = Symbol('enable_ts');
 const ON_TS_END = Symbol('on_ts_end');
@@ -77,13 +78,13 @@ function createEl(renderFn, context) {
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: renderFn
     }
-  }, true));
+  }));
 }
 
 function renderSwitch(component) {
   const value = component[C_VAL];
   const acs = component[ARG_COMPONENTS];
-  if (component.ts && acs) {
+  if (component[ENABLE_TRANSITION] && acs) {
     const t = createEmptyObject();
     for(const k in acs) {
       t[k] = [
@@ -140,7 +141,7 @@ function doUpdate(component) {
     removeChild(pa, fd);
   }
   ne && onAfterRender(ne);
-  component.notify('case-switched', component[C_VAL]);
+  component.notify('branch-switched', component[C_BV]);
 }
 
 function cancelTs(t, tn, e, onEnd) {
@@ -256,6 +257,9 @@ export class IfComponent extends Component {
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
+  get [C_BV]() {
+    return this.expect;
+  }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);
   }
@@ -284,6 +288,9 @@ export class SwitchComponent extends Component {
     if (this[C_VAL] === v) return;
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
+  }
+  get [C_BV]() {
+    return this.test;
   }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);

@@ -3,7 +3,7 @@ const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
 const path = require('path');
 const { TemplateParser } = require('./template');
-
+const { CSSParser } = require('./style');
 const { prependTab, isString, isArray, arrayIsEqual } = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
 const jingeUtilFile = path.resolve(__dirname, '../util/index.js');
@@ -303,16 +303,18 @@ class ComponentParser {
     let styInfo;
     if (styNode) {
       const source = this.walkStyle(styNode);
-      const sts = this.componentStyleStore.styles;
-      styInfo = sts.get(source);
-      if (styInfo && styInfo.component !== this.resourcePath) {
-        throw new Error(`style file '${source}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
+      if (source) {
+        const sts = this.componentStyleStore.styles;
+        styInfo = sts.get(source);
+        if (styInfo && styInfo.component !== this.resourcePath) {
+          throw new Error(`style file '${source}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
+        }
+        styInfo = {
+          component: this.resourcePath,
+          styleId: this.componentStyleStore.genId()
+        };
+        sts.set(source, styInfo);
       }
-      styInfo = {
-        component: this.resourcePath,
-        styleId: this.componentStyleStore.genId()
-      };
-      sts.set(source, styInfo);
     }
 
     if (tplNode) {
@@ -498,10 +500,33 @@ import {
     if (st.type !== 'ReturnStatement') {
       throw new Error('static getter `style` must return directly.');
     }
-    if (st.argument.type !== 'Identifier' || !this._store.styles.has(st.argument.name)) {
-      throw new Error('static getter `style` must return variable imported on file topest level.');
+    const arg = st.argument;
+    if (arg.type === 'Identifier') {
+      if (!this._store.styles.has(arg.name)) {
+        throw new Error('static getter `style` must return variable imported on file topest level.');
+      }
+      return this._store.styles.get(arg.name);
     }
-    return this._store.styles.get(st.argument.name);
+    let css;
+    if (arg.type === 'Literal') {
+      css = arg.value;
+    } else if (arg.type === 'TemplateLiteral') {
+      if (arg.expressions.length > 0) throw new Error('static getter `template` must not return template string with expression.');
+      css = arg.quasis[0].value.cooked;
+    } else {
+      throw new Error('static getter `style` must return css code');
+    }
+    css = CSSParser.parseInline(css, {
+      resourcePath: this.resourcePath,
+      compress: this.needComporess,
+      styleId: this.componentStyleStore.genId()
+    });
+    this._replaces.push({
+      start: arg.start,
+      end: arg.end,
+      code: css
+    });
+    return null;
   }
   walkTemplate(node, styInfo) {
     if (node.value.body.body.length === 0) throw new Error('static getter `template` must return.');

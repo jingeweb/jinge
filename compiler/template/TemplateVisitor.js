@@ -23,8 +23,9 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is message/event related attribute type */
   'on',
   /* bellow is compiler related attribute types */
-  'vm', 'vm-pass', 'vm-use', 'arg',
-  'arg-pass', 'arg-use', 'ref', '_t'
+  'vm', 'vm-pass', 'vm-use',
+  'slot-pass', 'slot-use',
+  'ref',
 ];
 
 function mergeAlias(src, dst) {
@@ -57,7 +58,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._imports = {};
     this._importOutputCodes = [];
     this._needHandleComment = true;
-    this._parent = { type: 'component', sub: 'normal' };
+    this._parent = { type: 'component', sub: 'root' };
     const alias = mergeAlias(opts.alias, {
       jinge: {
         I18nComponent: 'i18n',
@@ -301,8 +302,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (a_category === 'arg') a_category = 'arg-pass';
-      else if (a_category === 'vm') a_category = 'vm-use';
+      if (a_category === 'vm') a_category = 'vm-use';
       else if (a_category === 's') a_category = 'str';
       else if (a_category === 'e') a_category = 'expr';
 
@@ -331,21 +331,21 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (a_category === 'arg-pass') {
-        if (argPass) this._throwParseError(ctx.start, 'arg-pass: attribute can only be used once!');
+      if (a_category === 'slot-pass') {
+        if (argPass) this._throwParseError(ctx.start, 'slot-pass: attribute can only be used once!');
         if (parentInfo.sub === 'argument') {
-          this._throwParseError(ctx.start, 'if parent component has arg-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
+          this._throwParseError(ctx.start, 'if parent component has slot-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
         }
         if (parentInfo.type !== 'component') {
-          this._throwParseError(attrCtx.start, 'arg-pass type attribute can only be used as root child of Component element.');
+          this._throwParseError(attrCtx.start, 'slot-pass: attribute can only be used as root child of Component element.');
         }
         argPass = a_name;
         return;
       }
 
-      if (a_category === 'arg-use') {
+      if (a_category === 'slot-use') {
         if (argUse) {
-          this._throwParseError(attrCtx.start, 'arg-use type attribute can only be used once!');
+          this._throwParseError(attrCtx.start, 'slot-use: attribute can only be used once!');
         } 
         argUse = a_name;
         return;
@@ -420,6 +420,12 @@ class TemplateVisitor extends TemplateParserVisitor {
      */
 
     /**
+     * 从 1.0.6 版本开始，出于和 web components 概念一致的目的，
+     *   arg-pass: 和 arg-use: 更名为 slot-pass: 和 slot-use: 。
+     *   同时，原先含糊的组件别名 <argument/> 和 <parameter/> 也改成
+     *   和 <_t/> 类似的，以下划线打头的特殊组件 <_slot/>，在编译器
+     *   层面专用于 slot 概念。
+     * 需要注意，以下注释文档未更新！但只要等价替换就行。
      * 
      * # arg-pass:, arg-use:, vm-pass:, vm-use:
      * 
@@ -547,49 +553,56 @@ class TemplateVisitor extends TemplateParserVisitor {
      * 
      * ## 补充说明
      * 
+     * #### slot-pass: 必须用于 Component 元素的子元素。
+     * 
      * #### arg-pass: 和 arg-use: 不能同时使用。
      * 
-     * 对于 Component 元素，arg-pass: 和 arg-use: 同时存在具有歧义，
-     *   编译器无法知道到底是处理成 pass 还是 use。
-     * 对于 html 元素，arg-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
+     * arg-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
      *   比如：`<span arg-pass:a arg-use:c>hello</span>` 可以设计为等价于：
      * 
+     * 可以等价于：
+     * 
      * ````html
-     * <argument arg-pass:a>
-     *   <parameter arg-use:b>
+     * <_slot slot-pass:a>
+     *   <_slot slot-use:b>
      *     <span>hello</span>
-     *   </parameter>
-     * </argument/>
+     *   </_slot>
+     * </_slot>
      * ````
      * 
-     * 但这种等价仍然肯有一定的隐晦性。由于这种使用场景很少，
-     * 因此不提供这个场景的简化写法。对于 Component 和 html 元素，
-     * 统一都不支持 arg-pass: 和 arg-use: 同时使用。
+     * 但这种等价有一定的隐晦性。由于这种使用场景很少，
+     * 因此不提供这个场景的简化写法。
      *
      */
 
     // arg-pass: 属性和 arg-use: 属性不能同时存在，详见上面的注释。
     if (argPass && argUse) {
-      this._throwParseError(ctx.start, 'arg-pass and arg-use attribute can\' be both used on same element');
+      this._throwParseError(ctx.start, 'slot-pass: and slot-use: attribute can\' be both used on same element');
     }
     
     // html 元素上的必须有 arg-pass: 属性，才能有 vm-use: 属性
     // component 元素可以只有 vm-use: 属性，但需要满足上面注释里详细描述的条件，这个条件的检测在之后的代码逻辑里。
     if (vms.length > 0 && !(argPass) && mode === 'html') {
-      this._throwParseError(ctx.start, 'vm-use attribute require arg-pass attribute on html element. see https://[todo]');
+      this._throwParseError(ctx.start, 'vm-use: attribute require slot-pass: attribute on html element. see https://[todo]');
     }
 
     // vm-pass: 属性必须用在有 arg-use: 属性的元素上。
     if (vmPass.length > 0 && !argUse) {
-      this._throwParseError(ctx.start, 'vm-pass attribute require arg-use attribute');
+      this._throwParseError(ctx.start, 'vm-pass: attribute require slot-use: attribute');
     }
     // vm-use: 属性不能用在有 arg-use: 属性的元素上。
     if (argUse && vms.length > 0) {
-      this._throwParseError(ctx.start, 'vm-use attribute can\'t be used with arg-use attribute');
+      this._throwParseError(ctx.start, 'vm-use: attribute can\'t be used with slot-use: attribute');
     }
-
+    if (argPass && (this._parent.type !== 'component' || this._parent.sub === 'root')) {
+      this._throwParseError(ctx.start, 'slot-pass: attribute can only be used on Component element\'s root child.');
+    }
+    // 
+    if (tag === '_slot' && !argPass && !argUse) {
+      this._throwParseError(ctx. start, '<_slot> component require "slot-pass:" or "slot-use:" attribute.');
+    }
     /**
-     * 如果 html 元素上有 arg-pass: 和 vm-use: ，则该元素等价于被包裹在
+     * 如果元素上有 arg-pass: 和 vm-use: ，则该元素等价于被包裹在
      * arg-pass: 和 vm-use: 的 <argument> 组件里。这种情况下，html 元素上
      * 的其它表达式值属性，是可以使用该 vm-use: 引入的渲染参数的。因此，要将这些参数
      * 先添加到参数列表里，再进行 _parse_expr 或 _parse_listener，
@@ -597,7 +610,8 @@ class TemplateVisitor extends TemplateParserVisitor {
      * 
      * ````html
      * <SomeComponent>
-     *   <p arg-pass:a vm-use:xx="yy" class="c1 ${yy}">override ${yy}</p>
+     *   <p slot-pass:a vm-use:xx="yy" class="c1 ${yy}">override ${yy}</p>
+     *   <AnotherComponent slot:b vm:xx="yy"/>
      * </SomeComponent>
      * ````
      * 
@@ -605,16 +619,19 @@ class TemplateVisitor extends TemplateParserVisitor {
      * 
      * ````html
      * <SomeComponent>
-     * <argument arg-pass:a vm-use:xx="yy">
+     * <_slot slot-pass:a vm-use:xx="yy">
      *   <p class="c1 ${yy}">override ${yy}</p>
-     * </argument>
+     * </_slot>
+     * <_slot slot-pass:b vm-use:xx="yy">
+     *   <AnotherComponent/>
+     * </_slot>
      * </SomeComponent>
      * ````
      * 
      * 其中的，`class="c1 ${yy}"` 使用了 `vm-use:xx="yy"` 引入的渲染参数。
      * 
      */
-    if (mode === 'html' && vms.length > 0) {
+    if (tag !== '_slot' && vms.length > 0) {
       this._vms = pVms.slice().concat(vms);
     }
     const rtn = {
@@ -641,17 +658,9 @@ class TemplateVisitor extends TemplateParserVisitor {
       argUse,
       ref
     };
-    if (mode === 'html' && vms.length > 0) {
+    if (tag !== '_slot' && vms.length > 0) {
       this._vms = pVms;
     }
-
-    if ((argPass || argUse) && mode !== 'html' && (
-      rtn.constAttrs.length > 0 || rtn.argAttrs.length > 0
-      || rtn.listeners.length > 0
-    )) {
-      this._throwParseError(ctx.start, 'once used arg-pass or arg-use attribute, value attribute or messenger attribute can\'t be used on Component element. see https://[todo]');
-    }
-  
     return rtn;
   }
   _parse_html_ele(etag, ctx) {
@@ -729,10 +738,7 @@ return el;`, true) + '\n})()';
         value: this._gen_render([rtnEl], vmLevel)
       };
     }
-    return {
-      type: 'html',
-      value: code
-    };
+    return rtnEl;
   }
   _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel) {
     let vmPassInitCode = '';
@@ -776,7 +782,7 @@ return el;`, true) + '\n})()';
     elements.forEach(el => {
       if (el.type === 'component' && el.sub === 'argument') {
         if (found < 0) {
-          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass: attribute or none of them contain arg-pass: attribute`);
         }
         if (el.argPass in args) {
           this._throwParseError(tokenPosition, `arg-pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
@@ -785,7 +791,7 @@ return el;`, true) + '\n})()';
         found = 1;
       } else {
         if (found > 0) {
-          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass attribute or all of them do not contain arg-pass attribute`);
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass: attribute or none of them contain arg-pass: attribute`);
         }
         found = -1;
       }
@@ -809,7 +815,7 @@ return el;`, true) + '\n})()';
       av = av ? av.getText().trim() : '';
       av = av ? av.substring(1, av.length - 1) : '';
       if (!(an in info)) {
-        this._throwParseError(attrCtx.start, `attribute "${an}" is not support. see https://todo`);
+        this._throwParseError(attrCtx.start, `attribute "${an}" is not support on <_t> component. see https://todo`);
       }
       if (info[an]) this._throwParseError(attrCtx.start, `dulpilcated attribute "${an}"`); 
       if (!av) this._throwParseError(attrCtx.start, `attribute value of "${an}" must be non-empty.`);
@@ -882,38 +888,6 @@ return el;`, true) + '\n})()';
   }
   _parse_component_ele(tag, Component, ctx) {
     const result = this._parse_attrs('component', Component, ctx, this._parent);
-    if (tag === 'argument' && !result.argPass) {
-      this._throwParseError(ctx. start, '<argument> component require "arg-pass:" attribute.');
-    }
-    if (tag === 'parameter' && !result.argUse) {
-      this._throwParseError(ctx. start, '<parameter> component require "arg-use:" attribute.');
-    }
-    /**
-     * 
-     * I have to write Chinese comment to keep myself not forget.
-     * 
-     * 为什么把 arg-pass:/arg-use: 用在除了 <argument>/<parameter> 外的其它组件上时，
-     * 需要打印告警？且只打印告警并不抛出错误？
-     * 
-     * arg-pass: 和 arg-use: 都是编译属性，编译器会将有该属性的组件都当成
-     * 是空组件，即忽略组件的其它性质。因此，为了避免误操作带来的隐藏 bug，
-     * 对于不符合最佳实践（即，arg-pass: 始终和 <argument> 搭配，
-     * arg-use: 始终和 <parameter 搭配）的编码会提示告警。
-     * 
-     * 但 <argument> 和 <parameter> 都只是一个别名，都对应的是 EmptyComponent 组件。在 jinge
-     * 框架层面，所有组件都是平等的，因此没有特殊组件。因此 jinge 的模板语法层面，
-     * 将 arg-pass: 或 arg-use: 用在其它组件上时也是平等的合法的。并且，内置的组件
-     * 别名，是可以通过配置被覆盖的，也就是存在 <argument> 不是指向内置的 EmptyComponent 组件
-     * 而是指定用户自己定义的组件的情况，这种时候用户就会将 arg-pass: 和其它他自己定义的空组件配合使用。
-     * 
-     * 未来会考虑提供 webpack 参数来主动禁用告警信息。
-     */
-    if (result.argPass && tag !== 'argument') {
-      this._logParseError(ctx.start, `compiler treats any Component with arg-pass: attribute as empty component. We suggest you to use <argument arg-pass:${result.argPass}> instead of <${tag} arg-pass:${result.argPass}>`, 'Warning');
-    }
-    if (result.argUse && tag !== 'parameter') {
-      this._logParseError(ctx.start, `compiler treats any Component with arg-use: attribute as empty component. We suggest you to use <parameter arg-use:${result.argUse}> instead of <${tag} arg-use:${result.argUse}>`, 'Warning');
-    }
     
     /**
      * for 组件也是一个标准组件，并没有特殊性，且组件别名也可以被覆盖。因此只给予避免踩杭的告警，
@@ -929,22 +903,22 @@ return el;`, true) + '\n})()';
       ),
       vms: result.vms
     });
+    if (tag === '_slot' && elements.length === 0) {
+      this._throwParseError(ctx.start, '<_slot> component must have child.');
+    }
     const hasArg = this._assert_arg_pass(ctx.start, elements, tag);
     if (result.vms.length > 0 && !result.argPass && hasArg) {
-      this._throwParseError(ctx.start, 'if component has vm-use: attribute but do not have arg-pass: attribute, it\'s root child can\'t have vm-pass: attribute.');
+      this._throwParseError(ctx.start, 'if component has vm-use: attribute but do not have slot-pass: attribute, it\'s root children can\'t have slot-pass: attribute.');
     }
     const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
-    if (result.argUse) {
+    if (tag === '_slot' && result.argUse) {
       return this._parse_arg_use_parameter(
         elements, result.argUse, result.vmPass, vmLevel
       );
     }
 
-    if (result.argPass) {
-      if (elements.length === 0) {
-        this._throwParseError(ctx.start, `<${tag}>: component with "arg:pass" attribute must have children`);
-      }
+    if (tag === '_slot' && result.argPass) {
       return {
         type: 'component',
         sub: 'argument',
@@ -980,17 +954,31 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
     RENDER_END: at[0].startsWith('_') ? ';' : ');'
   })).join('\n')}
 `;
-    return {
-      type: 'component',
-      sub: 'normal',
-      value: '...(() => {\n' + this._prependTab(`
+
+    const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
 const el = new ${Component}(attrs);
 ${result.listeners.map(lt => `el.on('${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
-return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()'
-    };
+return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()';
+   
+    const rtnEl = {type: 'component', sub: 'normal', value: code};
+
+    if (result.argUse) {
+      return this._parse_arg_use_parameter(
+        [rtnEl], result.argUse, result.vmPass, vmLevel
+      );
+    }
+    if (result.argPass) {
+      return {
+        type: 'component',
+        sub: 'argument',
+        argPass: result.argPass,
+        value: this._gen_render([rtnEl], vmLevel)
+      };
+    }
+    return rtnEl;
   }
   
   _parse_expr_memeber_node(memExpr, startLine) {
@@ -1321,13 +1309,14 @@ ${body}
     if (endT && endT.getText() !== etag) {
       this._throwParseError(endT.start, `close tag <${endT.getText()}> does not match open <${etag}>`);
     }
-    if (etag.startsWith('_')) {
-      if (etag !== '_t') {
-        this._throwParseError(ctx.start, 'html tag starts with "_" is compiler preserved tag name. Current version only support tag: "<_t>". see https://todo"');
-      }
-      return this._parse_translate(ctx);
+    if (etag.startsWith('_') && etag !== '_t' && etag !== '_slot') {
+      this._throwParseError(ctx.start, 'html tag starts with "_" is compiler preserved tag name. Current version only support: "<_t>" and "<_slot>". see https://todo"');
     }
-    if (/^[a-z\d-]+$/.test(etag)) {
+    if (etag === '_t') {
+      return this._parse_translate(ctx);
+    } else if (etag === '_slot') {
+      return this._parse_component_ele(etag, etag, ctx);
+    } else if (/^[a-z\d-]+$/.test(etag)) {
       if (etag in this._alias) {
         const [c, source] = this._alias[etag];
         let arr = this._aliasImports[source];

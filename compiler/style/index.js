@@ -49,7 +49,7 @@ class CSSParser {
         extractInfo.map = result.map;
         extractInfo.code = result.css;
         return {
-          code: 'export default "Extract by JingeExtractPlugin";'
+          code: 'export default "Extract by JingeWebpackPlugin";'
         };
       });
     }
@@ -91,6 +91,37 @@ class CSSParser {
         })};`
       };
     });
+  }
+  static parseInline(code, opts) {
+    const plugins = [plugin];
+    if (!opts.compress) {
+      plugins.push(prettify);
+    }
+    let css = postcss(plugins).process(code, {
+      from: opts.resourcePath,
+      styleId: opts.styleId,
+      map: false
+    }).css;
+    if (css && opts.compress) {
+      css = new CleanCSS().minify(css).styles;
+    }
+    if (opts.extract) {
+      const ecsMap = this.componentStyleStore.extractComponentStyles;
+      const ecs = ecsMap.get(opts.resourcePath);
+      if (!ecs) {
+        ecsMap.set(opts.resourcePath, {
+          css
+        });
+      } else {
+        ecs.css = css;
+      }
+    }
+    return {
+      code: opts.extract ? 'return null;' : `return ${JSON.stringify({
+        css,
+        id: opts.styleId
+      })};`
+    };
   }
 }
 
