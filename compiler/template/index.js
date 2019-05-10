@@ -77,7 +77,6 @@ class JingeTemplateParser {
       imports: '',
       renderFn: replaceTplStr(TPL.EMPTY, {ID: RND_ID})
     };
-
     const [meetErr, tree] = helper.parse(source);
     if (meetErr) {
       this._logParseError(source, meetErr, 'syntax of template is error.');
@@ -102,6 +101,7 @@ class JingeTemplateParser {
     try {
       return visitor.visit(tree);
     } catch(ex) {
+      // debugger;
       // console.error(ex);
       return {
         aliasImports: '',

@@ -25,7 +25,7 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is compiler related attribute types */
   'vm', 'vm-pass', 'vm-use',
   'slot-pass', 'slot-use',
-  'ref',
+  'ref', '_t'
 ];
 
 function mergeAlias(src, dst) {
@@ -67,8 +67,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         SwitchComponent: 'switch',
         HideComponent: 'hide',
         BindHtmlComponent: 'bind-html',
-        ToggleClassComponent: 'toggle-class',
-        Component: ['argument', 'parameter']
+        ToggleClassComponent: 'toggle-class'
       }
     });
     this._alias = {};
@@ -243,6 +242,10 @@ class TemplateVisitor extends TemplateParserVisitor {
     };
   }
   _parse_attrs(mode, tag, ctx, parentInfo) {
+    // console.log(this._resourcePath);
+    // if (this._resourcePath.endsWith('button.html')) {
+    //   debugger;
+    // }
     const attrCtxs = ctx.htmlAttribute();
     if (!attrCtxs || attrCtxs.length === 0) return {
       constAttrs: [],
@@ -252,7 +255,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       vmPass: [],
       argPass: null,
       ref: null,
-      argUse: null
+      argUse: mode !== 'html' && tag === '_slot' ? 'default' : null
     };
     const constAttrs = {};
     const argAttrs = {};
@@ -288,16 +291,16 @@ class TemplateVisitor extends TemplateParserVisitor {
         a_category = '_t';
       }
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
-        throw new Error('unkown attribute type ' + a_category);
+        this._throwParseError(attrCtx.start, 'unkown attribute type ' + a_category);
       }
-      if (!/^[\w\d$_-]+$/.test(a_name)) {
-        throw new Error('attribute name must match /^[\\w\\d$_-]+$/');
+      if (!/^[\w\d$_-][\w\d$_.|-]*$/.test(a_name)) {
+        this._throwParseError(attrCtx.start, 'attribute name must match /^[\\w\\d$_-][\\w\\d$_.|-]*$/');
       }
       a_category = a_category.toLowerCase();
 
       if (a_category === 'ref') {
-        if (!a_name) throw new Error('ref attribute require name.');
-        if (ref) throw new Error('ref attribute can only be used once!');
+        if (!a_name) this._throwParseError(attrCtx.start, 'ref attribute require name.');
+        if (ref) this._throwParseError(attrCtx.start, 'ref attribute can only be used once!');
         ref = a_name;
         return;
       }
@@ -312,29 +315,29 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (aval) aval = aval.substr(1, aval.length - 2).trim();
 
       if (a_category === 'vm-use') {
-        if (!a_name) this._throwParseError(ctx.start, 'vm-use type attribute require reflect variable name.');
+        if (!a_name) this._throwParseError(attrCtx.start, 'vm-use type attribute require reflect variable name.');
         if (!aval) aval = a_name;
-        if (!/^[\w\d$_]+$/.test(aval)) this._throwParseError(ctx.start, 'vm-use type attribute value must match /^[\\w\\d$_]+$/, but got: ' + aval);
-        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/, but got: ' + a_name);
-        if (vms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use type attribute name dulipcated: ' + a_name);
-        if (pVms.find(v => v.name === aval)) this._throwParseError(ctx.start, 'vm-use attribute reflect vairiable name"' + a_name + '" has been declared in parent context.');
+        if (!/^[\w\d$_]+$/.test(aval)) this._throwParseError(attrCtx.start, 'vm-use type attribute value must match /^[\\w\\d$_]+$/, but got: ' + aval);
+        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/, but got: ' + a_name);
+        if (vms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use type attribute name dulipcated: ' + a_name);
+        if (pVms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use attribute reflect vairiable name"' + a_name + '" has been declared in parent context.');
         vms.push({name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1});
         return;
       }
 
       if (a_category === 'vm-pass') {
-        if (mode === 'html') this._throwParseError(ctx.start, 'vm-pass attribute can\'t be used on html element');
-        if (!aval) this._throwParseError(ctx.start, 'vm-pass type attribute require attribute value');
-        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
-        if (vmPass.find(v => v.name === a_name)) this._throwParseError(ctx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
+        if (mode === 'html') this._throwParseError(attrCtx.start, 'vm-pass attribute can\'t be used on html element');
+        if (!aval) this._throwParseError(attrCtx.start, 'vm-pass type attribute require attribute value');
+        if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
+        if (vmPass.find(v => v.name === a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
         vmPass.push({name: a_name, expr: aval});
         return;
       }
 
       if (a_category === 'slot-pass') {
-        if (argPass) this._throwParseError(ctx.start, 'slot-pass: attribute can only be used once!');
+        if (argPass) this._throwParseError(attrCtx.start, 'slot-pass: attribute can only be used once!');
         if (parentInfo.sub === 'argument') {
-          this._throwParseError(ctx.start, 'if parent component has slot-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
+          this._throwParseError(attrCtx.start, 'if parent component has slot-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
         }
         if (parentInfo.type !== 'component') {
           this._throwParseError(attrCtx.start, 'slot-pass: attribute can only be used as root child of Component element.');
@@ -356,13 +359,15 @@ class TemplateVisitor extends TemplateParserVisitor {
           this._throwParseError(attrCtx.start, 'event name is required!');
         }
         if (a_name in listeners) {
-          this._throwParseError(attrCtx, 'event name is dulplicated: ' + a_name);
+          this._throwParseError(attrCtx.start, 'event name is dulplicated: ' + a_name);
         }
         listeners[a_name] = [aval, mode, a_tag];
         return;
       }
 
-      if (a_name in constAttrs || a_name in argAttrs) throw new Error('dulplicated attribute:', a_name);
+      if (a_name in constAttrs || a_name in argAttrs) {
+        this._throwParseError(attrCtx.start, 'dulplicated attribute: ' + a_name);
+      }
       if (!aval) {
         if (a_category === '_t') {
           this._throwParseError(attrCtx.start, 'attribute with _t: type require non-empty value');
@@ -661,6 +666,14 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (tag !== '_slot' && vms.length > 0) {
       this._vms = pVms;
     }
+
+    if (tag === '_slot' && (
+      rtn.ref || rtn.constAttrs.length > 0
+      || rtn.argAttrs.length > 0
+      || rtn.listeners.length > 0
+    )) {
+      this._throwParseError(ctx.start, '<_slot> component can only have slot-pass: or slot-use: attribute');
+    }
     return rtn;
   }
   _parse_html_ele(etag, ctx) {
@@ -782,16 +795,16 @@ return el;`, true) + '\n})()';
     elements.forEach(el => {
       if (el.type === 'component' && el.sub === 'argument') {
         if (found < 0) {
-          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass: attribute or none of them contain arg-pass: attribute`);
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain slot-pass: attribute or none of them contain slot-pass: attribute`);
         }
         if (el.argPass in args) {
-          this._throwParseError(tokenPosition, `arg-pass name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
+          this._throwParseError(tokenPosition, `slot-pass: attribute name must be unique under <${Component}>, but found duplicate: ${el.argPass}`);
         }
         args[el.argPass] = true;
         found = 1;
       } else {
         if (found > 0) {
-          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain arg-pass: attribute or none of them contain arg-pass: attribute`);
+          this._throwParseError(tokenPosition, `children of <${Component}> must satisfy the requirement that all of them contain slot-pass: attribute or none of them contain slot-pass: attribute`);
         }
         found = -1;
       }
@@ -888,7 +901,6 @@ return el;`, true) + '\n})()';
   }
   _parse_component_ele(tag, Component, ctx) {
     const result = this._parse_attrs('component', Component, ctx, this._parent);
-    
     /**
      * for 组件也是一个标准组件，并没有特殊性，且组件别名也可以被覆盖。因此只给予避免踩杭的告警，
      * 而不是抛出错误。
@@ -903,8 +915,8 @@ return el;`, true) + '\n})()';
       ),
       vms: result.vms
     });
-    if (tag === '_slot' && elements.length === 0) {
-      this._throwParseError(ctx.start, '<_slot> component must have child.');
+    if (tag === '_slot' && elements.length === 0 && result.argPass) {
+      this._throwParseError(ctx.start, '<_slot> component with arg-pass: attribute must have child.');
     }
     const hasArg = this._assert_arg_pass(ctx.start, elements, tag);
     if (result.vms.length > 0 && !result.argPass && hasArg) {
@@ -1203,9 +1215,18 @@ function _notify_${lv_id}() {
      * we wrap it into '()' to treat it as ObjectExpression.
      */
     if (txt[0] === '{') txt = '(' + txt + ')';
-    const expr = acorn.Parser.parse(txt, {
-      locations: true,
-    });
+    if (txt === 'class' || /\bclass\b/.test(txt)) {
+      this._throwParseError(ctx.start, 'expression can\'t contain js keyword class');
+    }
+    let expr;
+    try {
+      expr = acorn.Parser.parse(txt, {
+        locations: true,
+      });
+    } catch(ex) {
+      console.error(ex);
+      this._throwParseError(ctx.start, 'expression grammar error.');
+    }
     if (expr.body.length > 1 || expr.body[0].type !== 'ExpressionStatement') {
       // console.log(ctx.start.line, this._baseLinePosition);
       this._throwParseError(ctx.start, 'expression only support single ExpressionStatement. see https://[todo].');
@@ -1330,7 +1351,7 @@ ${body}
       }
 
       if (HTMLTags.indexOf(etag) < 0) {
-        console.warn(`warning: '${etag}' is not known html tag, do you forgot to config component alias?`);
+        this._logParseError(ctx.start, `'${etag}' is not known html tag, do you forgot to config component alias?`, 'Warning');
       }
       return this._parse_html_ele(etag, ctx);
     }

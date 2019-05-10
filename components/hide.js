@@ -8,21 +8,10 @@ import {
   vmWatch,
   vmUnwatch
 } from '../viewmodel/notify';
-import {
-  simpleUUID
-} from '../util';
 
 export const STR_JG_HIDE = 'jg-hide';
 
-const STYLE = {
-  id: `--jinge-hide-style-${simpleUUID()}--`,
-  css: '.jg-hide{display:none!important}.jg-hide.jg-hide-enter,.jg-hide.jg-hide-leave{display:block!important}'
-};
-
 export class HideComponent extends ToggleClassComponent {
-  static get style() {
-    return STYLE;
-  }
   constructor(attrs) {
     attrs.class = wrapViewModel({
       [STR_JG_HIDE]: !!attrs.test  

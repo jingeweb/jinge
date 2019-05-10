@@ -43,17 +43,17 @@ import {
   TS_STATE_LEAVED,
   TS_STATE_LEAVING,
   TS_STATE_ENTERING,
-  // TS_ENTER,
-  // TS_LEAVE,
-  // TS_TRANSITION,
-  // TS_LEAVE_CANCELLED,
-  // TS_ENTER_CANCELLED,
-  // TS_BEFORE_ENTER,
-  // TS_BEFORE_LEAVE,
+  TS_ENTER,
+  TS_LEAVE,
+  TS_TRANSITION,
+  TS_LEAVE_CANCELLED,
+  TS_ENTER_CANCELLED,
+  TS_BEFORE_ENTER,
+  TS_BEFORE_LEAVE,
   TS_TRANSITION_END,
   TS_ANIMATION_END,
-  // TS_AFTER_ENTER,
-  // TS_AFTER_LEAVE,
+  TS_AFTER_ENTER,
+  TS_AFTER_LEAVE,
   TS_C_ENTER,
   TS_C_LEAVE,
   TS_C_ENTER_ACTIVE,
@@ -144,18 +144,22 @@ function doUpdate(component) {
   component.notify('branch-switched', component[C_BV]);
 }
 
-function cancelTs(t, tn, e, onEnd) {
+function cancelTs(t, tn, e, component) {
   const el = t[1];
   if (el.nodeType !== Node.ELEMENT_NODE) {
     return;
   }
+  const onEnd = component[OE_H];
   removeClass(el, tn + (e ? TS_C_ENTER : TS_C_LEAVE));
   removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
   removeEvent(el, TS_TRANSITION_END, onEnd);
   removeEvent(el, TS_ANIMATION_END, onEnd);
+  component.notify(TS_TRANSITION, e ? TS_ENTER_CANCELLED : TS_LEAVE_CANCELLED, el);
 }
-function startTs(t, tn, e, onEnd) {
+
+function startTs(t, tn, e, component) {
   const el = t[1];
+  const onEnd = component[OE_H];
   if (el.nodeType !== Node.ELEMENT_NODE) {
     raf(onEnd);
     return;
@@ -178,6 +182,10 @@ function startTs(t, tn, e, onEnd) {
   }
   t[0] = e ? TS_STATE_ENTERING : TS_STATE_LEAVING;
   addEvent(el, t_end, onEnd);
+  component.notify(TS_TRANSITION, e ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, el);
+  raf(() => {
+    component.notify(TS_TRANSITION, e ? TS_ENTER : TS_LEAVE, el);
+  });
 }
 function updateSwitch_ts(component) {
   const value = component[C_VAL];
@@ -194,15 +202,15 @@ function updateSwitch_ts(component) {
   // debugger;
   if (pt[0] === TS_STATE_ENTERING) {
     if (value === pv) return;
-    cancelTs(pt, tn, true, component[OE_H]);
-    startTs(pt, tn, false, component[OE_H]);
+    cancelTs(pt, tn, true, component);
+    startTs(pt, tn, false, component);
   } else if (pt[0] === TS_STATE_LEAVING) {
     if (value !== pv) return;
-    cancelTs(pt, tn, false, component[OE_H]);
-    startTs(pt, tn, true, component[OE_H]);
+    cancelTs(pt, tn, false, component);
+    startTs(pt, tn, true, component);
   } else if (pt[0] === TS_STATE_ENTERED) {
     pt[1] = getFirstHtmlDOM(component);
-    startTs(pt, tn, false, component[OE_H]);
+    startTs(pt, tn, false, component);
   } else if (pt[0] === TS_STATE_LEAVED) {
     assert_fail();
   }
@@ -222,6 +230,7 @@ function updateSwitch_ts_end(component) {
     removeEvent(el, TS_ANIMATION_END, component[OE_H]);
     removeClass(el, tn + (e  ? TS_C_ENTER : TS_C_LEAVE));
     removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
+    component.notify(TS_TRANSITION, e ? TS_AFTER_ENTER : TS_AFTER_LEAVE);
   }
   
   pt[0] = e ? TS_STATE_ENTERED : TS_STATE_LEAVED;
@@ -239,7 +248,7 @@ function updateSwitch_ts_end(component) {
   }
 
   ct[1] = fd; 
-  startTs(ct, tn, true, component[OE_H]);
+  startTs(ct, tn, true, component);
 }
 
 export class IfComponent extends Component {

@@ -20,6 +20,10 @@ export function isArray(v) {
   return Array.isArray(v);
 }
 
+export function isBoolean(v) {
+  return typeof v === 'boolean' || instanceOf(v, Boolean);
+}
+
 export function isFunction(v) {
   return typeOf(v) === 'function';
 }

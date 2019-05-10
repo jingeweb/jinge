@@ -11,6 +11,8 @@ const I18N_OPTION_NAMES = [
 
 function jingeLoader(source, sourceMap) {
   const callback = this.async();
+  this.cacheable && this.cacheable();
+
   const resourcePath = this.resourcePath;
   const opts = this.query || {};
   const needCompress = ('compress' in opts) ? !!opts.compress : this._compiler.options.mode === 'production';
@@ -24,9 +26,13 @@ function jingeLoader(source, sourceMap) {
     parseOpts = {
       resourcePath,
       componentStyleStore: store,
-      compress: needCompress
+      compress: needCompress,
+      extractStyle: opts.extractStyle
     };
   } else {
+    if (!/\.(js|html)$/.test(resourcePath)) {
+      return callback('jingeLoader only support .js,.html,.css,.less,.scss file');
+    }
     const iopt = opts.i18n || {mode: 'dictionary-reflect'};
     if (iopt.mode === 'compiler-translate') {
       I18N_OPTION_NAMES.forEach(n => {
@@ -36,7 +42,7 @@ function jingeLoader(source, sourceMap) {
         iopt.idBaseDir = process.cwd();
       }
     } else if (iopt.mode !== 'dictionary-reflect') {
-      throw new Error('jingeLoader option "i18n.mode" must be "dictionary-reflect" or "compiler-translate". see https://todo');
+      return callback('jingeLoader option "i18n.mode" must be "dictionary-reflect" or "compiler-translate". see https://todo');
     }
     if (iopt.buildLocale !== iopt.defaultLocale) {
       store.i18n.loadTranslateCSV(iopt);
@@ -53,14 +59,14 @@ function jingeLoader(source, sourceMap) {
       componentAlias: opts.componentAlias,
       componentBase: opts.componentBase,
       i18n: iopt,
+      extractStyle: opts.extractStyle,
       compress: needCompress
-      // isProduction: this._compiler.options.mode === 'production',
     };
     Parser = /\.htm(l?)$/.test(resourcePath) ? TemplateParser : ComponentParser;
   }
   Parser.parse(source, sourceMap, parseOpts).then(result => {
     // console.log(result.code);
-    // if (resourcePath.endsWith('.html')) console.log(result.code);
+    // if (resourcePath.endsWith('content.js')) console.log(result.code);
     callback(null, result.code, result.map || null, result.ast ? {
       webpackAST: result.ast
     } : null);

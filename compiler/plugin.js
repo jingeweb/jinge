@@ -18,22 +18,29 @@ async function mkdir(dirname) {
 
 class JingeWebpackPlugin {
   constructor(options = {}) {
-    this.i18nOptions = options.i18n || {};
-    this.styleOptions = options.style || {};
+    this.options = options;
   }
   async _genStyle(outputDir, compress) {
-    let output = '';
+    const opts = this.options.extractStyle;
+    let output = `.jg-hide {
+  display: none !important;
+}
+
+.jg-hide.jg-hide-enter,
+.jg-hide.jg-hide-leave {
+  display: block !important;
+}\n`;
     store.extractStyles.forEach(info => {
-      output += info.code;
+      output += info.code || '';
     });
     store.extractComponentStyles.forEach(info => {
-      output += info.css;
+      output += info.css || '';
     });
     // TODO: generate soure map
     if (compress) {
       output = new CleanCSS().minify(output).styles;
     }
-    const file = path.resolve(outputDir, this.styleOptions.filename);
+    const file = path.resolve(outputDir, opts.filename);
     await mkdir(path.dirname(file));
     await fs.writeFile(
       file,
@@ -41,7 +48,7 @@ class JingeWebpackPlugin {
     );
   }
   async _genTranslate() {
-    const opts = this.i18nOptions;
+    const opts = this.options.i18n || {};
     if (opts.buildLocale !== opts.defaultLocale || opts.generateCSV === false) {
       return;
     }
@@ -51,11 +58,12 @@ class JingeWebpackPlugin {
   }
   apply(compiler) {
     const copt = compiler.options;
-    const needCompress = ('compress' in this.styleOptions) ? !!this.styleOptions.compress : copt.mode === 'production';
+    const popt = this.options;
+    const needCompress = ('compress' in popt) ? !!popt.compress : copt.mode === 'production';
     const outputDir = (copt.output ? copt.output.path : null) || process.cwd();
     compiler.hooks.emit.tapAsync('JINGE_EXTRACT_PLUGIN', (compilation, callback) => {
       Promise.all([
-        store.extractStyles.size > 0 || store.extractComponentStyles.size > 0 ? this._genStyle(outputDir, needCompress) : Promise.resolve(),
+        popt.extractStyle ? this._genStyle(outputDir, needCompress) : Promise.resolve(),
         store.i18n.size > 0 ? this._genTranslate() : Promise.resolve(),
       ]).catch((error) => {
         compilation.errors.push(error);

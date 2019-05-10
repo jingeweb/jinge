@@ -1,14 +1,25 @@
 import {
-  Symbol
+  Symbol,
+  simpleUUID
 } from '../util';
 import {
   createElement,
-  appendChild
+  appendChild,
+  getCSPropertyValue
 } from '../dom';
 
 export const CSTYLE_ADD = Symbol('add');
 export const CSTYLE_DEL = Symbol('del');
 export const CSTYLE_ATTACH = Symbol('attach');
+
+function isHideCssExists() {
+  const $e = createElement('span', {
+    style: 'position:absolute;left:-10000px;',
+    class: 'jg-hide'
+  });
+  appendChild(document.body, $e);
+  return getCSPropertyValue(getComputedStyle($e), 'display') === 'none';
+}
 
 class ComponentStyleManager {
   constructor() {
@@ -53,6 +64,12 @@ class ComponentStyleManager {
   [CSTYLE_ATTACH]() {
     if (this.s !== 0) return;
     this.s = 1;
+    if (!isHideCssExists()) {
+      this._c({
+        dom: `__jgsty_${simpleUUID()}__`,
+        css: '.jg-hide{display:none!important}.jg-hide.jg-hide-enter,.jg-hide.jg-hide-leave{display:block!important}'
+      });
+    }
     this.m.forEach(info => this._c(info));
   }
   [CSTYLE_DEL](sty) {

@@ -90,9 +90,9 @@ class I18NManager {
       } else {
         const txt = this.get(translateId);
         if (!info.text) {
-          info.text = txt;
-        } else if (info.text !== txt && opts.checkConflict) {
-          return `key "${info.key}"(translate id "${translateId}") in different place have conflict text "${info.text}" and "${txt}". see https://todo`;
+          info.text = txt[0];
+        } else if (info.text !== txt[0] && opts.checkConflict) {
+          return `key "${info.key}"(translate id "${translateId}") in different place have conflict text "${info.text}" and "${txt[0]}". see https://todo`;
         }
       }
     }

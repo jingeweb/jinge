@@ -54,6 +54,7 @@ class CSSParser {
       });
     }
     const styleId = _store.styles.get(opts.resourcePath).styleId;
+    // console.log(opts.resourcePath, styleId);
     const plugins = [plugin];
     if (!opts.compress) {
       plugins.push(prettify);
@@ -62,7 +63,7 @@ class CSSParser {
       from: opts.resourcePath,
       styleId,
       map: sourceMap ? {
-        inline: opts.extract ? false : true,
+        inline: opts.extractStyle ? false : true,
         prev: sourceMap
       } : false
     }).then(result => {
@@ -73,7 +74,8 @@ class CSSParser {
         // TODO: generate map
         map = null;
       }
-      if (opts.extract) {
+      if (opts.extractStyle) {
+        css = `\n/* ${opts.resourcePath} */\n` + css;
         const ecs = _store.extractComponentStyles.get(opts.resourcePath);
         if (!ecs) {
           _store.extractComponentStyles.set(opts.resourcePath, {
@@ -85,7 +87,7 @@ class CSSParser {
         }
       }
       return {
-        code: opts.extract ? 'export default null;' : `export default ${JSON.stringify({
+        code: opts.extractStyle ? 'export default null;' : `export default ${JSON.stringify({
           css,
           id: styleId
         })};`
@@ -97,16 +99,21 @@ class CSSParser {
     if (!opts.compress) {
       plugins.push(prettify);
     }
+    // if (opts.resourcePath.endsWith('floating-buttons.js')) {
+    //   debugger;
+    // }
     let css = postcss(plugins).process(code, {
       from: opts.resourcePath,
       styleId: opts.styleId,
       map: false
     }).css;
+    
     if (css && opts.compress) {
       css = new CleanCSS().minify(css).styles;
     }
-    if (opts.extract) {
-      const ecsMap = this.componentStyleStore.extractComponentStyles;
+    if (opts.extractStyle) {
+      css = `\n/* ${opts.resourcePath} */\n` + css;
+      const ecsMap = opts.componentStyleStore.extractComponentStyles;
       const ecs = ecsMap.get(opts.resourcePath);
       if (!ecs) {
         ecsMap.set(opts.resourcePath, {
@@ -117,7 +124,7 @@ class CSSParser {
       }
     }
     return {
-      code: opts.extract ? 'return null;' : `return ${JSON.stringify({
+      code: opts.extractStyle ? 'null; // extracted by JingeWebpackPlugin' : `return ${JSON.stringify({
         css,
         id: opts.styleId
       })};`

@@ -145,6 +145,7 @@ class ComponentParser {
     this.componentAlias = options.componentAlias;
     this.componentBaseLocals = new Map();
     this.needComporess = !!options.compress;
+    this.needExtractStyle = !!options.extractStyle;
     this.styleRequireScoped = !!options.styleRequireScoped;
     this.tabSize = options.tabSize;
     if (typeof this.tabSize !== 'number' || this.tabSize <= 0) {
@@ -173,19 +174,27 @@ class ComponentParser {
       }
     })(node);
   }
+  _resolve(node) {
+    return new Promise((resolve, reject) => {
+      this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+  }
   async walkImport(node) {
     let source = null;
-    const _isHtml = /\.htm(?:l)?$/.test(node.source.value);
-    const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(node.source.value);
-
+    let testSource = node.source.value;
+    if (!/\.\w+$/.test(testSource)) {
+      source = await this._resolve(node);
+      testSource = source;
+    }
+    const _isHtml = /\.htm(?:l)?$/.test(testSource);
+    const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(testSource);
+    
     if (node.specifiers.length === 0) {
       if (_isStyle) {
-        source = await new Promise((resolve, reject) => {
-          this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          });
-        });
+        source = source || (await this._resolve(node));
         this.componentStyleStore.extractStyles.set(source, {code: null});
       }
       return false;
@@ -213,12 +222,7 @@ class ComponentParser {
 
       if (_isHtml || _isStyle) {
         if (!source) {
-          source = await new Promise((resolve, reject) => {
-            this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
+          source = await this._resolve(node);
         }
         if (_isHtml) {
           this._store.templates.set(local, source);
@@ -246,12 +250,7 @@ class ComponentParser {
       }
       if (this.needComporess && imported === 'Symbol') {
         if (!source) {
-          source = await new Promise((resolve, reject) => {
-            this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
+          source = await this._resolve(node);
         }
         if (source === jingeUtilFile || source === jingeUtilCommonFile) {
           this._needRemoveSymbolDesc = true;
@@ -260,12 +259,7 @@ class ComponentParser {
       if (!needHandleComponent && (imported in this.componentBase)) {
         if (!source) {
           // console.log(this.webpackLoaderContext.context, node.source.value);
-          source = await new Promise((resolve, reject) => {
-            this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
+          source = await this._resolve(node);
         }
         if (this.componentBase[imported].indexOf(source) >= 0) {
           this.componentBaseLocals.set(spec.local.name, true);
@@ -302,18 +296,21 @@ class ComponentParser {
 
     let styInfo;
     if (styNode) {
-      const source = this.walkStyle(styNode);
-      if (source) {
+      const sty = this.walkStyle(styNode);
+      if (sty) {
         const sts = this.componentStyleStore.styles;
-        styInfo = sts.get(source);
+        styInfo = sts.get(sty.file);
         if (styInfo && styInfo.component !== this.resourcePath) {
-          throw new Error(`style file '${source}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
+          throw new Error(`style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
         }
-        styInfo = {
-          component: this.resourcePath,
-          styleId: this.componentStyleStore.genId()
-        };
-        sts.set(source, styInfo);
+        if (!styInfo) {
+          styInfo = {
+            component: this.resourcePath,
+            styleId: sty.id
+          };
+        }
+        // console.log(source, styInfo, '\n---\n');
+        sts.set(sty.file, styInfo);
       }
     }
 
@@ -505,7 +502,10 @@ import {
       if (!this._store.styles.has(arg.name)) {
         throw new Error('static getter `style` must return variable imported on file topest level.');
       }
-      return this._store.styles.get(arg.name);
+      return {
+        file: this._store.styles.get(arg.name),
+        id: this.componentStyleStore.genId()
+      };
     }
     let css;
     if (arg.type === 'Literal') {
@@ -516,17 +516,23 @@ import {
     } else {
       throw new Error('static getter `style` must return css code');
     }
+    const styleId = this.componentStyleStore.genId();
     css = CSSParser.parseInline(css, {
       resourcePath: this.resourcePath,
+      extractStyle: this.needExtractStyle,
+      componentStyleStore: this.componentStyleStore,
       compress: this.needComporess,
-      styleId: this.componentStyleStore.genId()
+      styleId
     });
     this._replaces.push({
       start: arg.start,
       end: arg.end,
-      code: css
+      code: css.code
     });
-    return null;
+    return {
+      file: this.resourcePath,
+      id: styleId
+    };
   }
   walkTemplate(node, styInfo) {
     if (node.value.body.body.length === 0) throw new Error('static getter `template` must return.');
@@ -553,6 +559,7 @@ import {
           component: this.resourcePath,
           styleId: styInfo ? styInfo.styleId : null
         });
+        // console.log(source, this.resourcePath, styInfo);
         return;
       }
       if (tplInfo.styleId && this.resourcePath !== tplInfo.component) {
@@ -570,6 +577,7 @@ import {
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
+    
     const result = TemplateParser._parse(tpl, {
       componentStyleStore: this.componentStyleStore,
       componentStyleId: styInfo ? styInfo.styleId : null,
@@ -592,9 +600,8 @@ import {
     if (result.localImports.trim()) {
       this._templateLocalImports.push(result.localImports);
     }
-
     let code = result.renderFn;
-    if (st.loc.start.column > 0) {
+    if (st.loc.start.column > 0 && code.indexOf('\n') > 0) {
       code = 'function(component) {\n' + prependTab(code.substring(code.indexOf('\n') + 1), false, st.loc.start.column);
     }
 
