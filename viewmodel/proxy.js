@@ -6,7 +6,8 @@ import {
   isArray,
   isObject,
   assert_fail,
-  STR_LENGTH
+  STR_LENGTH,
+  isFunction
 } from '../util';
 import {
   VM_PARENTS,
@@ -57,7 +58,21 @@ function objectPropSetHandler(target, prop, value) {
   if (isViewModel(oldVal)) {
     removeVMParent(oldVal, target, prop);
   }
-  target[prop] = value;
+  /**
+   * we must ensure `this` in setter function to be `Proxy`
+   * 
+   * 首先判断当前赋值的变量名，是否对应了一个 setter 函数，
+   * 如果是 setter 函数，则应该显式地调用，
+   *   并将 `this` 设置为该 target 的包装 Proxy，
+   *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
+   * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
+   */
+  const desc = Object.getOwnPropertyDescriptor(target.constructor.prototype, prop);
+  if (desc && isFunction(desc.set)) {
+    desc.set.call(target[VM_WRAPPER_PROXY], value);
+  } else {
+    target[prop] = value;
+  }
   if (newValIsVM) {
     addVMParent(value, target, prop);
   }
@@ -309,16 +324,7 @@ function wrapProp(vm, prop) {
 function wrapProxy(vm, isArr) {
   vm[VM_PARENTS] = [];
   const p = new Proxy(vm, isArr ? ArrayProxyHandler : ObjectProxyHandler);
-  /**
-   * as Array.sort/reverse/fill must return itself,
-   * we must store the wrapper proxy into array,
-   * and return this proxy when those functions are called.
-   * 
-   * Array.sort/reverse/fill 函数的返回值是其本身，即： arr.reverse() === arr；
-   * 但如果 arr 是一个 proxy，则需要返回该 proxy 才能保证 `===` 成立。
-   * 此处将 Proxy 反向存储下来，以便在这些函数被调用时可以返回。
-   */
-  if (isArr) vm[VM_WRAPPER_PROXY] = p;
+  vm[VM_WRAPPER_PROXY] = p;
   return p;
 }
 
@@ -379,7 +385,9 @@ export function wrapComponent(component) {
   component[VM_PARENTS] = VM_EMPTY_PARENTS;
   component[VM_LISTENERS] = new Map();
   handleVMDebug(component);
-  return new Proxy(component, ObjectProxyHandler);
+  const p = new Proxy(component, ObjectProxyHandler);
+  component[VM_WRAPPER_PROXY] = p;
+  return p;
 }
 
 // const AttrsProxyHandler = {

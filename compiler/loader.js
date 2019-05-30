@@ -27,6 +27,7 @@ function jingeLoader(source, sourceMap) {
       resourcePath,
       componentStyleStore: store,
       compress: needCompress,
+      keepStyleComments: opts.keepStyleComments,
       extractStyle: opts.extractStyle
     };
   } else {

@@ -1,5 +1,6 @@
 const postcss = require('postcss');
 const parser = require('postcss-selector-parser');
+const discard = require('postcss-discard-comments');
 const prettify = require('postcss-prettify');
 const CleanCSS = require('clean-css');
 
@@ -39,7 +40,11 @@ class CSSParser {
     const _store = opts.componentStyleStore;
     const extractInfo = _store.extractStyles.get(opts.resourcePath);
     if (extractInfo) {
-      return postcss([prettify]).process(code, {
+      const plugs = [prettify];
+      if (!opts.keepStyleComments) {
+        plugs.unshift(discard);
+      }
+      return postcss(plugs).process(code, {
         from: opts.resourcePath,
         map: sourceMap ? {
           inline: false,
@@ -49,7 +54,7 @@ class CSSParser {
         extractInfo.map = result.map;
         extractInfo.code = result.css;
         return {
-          code: 'export default "Extract by JingeWebpackPlugin";'
+          code: `export default "Extract by JingeWebpackPlugin at ${new Date().toLocaleString()}";`
         };
       });
     }
@@ -58,6 +63,9 @@ class CSSParser {
     const plugins = [plugin];
     if (!opts.compress) {
       plugins.push(prettify);
+    }
+    if (opts.extractStyle && !opts.keepStyleComments) {
+      plugins.push(discard);
     }
     return postcss(plugins).process(code, {
       from: opts.resourcePath,
@@ -87,7 +95,7 @@ class CSSParser {
         }
       }
       return {
-        code: opts.extractStyle ? 'export default null;' : `export default ${JSON.stringify({
+        code: opts.extractStyle ? `export default null; // extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `export default ${JSON.stringify({
           css,
           id: styleId
         })};`
@@ -96,12 +104,12 @@ class CSSParser {
   }
   static parseInline(code, opts) {
     const plugins = [plugin];
+    if (opts.extractStyle && !opts.keepStyleComments) {
+      plugins.push(discard);
+    }
     if (!opts.compress) {
       plugins.push(prettify);
     }
-    // if (opts.resourcePath.endsWith('floating-buttons.js')) {
-    //   debugger;
-    // }
     let css = postcss(plugins).process(code, {
       from: opts.resourcePath,
       styleId: opts.styleId,
@@ -124,7 +132,7 @@ class CSSParser {
       }
     }
     return {
-      code: opts.extractStyle ? 'null; // extracted by JingeWebpackPlugin' : `return ${JSON.stringify({
+      code: opts.extractStyle ? `null; // extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `return ${JSON.stringify({
         css,
         id: opts.styleId
       })};`

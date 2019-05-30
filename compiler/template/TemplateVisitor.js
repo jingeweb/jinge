@@ -61,6 +61,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._parent = { type: 'component', sub: 'root' };
     const alias = mergeAlias(opts.alias, {
       jinge: {
+        LogComponent: 'log',
         I18nComponent: 'i18n',
         IfComponent: 'if',
         ForComponent: 'for',
@@ -727,7 +728,7 @@ ${result.argAttrs.map((at, i) => {
       RENDER_END: ');'
     });
   }).join('\n')}
-${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
+${result.listeners.map(lt => `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].prevent && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${pushEleCode}
 return el;`, true) + '\n})()';

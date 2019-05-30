@@ -296,7 +296,13 @@ class ComponentParser {
 
     let styInfo;
     if (styNode) {
-      const sty = this.walkStyle(styNode);
+      const csm = this.componentStyleStore.components;
+      if (!csm.has(this.resourcePath)) {
+        csm.set(this.resourcePath, {
+          id: this.componentStyleStore.genId()
+        });
+      }
+      const sty = this.walkStyle(styNode, csm.get(this.resourcePath));
       if (sty) {
         const sts = this.componentStyleStore.styles;
         styInfo = sts.get(sty.file);
@@ -490,7 +496,7 @@ import {
       code: newCode
     });
   }
-  walkStyle(node) {
+  walkStyle(node, ci) {
     // debugger;
     if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
     const st = node.value.body.body[0];
@@ -504,7 +510,7 @@ import {
       }
       return {
         file: this._store.styles.get(arg.name),
-        id: this.componentStyleStore.genId()
+        id: ci.id
       };
     }
     let css;
@@ -516,13 +522,12 @@ import {
     } else {
       throw new Error('static getter `style` must return css code');
     }
-    const styleId = this.componentStyleStore.genId();
     css = CSSParser.parseInline(css, {
       resourcePath: this.resourcePath,
       extractStyle: this.needExtractStyle,
       componentStyleStore: this.componentStyleStore,
       compress: this.needComporess,
-      styleId
+      styleId: ci.id
     });
     this._replaces.push({
       start: arg.start,
@@ -531,7 +536,7 @@ import {
     });
     return {
       file: this.resourcePath,
-      id: styleId
+      id: ci.id
     };
   }
   walkTemplate(node, styInfo) {

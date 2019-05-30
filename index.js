@@ -2,6 +2,9 @@ export {
   ForComponent
 } from './components/for';
 export {
+  LogComponent
+} from './components/log';
+export {
   IfComponent,
   SwitchComponent
 } from './components/if';

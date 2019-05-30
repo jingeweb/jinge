@@ -16,6 +16,12 @@ export function defineProperty(...args) {
   return Object.defineProperty(...args);
 }
 
+export function obj2class(obj) {
+  return Object.keys(obj).map(k => {
+    return obj[k] ? k : '';
+  }).join(' ');
+}
+
 export function defineProperties(...args) {
   return Object.defineProperties(...args);
 }

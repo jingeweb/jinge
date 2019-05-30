@@ -134,12 +134,6 @@ export function removeEvent($element, eventName, handler) {
   $element.removeEventListener(eventName, handler);
 }
 
-export function obj2class(obj) {
-  return Object.keys(obj).map(k => {
-    return obj[k] ? k : '';
-  }).join(' ');
-}
-
 export function getComputedStyle(el, p) {
   return window.getComputedStyle(el, p);
 }

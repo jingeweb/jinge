@@ -36,6 +36,7 @@ class JingeWebpackPlugin {
     store.extractComponentStyles.forEach(info => {
       output += info.css || '';
     });
+    output = output.replace(/@charset "UTF-8";/g, '');
     // TODO: generate soure map
     if (compress) {
       output = new CleanCSS().minify(output).styles;
