@@ -10,9 +10,7 @@ import {
   getFirstHtmlDOM,
   CONTEXT,
   onAfterRender,
-  getLastHtmlDOM,
-  STATE,
-  STATE_RENDERED
+  getLastHtmlDOM
 } from '../core/component';
 import {
   isArray,
@@ -23,9 +21,7 @@ import {
   STR_EMPTY,
   STR_LENGTH,
   isNumber,
-  isString,
-  setImmediate,
-  clearImmediate
+  isString
 } from '../util';
 import {
   createComment,
@@ -50,8 +46,7 @@ import {
 export const FOR_LENGTH = Symbol('length');
 export const FOR_KEYS = Symbol('keys');
 export const FOR_KEY_NAME = Symbol('key');
-export const FOR_UPDATE_TM = Symbol('update_tm');
-export const FOR_UPDATE_HD = Symbol('update_handler');
+export const FOR_WAIT_UPDATE = Symbol('waiting_update');
 export const FOR_UPDATE_ITEM = Symbol('update_item');
 
 const KEY_INDEX = 'index';
@@ -103,6 +98,7 @@ function prepare_key(item, i, keyMap, keyName) {
   keyMap.set(key, i);
   return key;
 }
+
 function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
   const result = [];
   const tmpKeyMap = new Map();
@@ -115,6 +111,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
   });
   return result;
 }
+
 function loopAppend($parent, el) {
   el[ROOT_NODES].forEach(node => {
     if (isComponent(node)) {
@@ -124,6 +121,7 @@ function loopAppend($parent, el) {
     }
   });
 }
+
 function updateEl(el, i, items) {
   if (el.isFirst !== (i === 0)) {
     el.isFirst = i === 0;
@@ -154,8 +152,7 @@ export class ForComponent extends Component {
     this[FOR_KEY_NAME] = kn;
     this[FOR_LENGTH] = 0;
     this[FOR_KEYS] = null;
-    this[FOR_UPDATE_TM] = null;
-    this[FOR_UPDATE_HD] = this[UPDATE_IF_NEED].bind(this);
+    this[FOR_WAIT_UPDATE] = false;
 
     if (kn !== KEY_INDEX && kn !== KEY_EACH) {
       this[FOR_KEY_NAME] = new Function(KEY_EACH, `return ${kn}`);
@@ -163,7 +160,7 @@ export class ForComponent extends Component {
       const propCount = kn.split('.').length + 1;
       // console.log(propCount);
       vmWatch(this, 'loop.*.' + kn.slice(5), propPath => {
-        if (propPath.length !== propCount || this[FOR_UPDATE_TM]) {
+        if (propPath.length !== propCount || this[FOR_WAIT_UPDATE]) {
           // ignore if it's parent path
           // or is alreay waiting for update
           // console.log('skip2', propPath);
@@ -181,7 +178,7 @@ export class ForComponent extends Component {
       });
     }
     vmWatch(this, 'loop.*', propPath => {
-      if (propPath.length !== 2 || this[FOR_UPDATE_TM]) {
+      if (propPath.length !== 2 || this[FOR_WAIT_UPDATE]) {
         // if propPath.length === 1 means loop variable changed, loop setter will handle it.
         // ignore if is alreay waiting for update
         // console.log('skip', propPath);
@@ -190,17 +187,13 @@ export class ForComponent extends Component {
       // console.log(propPath);
       const p = _parse_index_path(propPath[1]);
       if (p === STR_LENGTH) {
-        this[FOR_UPDATE_TM] = setImmediate(this[FOR_UPDATE_HD]);
+        this[FOR_WAIT_UPDATE] = true;
+        this[UPDATE_IF_NEED]();
+        // this[FOR_UPDATE_TM] = setImmediate(this[FOR_UPDATE_HD]);
       } else if (isNumber(p)) {
         this[FOR_UPDATE_ITEM](p);
       }
     });
-  }
-  beforeDestroy() {
-    if (this[FOR_UPDATE_TM]) {
-      clearImmediate(this[FOR_UPDATE_TM]);
-      this[FOR_UPDATE_TM] = null;
-    }
   }
   get loop() {
     return this._l;
@@ -208,9 +201,8 @@ export class ForComponent extends Component {
   set loop(v) {
     // console.log('set loop');
     this._l = v;
-    if (this[STATE] === STATE_RENDERED && !this[FOR_UPDATE_TM]) {
-      this[FOR_UPDATE_TM] = setImmediate(this[FOR_UPDATE_HD]);
-    }
+    this[FOR_WAIT_UPDATE] = true;
+    this[UPDATE_IF_NEED]();
   }
   [RENDER]() {
     const roots = this[ROOT_NODES];
@@ -274,7 +266,7 @@ export class ForComponent extends Component {
     }
   }
   [UPDATE]() {
-    this[FOR_UPDATE_TM] = null;
+    this[FOR_WAIT_UPDATE] = false;
     // console.log('for update');
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
     if (!itemRenderFn) return;

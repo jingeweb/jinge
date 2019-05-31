@@ -25,17 +25,31 @@ export {
   BindHtmlComponent
 } from './components/html';
 export {
-  Component
+  Component,
+  AFTER_RENDER,
+  BEFORE_DESTROY,
+  UPDATE_IF_NEED,
+  UPDATE,
+  GET_REF,
+  CONTEXT,
+  GET_CONTEXT,
+  SET_CONTEXT,
+  RENDER,
+  ARG_COMPONENTS
 } from './core/component';
 export {
-  wrapViewModel as VM
+  wrapViewModel as VM,
+  wrapAttrs
 } from './viewmodel/proxy';
 export {
   vmWatch,
   vmUnwatch
 } from './viewmodel/notify';
 export {
-  Messenger
+  Messenger,
+  NOTIFY,
+  ON,
+  OFF
 } from './core/messenger';
 export {
   _t,
@@ -48,6 +62,22 @@ export {
 export {
   bootstrap
 } from './core/bootstrap';
+export {
+  Symbol,
+  STR_DEFAULT,
+  STR_JINGE,
+  STR_EMPTY,
+  isString,
+  isObject,
+  isFunction,
+  isNumber,
+  instanceOf,
+  isUndefined,
+  isBoolean,
+  obj2class,
+  setImmediate,
+  clearImmediate
+} from './util';
 
 import * as components from './components';
 import * as config from './config';

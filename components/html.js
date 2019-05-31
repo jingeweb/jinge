@@ -34,12 +34,12 @@ export class BindHtmlComponent extends Component {
     if (attrs[ARG_COMPONENTS]) throw new Error('<bind-html/> don\'t accept any child.');
     if (!('content' in attrs)) throw new Error('<bind-html/> require "content" attribute');
     super(attrs);
-    this.content = attrs.content;
+    this.c = attrs.content;
   }
-  get content() {
+  get c() {
     return this._c;
   }
-  set content(v) {
+  set c(v) {
     if (this._c === v) return;
     this._c = v;
     this[UPDATE_IF_NEED]();

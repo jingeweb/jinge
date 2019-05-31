@@ -7,7 +7,8 @@ import {
   CFG_I18N_WARN_KEY_NOT_FOUND
 } from '../config';
 import {
-  Messenger
+  Messenger,
+  NOTIFY
 } from './messenger';
 
 export const messenger = new Messenger();
@@ -71,6 +72,6 @@ export function registerData(dict) {
   const hasOld = !!dictStore;
   dictStore = dict;
   if (hasOld) {
-    messenger.notify(I18N_DATA_CHANGED);
+    messenger[NOTIFY](I18N_DATA_CHANGED);
   }
 }

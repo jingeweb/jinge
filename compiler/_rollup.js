@@ -12,7 +12,7 @@ function jingeBuildSelfPlugin(opts) {
     transform ( code, id ) {
       if (!id.startsWith(opts.innerComponentsDir)) return;
       if (path.basename(id) === 'index.js') return;
-      return ComponentParser.parse(code, {
+      return ComponentParser.parse(code, null, {
         resourcePath: id,
         componentStyleStore: store,
         jingeBase: path.relative(path.dirname(id), opts.jingeRoot),
@@ -29,7 +29,7 @@ function jingeBuildSelfPlugin(opts) {
         tabSize: opts.tabSize,
         componentAlias: opts.componentAlias,
         componentBase: opts.componentBase,
-        isProduction: true
+        compress: true
       }).then(result => {
         // console.log(result.code);
         return result;

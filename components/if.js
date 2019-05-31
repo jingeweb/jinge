@@ -12,6 +12,9 @@ import {
   isComponent
 } from '../core/component';
 import {
+  NOTIFY
+} from '../core/messenger';
+import {
   createComment,
   getParent,
   removeChild,
@@ -141,7 +144,7 @@ function doUpdate(component) {
     removeChild(pa, fd);
   }
   ne && onAfterRender(ne);
-  component.notify('branch-switched', component[C_BV]);
+  component[NOTIFY]('branch-switched', component[C_BV]);
 }
 
 function cancelTs(t, tn, e, component) {
@@ -154,7 +157,7 @@ function cancelTs(t, tn, e, component) {
   removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
   removeEvent(el, TS_TRANSITION_END, onEnd);
   removeEvent(el, TS_ANIMATION_END, onEnd);
-  component.notify(TS_TRANSITION, e ? TS_ENTER_CANCELLED : TS_LEAVE_CANCELLED, el);
+  component[NOTIFY](TS_TRANSITION, e ? TS_ENTER_CANCELLED : TS_LEAVE_CANCELLED, el);
 }
 
 function startTs(t, tn, e, component) {
@@ -182,9 +185,9 @@ function startTs(t, tn, e, component) {
   }
   t[0] = e ? TS_STATE_ENTERING : TS_STATE_LEAVING;
   addEvent(el, t_end, onEnd);
-  component.notify(TS_TRANSITION, e ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, el);
+  component[NOTIFY](TS_TRANSITION, e ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, el);
   raf(() => {
-    component.notify(TS_TRANSITION, e ? TS_ENTER : TS_LEAVE, el);
+    component[NOTIFY](TS_TRANSITION, e ? TS_ENTER : TS_LEAVE, el);
   });
 }
 function updateSwitch_ts(component) {
@@ -230,7 +233,7 @@ function updateSwitch_ts_end(component) {
     removeEvent(el, TS_ANIMATION_END, component[OE_H]);
     removeClass(el, tn + (e  ? TS_C_ENTER : TS_C_LEAVE));
     removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
-    component.notify(TS_TRANSITION, e ? TS_AFTER_ENTER : TS_AFTER_LEAVE);
+    component[NOTIFY](TS_TRANSITION, e ? TS_AFTER_ENTER : TS_AFTER_LEAVE);
   }
   
   pt[0] = e ? TS_STATE_ENTERED : TS_STATE_LEAVED;
@@ -254,20 +257,20 @@ function updateSwitch_ts_end(component) {
 export class IfComponent extends Component {
   constructor(attrs) {
     super(attrs);
-    this.expect = attrs.expect;
+    this.e = attrs.expect;
     this[ENABLE_TRANSITION] = attrs.transition; // enable transition
   }
-  get expect() {
+  get e() {
     return this[C_VAL] === STR_DEFAULT;
   }
-  set expect(v) {
+  set e(v) {
     v = v ? STR_DEFAULT : IF_STR_ELSE;
     if (this[C_VAL] === v) return;
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
   get [C_BV]() {
-    return this.expect;
+    return this.e;
   }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);
@@ -283,13 +286,13 @@ export class IfComponent extends Component {
 export class SwitchComponent extends Component {
   constructor(attrs) {
     super(attrs);
-    this.test = attrs.test;
+    this.t = attrs.test;
     this[ENABLE_TRANSITION] = attrs.transition; // enable transition
   }
-  get test() {
+  get t() {
     return this[C_VAL];
   }
-  set test(v) {
+  set t(v) {
     const acs = this[ARG_COMPONENTS];
     if (!acs || !(v in acs)) {
       v = STR_DEFAULT;
@@ -299,7 +302,7 @@ export class SwitchComponent extends Component {
     this[UPDATE_IF_NEED]();
   }
   get [C_BV]() {
-    return this.test;
+    return this.t;
   }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);

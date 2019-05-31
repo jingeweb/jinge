@@ -25,6 +25,9 @@ import {
   vmUnwatch
 } from '../viewmodel/notify';
 import {
+  NOTIFY
+} from '../core/messenger';
+import {
   TS_STATE_ENTERED,
   TS_STATE_LEAVED,
   TS_STATE_LEAVING,
@@ -120,7 +123,7 @@ export class ToggleClassComponent extends Component {
         removeEvent(el, TS_TRANSITION_END, t[1]);
         removeEvent(el, TS_ANIMATION_END, t[1]);
         t[1] = null;
-        this.notify(TS_TRANSITION, v ? TS_LEAVE_CANCELLED : TS_ENTER_CANCELLED, k, el);
+        this[NOTIFY](TS_TRANSITION, v ? TS_LEAVE_CANCELLED : TS_ENTER_CANCELLED, k, el);
       }
       const class_n = k + (v ? TS_C_ENTER : TS_C_LEAVE);
       const class_a = k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
@@ -147,14 +150,14 @@ export class ToggleClassComponent extends Component {
         t[1] = null;
         t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
         v ? addClass(el, k) : removeClass(el, k);
-        this.notify(TS_TRANSITION, v ? TS_AFTER_ENTER : TS_AFTER_LEAVE, k, el);
+        this[NOTIFY](TS_TRANSITION, v ? TS_AFTER_ENTER : TS_AFTER_LEAVE, k, el);
       };
       t[0] = v ? TS_STATE_ENTERING : TS_STATE_LEAVING;
       t[1] = onEnd;
       addEvent(el, t_end, onEnd);
-      this.notify(TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
+      this[NOTIFY](TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
       raf(() => {
-        this.notify(TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
+        this[NOTIFY](TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
       });
     });
   }

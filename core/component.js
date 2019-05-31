@@ -13,7 +13,8 @@ import {
   VM_PARENTS
 } from '../viewmodel/common';
 import {
-  Messenger
+  Messenger,
+  CLEAR
 } from './messenger';
 import {
   manager as StyleManager, CSTYLE_ADD, CSTYLE_DEL, CSTYLE_ATTACH
@@ -30,7 +31,9 @@ import {
   createEmptyObject,
   arrayFindIndex,
   arrayEqual,
-  STR_EMPTY
+  STR_EMPTY,
+  setImmediate,
+  clearImmediate
 } from '../util';
 import {
   getParent,
@@ -62,8 +65,14 @@ export const RELATED_VM_LISTENERS = Symbol('related_vm_listeners');
 export const RELATED_VM_ON = Symbol('related_vm_on');
 export const RELATED_VM_OFF = Symbol('related_vm_off');
 export const GET_STATE_NAME = Symbol('get_state_name');
+export const AFTER_RENDER = Symbol('afterRender');
+export const BEFORE_DESTROY = Symbol('beforeDestroy');
+export const GET_CONTEXT = Symbol('getContext');
+export const SET_CONTEXT = Symbol('setContext');
+export const GET_REF = Symbol('getRef');
 export const UPDATE = Symbol('update');
 export const UPDATE_IF_NEED = Symbol('update_if_need');
+export const UPDATE_NEXT_MAP = Symbol('update_next_tick_map');
 export const STATE = Symbol('state');
 export const STATE_INITIALIZE = 0;
 export const STATE_RENDERED = 1;
@@ -84,7 +93,7 @@ export function onAfterRender(node) {
   node[NON_ROOT_COMPONENT_NODES].forEach(onAfterRender);
   node[STATE] = STATE_RENDERED;
   node[CONTEXT_STATE] = -1; // has been rendered, can't modify context
-  node.afterRender();
+  node[AFTER_RENDER]();
 }
 
 function removeRootNodes(component, $parent) {
@@ -104,6 +113,7 @@ function getOrCreateMap(comp, prop) {
   return m;
 }
 
+
 export class Component extends Messenger {
   /**
    * compiler will auto transform the `template` getter's return value from String to Render Function.
@@ -120,7 +130,8 @@ export class Component extends Messenger {
     }
     super();
     this[VM_PARENTS] = null;
-    this[VM_LISTENERS] = null; 
+    this[VM_LISTENERS] = null;
+    this[UPDATE_NEXT_MAP] = null;
     this[CONTEXT] = attrs[CONTEXT];
     this[CONTEXT_STATE] = 0;
     this[ARG_COMPONENTS] = attrs[ARG_COMPONENTS];
@@ -262,8 +273,15 @@ export class Component extends Messenger {
   [DESTROY](removeDOM = true) {
     if (this[STATE] > STATE_WILLDESTROY) return;
     this[STATE] = STATE_WILLDESTROY;
-    this.beforeDestroy();
-    super.clear();   // dont forgot call super clear.
+    this[BEFORE_DESTROY]();
+    super[CLEAR]();   // dont forgot call super clear.
+    // clear next tick update setImmediate 
+    if (this[UPDATE_NEXT_MAP]) {
+      this[UPDATE_NEXT_MAP].forEach(imm => {
+        clearImmediate(imm);
+      });
+      this[UPDATE_NEXT_MAP].clear();
+    }
     this[VM_CLEAR](); // dont forgot clear vm listeners
     destroyRelatedVM(this);
     this[NON_ROOT_COMPONENT_NODES].forEach(component => {
@@ -291,10 +309,40 @@ export class Component extends Messenger {
       removeRootNodes(this);
     }
   }
-  [UPDATE_IF_NEED]() {
-    if (this[STATE] === STATE_RENDERED) {
-      this[UPDATE]();
+  /**
+   * 
+   * @param {Function|boolean} handler 
+   * @param {boolean} nextTick 
+   */
+  [UPDATE_IF_NEED](handler = null, nextTick = true) {
+    if (this[STATE] !== STATE_RENDERED) {
+      return;
     }
+    if (handler === false) {
+      return this[UPDATE]();
+    }
+  
+    if (!isFunction(handler)) {
+      handler = this[UPDATE];
+    }
+
+    if (!nextTick) {
+      handler.call(this);
+      return;
+    }
+
+    let ntMap = this[UPDATE_NEXT_MAP];
+    if (!ntMap) {
+      ntMap = this[UPDATE_NEXT_MAP] = new Map();
+    }
+    if (ntMap.has(handler)) {
+      // already in queue.
+      return;
+    }
+    ntMap.set(handler, setImmediate(() => {
+      ntMap.delete(handler);
+      handler.call(this);
+    }));
   }
   [UPDATE]() {
     throw new Error('abstract method');
@@ -302,7 +350,7 @@ export class Component extends Messenger {
   [GET_STATE_NAME]() {
     return STATE_NAMES[this[STATE]];
   }
-  setContext(id, ctx, forceOverride = false) {
+  [SET_CONTEXT](id, ctx, forceOverride = false) {
     if (this[CONTEXT_STATE] < 0) {
       throw new Error('Can\'t setContext after component has been rendered. Try put setContext code into constructor.');
     }
@@ -325,15 +373,20 @@ export class Component extends Messenger {
     }
     this[CONTEXT][id] = ctx;
   }
-  getContext(id) {
+  [GET_CONTEXT](id) {
     return this[CONTEXT] ? this[CONTEXT][id] : null;
   }
   [SET_REF_NODE](ref, el, relatedComponent) {
     const rns = getOrCreateMap(this, REF_NODES);
-    if (rns.has(ref)) {
-      throw new Error(`ref name '${ref}' of component '${this.constructor.name}' is dulplicated.`);
+    let elOrArr = rns.get(ref);
+    if (!elOrArr) {
+      rns.set(ref, el);
+    } else if (isArray(elOrArr)) {
+      elOrArr.push(el);
+    } else {
+      elOrArr = [elOrArr, el];
+      rns.set(ref, elOrArr);
     }
-    rns.set(ref, el);
     if (relatedComponent === this) return;
     const rvrs = getOrCreateMap(relatedComponent, RELATED_VM_REFS);
     let rs = rvrs.get(this);
@@ -343,17 +396,28 @@ export class Component extends Messenger {
     }
     rs.push(ref);
   }
-  getChild(ref) {
+  /**
+   * Get child node(or nodes) marked by 'ref:' attribute in template 
+   * @param {String} ref 
+   * @returns {Node|Array<Node>}
+   */
+  [GET_REF](ref) {
     if (this[STATE] !== STATE_RENDERED) {
       console.error(`Warning: call getChild before component '${this.constructor.name}' is rendered will get nothing, try put getChild into afterRender lifecycle hook.`);
     }
     return this[REF_NODES] ? this[REF_NODES].get(ref) : null;
   }
-  afterRender() {
-    // life time hook
+  /**
+   * lifecycle hook, called after rendered.
+   */
+  [AFTER_RENDER]() {
+    // lifecycle hook, default do nothing.
   }
-  beforeDestroy() {
-    // life time hook
+  /**
+   * lifecycle hook, called before destroy.
+   */
+  [BEFORE_DESTROY]() {
+    // lifecycle hook, default do nothing.
   }
 }
 

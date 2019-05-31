@@ -13,10 +13,4 @@ export class ParameterComponent extends Component {
       attrs[VM_ON](p, () => this[p] = attrs[p]);
     });
   }
-  // afterRender() {
-  //   console.log('pc ar');
-  // }
-  // beforeDestroy() {
-  //   console.log('pc bd');
-  // }
 }

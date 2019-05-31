@@ -57,14 +57,19 @@ export function onceHelper(listenersMap, notifyKey, listener) {
   onHelper(listenersMap, notifyKey, onceListener);
 }
 
+export const NOTIFY = Symbol('notify');
+export const ON = Symbol('on');
+export const OFF = Symbol('off');
+export const CLEAR = Symbol('clear');
+
 export class Messenger {
   constructor() {
     this[LISTENERS] = null;
   }
-  notify(eventName, ...args) {
+  [NOTIFY](eventName, ...args) {
     notifyHelper(this[LISTENERS], eventName, ...args);
   }
-  on(eventName, eventListener, opts) {
+  [ON](eventName, eventListener, opts) {
     const me = this;
     if (!me[LISTENERS]) {
       me[LISTENERS] = new Map();
@@ -78,10 +83,10 @@ export class Messenger {
       onHelper(me[LISTENERS], eventName, eventListener);
     }
   }
-  off(eventName, eventListener) {
+  [OFF](eventName, eventListener) {
     offHelper(this[LISTENERS], eventName, eventListener);
   }
-  clear(eventName) {
+  [CLEAR](eventName) {
     clearHelper(this[LISTENERS], eventName);
   }
 }

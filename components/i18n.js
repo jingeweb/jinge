@@ -8,13 +8,9 @@ import {
   RENDER,
   ROOT_NODES,
   UPDATE,
-  STATE,
-  STATE_RENDERED
+  BEFORE_DESTROY,
+  UPDATE_IF_NEED
 } from '../core/component';
-import { 
-  setImmediate,
-  clearImmediate
-} from '../util';
 import {
   createTextNode,
   setText,
@@ -29,6 +25,10 @@ import {
   I18N_DATA_CHANGED,
   _t as i18nRender
 } from '../core/i18n';
+import {
+  ON,
+  OFF
+} from '../core/messenger';
 
 function render() {
   if (this._h) {
@@ -56,15 +56,6 @@ function update() {
   }
 }
 
-function updateLater() {
-  if (this[STATE] !== STATE_RENDERED) return;
-  if (this._i) clearImmediate(this._i);
-  this._i = setImmediate(() => {
-    this._i = null;
-    this[UPDATE]();
-  });
-}
-
 const I18nComponentsCache = new Map();
 export class I18nComponent extends Component {
   static prefix(prefix, cache = true) {
@@ -86,27 +77,25 @@ export class I18nComponent extends Component {
   constructor(attrs) {
     if (!attrs.key) throw new Error('I18n component require attribute "key". see https://todo');
     super(attrs);
-    this.key = attrs.key;
+    this.k = attrs.key;
     this.p = attrs.params;
     this._h = !!attrs._html; // render html mode
     this._f = ''; // prefix
-
-    this._i = null;  // update immediate
-    this._ub = updateLater.bind(this);
-    vmWatch(this, 'p.**', this._ub);
-    i18nMessenger.on(I18N_DATA_CHANGED, this._ub);
+    this._o = this[UPDATE_IF_NEED].bind(this);
+    vmWatch(this, 'p.**', this._o);
+    i18nMessenger[ON](I18N_DATA_CHANGED, this._o);
   }
-  beforeDestroy() {
-    vmUnwatch(this, 'p.**', this._ub);
-    i18nMessenger.off(I18N_DATA_CHANGED, this._ub);
+  [BEFORE_DESTROY]() {
+    vmUnwatch(this, 'p.**', this._o);
+    i18nMessenger[OFF](I18N_DATA_CHANGED, this._o);
   }
-  get key() {
+  get k() {
     return this._k;
   }
-  set key(v) {
+  set k(v) {
     if (this._k === v) return;
     this._k = v;
-    updateLater.call(this);
+    this[UPDATE_IF_NEED]();
   }
   /**
    * render text
@@ -128,8 +117,7 @@ export class _TComponent extends Component {
     this.p = attrs.params;
     this._t = attrs._text;
     this._h = !!attrs._html; // render html mode
-    this._i = null;  // update immediate
-    vmWatch(this, 'p.**', updateLater.bind(this));
+    vmWatch(this, 'p.**', () => this[UPDATE_IF_NEED]());
   }
   beforeDestroy() {
     vmUnwatch(this, 'p.**');
