@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
   "main": "index.js",
   "scripts": {
