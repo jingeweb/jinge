@@ -16,10 +16,11 @@ export function defineProperty(...args) {
   return Object.defineProperty(...args);
 }
 
-export function obj2class(obj) {
-  return Object.keys(obj).map(k => {
+export function obj2class(obj, prepend) {
+  const classes = Object.keys(obj).map(k => {
     return obj[k] ? k : '';
-  }).join(' ');
+  }).join(' ').trim();
+  return prepend ? `${prepend} ${classes}` : classes; 
 }
 
 export function defineProperties(...args) {

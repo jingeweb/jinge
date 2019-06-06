@@ -195,7 +195,9 @@ class ComponentParser {
     if (node.specifiers.length === 0) {
       if (_isStyle) {
         source = source || (await this._resolve(node));
-        this.componentStyleStore.extractStyles.set(source, {code: null});
+        if (!this.componentStyleStore.extractStyles.has(source)) {
+          this.componentStyleStore.extractStyles.set(source, {code: null});
+        }
       }
       return false;
     }

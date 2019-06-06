@@ -31,7 +31,7 @@
     "escodegen": "^1.11.1",
     "html-entities": "^1.2.1",
     "html-tags": "^3.0.0",
-    "postcss": "^7.0.16",
+    "postcss": "^7.0.17",
     "postcss-discard-comments": "^4.0.2",
     "postcss-prettify": "^0.3.4",
     "postcss-selector-parser": "^6.0.2"
@@ -39,9 +39,9 @@
   "devDependencies": {
     "eslint": "^5.16.0",
     "precommit-hook": "^3.0.0",
-    "rollup": "^1.12.5",
+    "rollup": "^1.14.2",
     "rollup-plugin-banner": "^0.2.0",
-    "rollup-plugin-node-resolve": "^5.0.0",
+    "rollup-plugin-node-resolve": "^5.0.1",
     "rollup-plugin-terser": "^5.0.0"
   },
   "pre-commit": [

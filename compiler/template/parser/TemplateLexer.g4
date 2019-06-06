@@ -47,4 +47,4 @@ fragment DIGIT: [0-9];
 fragment TAG_NameStartChar: [_$a-zA-Z] | '-';
 fragment TAG_NameChar: TAG_NameStartChar | DIGIT;
 fragment ATTR_NameStartChar: TAG_NameStartChar;
-fragment ATTR_NameChar: ATTR_NameStartChar | DIGIT | ':' | '.' | '|';
+fragment ATTR_NameChar: ATTR_NameStartChar | DIGIT | ':' | '.' | '|' | ',';
