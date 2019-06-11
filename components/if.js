@@ -6,7 +6,7 @@ import {
   UPDATE_IF_NEED,
   UPDATE,
   ROOT_NODES,
-  onAfterRender,
+  HANDLE_AFTER_RENDER,
   getFirstHtmlDOM,
   CONTEXT,
   isComponent
@@ -143,7 +143,7 @@ function doUpdate(component) {
   } else {
     removeChild(pa, fd);
   }
-  ne && onAfterRender(ne);
+  ne && renderFn && ne[HANDLE_AFTER_RENDER]();
   component[NOTIFY]('branch-switched', component[C_BV]);
 }
 

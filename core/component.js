@@ -41,7 +41,8 @@ import {
   replaceChild,
   createComment,
   createElement,
-  createTextNode
+  createTextNode,
+  appendChild
 } from '../dom';
 import {
   wrapComponent
@@ -66,6 +67,9 @@ export const RELATED_VM_ON = Symbol('related_vm_on');
 export const RELATED_VM_OFF = Symbol('related_vm_off');
 export const GET_STATE_NAME = Symbol('get_state_name');
 export const AFTER_RENDER = Symbol('afterRender');
+export const HANDLE_AFTER_RENDER = Symbol('handleAfterRender');
+export const HANDLE_REMOVE_ROOT_DOMS = Symbol('handle_remove_root_doms');
+export const HANDLE_BEFORE_DESTROY = Symbol('handleBeforeDestroy');
 export const BEFORE_DESTROY = Symbol('beforeDestroy');
 export const GET_CONTEXT = Symbol('getContext');
 export const SET_CONTEXT = Symbol('setContext');
@@ -85,26 +89,6 @@ export const STATE_NAMES = [
 function copyContext(context) {
   if (!context) return null;
   return Object.assign(createEmptyObject(), context);
-}
-
-export function onAfterRender(node) {
-  if (!isComponent(node)) return; // skip html-node
-  node[ROOT_NODES].forEach(onAfterRender);
-  node[NON_ROOT_COMPONENT_NODES].forEach(onAfterRender);
-  node[STATE] = STATE_RENDERED;
-  node[CONTEXT_STATE] = -1; // has been rendered, can't modify context
-  node[AFTER_RENDER]();
-}
-
-function removeRootNodes(component, $parent) {
-  component[ROOT_NODES].forEach(node => {
-    if (isComponent(node)) removeRootNodes(node, $parent);
-    else {
-      if (!$parent) $parent = getParent(node);
-      removeChild($parent, node);
-    }
-  });
-  component[ROOT_NODES] = null;
 }
 
 function getOrCreateMap(comp, prop) {
@@ -256,19 +240,30 @@ export class Component extends Messenger {
     if (!renderFn && this[ARG_COMPONENTS]) {
       renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
     }
-    if (!isFunction(renderFn)) assert_fail();
+    if (!isFunction(renderFn)) {
+      assert_fail(`render function of ${Clazz.name} not found. Forget static getter "template"?`);
+    }
     StyleManager[CSTYLE_ADD](Clazz.style);
     return renderFn(this);
   }
-  [RENDER_TO_DOM]($targetDOM) {
+  /**
+   * 
+   * @param {HTMLElement} $targetDOM 
+   * @param {Boolean} replaceMode if false, use append mode
+   */
+  [RENDER_TO_DOM]($targetDOM, replaceMode = true) {
     if (!isDOMNode($targetDOM)) assert_fail();
     if (this[STATE] !== STATE_INITIALIZE) {
       assert_fail();
     }
     const rr = assertRenderResults(this[RENDER]());
     StyleManager[CSTYLE_ATTACH]();
-    replaceChild(getParent($targetDOM), rr, $targetDOM);
-    onAfterRender(this);
+    if (replaceMode) {
+      replaceChild(getParent($targetDOM), rr, $targetDOM);
+    } else {
+      appendChild($targetDOM, rr);
+    }
+    this[HANDLE_AFTER_RENDER]();
   }
   [DESTROY](removeDOM = true) {
     if (this[STATE] > STATE_WILLDESTROY) return;
@@ -284,14 +279,7 @@ export class Component extends Messenger {
     }
     this[VM_CLEAR](); // dont forgot clear vm listeners
     destroyRelatedVM(this);
-    this[NON_ROOT_COMPONENT_NODES].forEach(component => {
-      component[DESTROY](false);
-    });
-    this[ROOT_NODES].forEach(node => {
-      if (isComponent(node)) {
-        node[DESTROY](false);
-      }
-    });
+    this[HANDLE_BEFORE_DESTROY]();
 
     // remove component style
     StyleManager[CSTYLE_DEL](this.constructor.style);
@@ -306,8 +294,40 @@ export class Component extends Messenger {
     
     // remove dom
     if (removeDOM) {
-      removeRootNodes(this);
+      this[HANDLE_REMOVE_ROOT_DOMS]();
     }
+  }
+  [HANDLE_BEFORE_DESTROY]() {
+    this[NON_ROOT_COMPONENT_NODES].forEach(component => {
+      component[DESTROY](false);
+    });
+    this[ROOT_NODES].forEach(node => {
+      if (isComponent(node)) {
+        node[DESTROY](false);
+      }
+    });
+  }
+  [HANDLE_REMOVE_ROOT_DOMS]($parent) {
+    this[ROOT_NODES].forEach(node => {
+      if (isComponent(node)) {
+        node[HANDLE_REMOVE_ROOT_DOMS]($parent);
+      } else {
+        if (!$parent) $parent = getParent(node);
+        removeChild($parent, node);
+      }
+    });
+    this[ROOT_NODES] = null;
+  }
+  [HANDLE_AFTER_RENDER]() {
+    this[ROOT_NODES].forEach(n => {
+      if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
+    });
+    this[NON_ROOT_COMPONENT_NODES].forEach(n => {
+      if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
+    });
+    this[STATE] = STATE_RENDERED;
+    this[CONTEXT_STATE] = -1; // has been rendered, can't modify context
+    this[AFTER_RENDER]();
   }
   /**
    * 

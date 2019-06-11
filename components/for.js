@@ -9,7 +9,7 @@ import {
   isComponent,
   getFirstHtmlDOM,
   CONTEXT,
-  onAfterRender,
+  HANDLE_AFTER_RENDER,
   getLastHtmlDOM
 } from '../core/component';
 import {
@@ -256,7 +256,7 @@ export class ForComponent extends Component {
         oldEl[DESTROY]();
         roots[index] = newEl;
         keys[index] = newKey;
-        onAfterRender(newEl);
+        newEl[HANDLE_AFTER_RENDER]();
         // console.log('update item render:', index);
       } else {
         oldEl.each = item;
@@ -317,7 +317,7 @@ export class ForComponent extends Component {
         const $le = ol === 0 ? firstEl : getLastHtmlDOM(roots[ol - 1]);
         insertAfter($parent, $f, $le);
         for(let i = ol; i < nl; i++) {
-          onAfterRender(roots[i]);
+          roots[i][HANDLE_AFTER_RENDER]();
         }
       }
       if (ol === 0) {
@@ -341,7 +341,7 @@ export class ForComponent extends Component {
       );
       insertAfter($parent, createFragment(rs), firstEl);
       removeChild($parent, firstEl);
-      roots.forEach(el => onAfterRender(el));
+      roots.forEach(el => el[HANDLE_AFTER_RENDER]());
       return;
     }
 
@@ -394,7 +394,7 @@ export class ForComponent extends Component {
             appendChild($parent, $f);
           }
           for(let i = cei; i < newRoots.length; i++) {
-            onAfterRender(newRoots[i]);
+            newRoots[i][HANDLE_AFTER_RENDER]();
           }
         }
         break;
@@ -432,7 +432,7 @@ export class ForComponent extends Component {
       }
       const el = roots[oi];
       $f && insertBefore($parent, $f, getFirstHtmlDOM(el));
-      $nes && $nes.forEach(el => onAfterRender(el));
+      $nes && $nes.forEach(el => el[HANDLE_AFTER_RENDER]());
       updateEl(el, ni, newItems);
       newRoots.push(el);
       oi++;

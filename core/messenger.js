@@ -90,3 +90,31 @@ export class Messenger {
     clearHelper(this[LISTENERS], eventName);
   }
 }
+
+/**
+ * pass all listeners on srcMessenger to dstMessenger
+ * @param {Messenger} srcMessenger 
+ * @param {Messenger} dstMessenger 
+ */
+export function passListeners(srcMessenger, dstMessenger) {
+  if (!(LISTENERS in srcMessenger) || !(LISTENERS in dstMessenger)) {
+    // src or dst is not instance of Messenger
+    return;
+  }
+  const srcLis = srcMessenger[LISTENERS];
+  if (!srcLis) return;
+  srcLis.forEach((lis, key) => {
+    let dstLis = dstMessenger[LISTENERS];
+    if (!dstLis) {
+      dstLis = dstMessenger[LISTENERS] = new Map();
+    }
+    lis.forEach(listener => {
+      const tag = listener.tag;
+      if (tag && tag.once) {
+        onceHelper(dstLis, key, listener);
+      } else {
+        onHelper(dstLis, key, listener);
+      }
+    });
+  });
+}

@@ -35,7 +35,10 @@ export {
   GET_CONTEXT,
   SET_CONTEXT,
   RENDER,
-  ARG_COMPONENTS
+  ARG_COMPONENTS,
+  ROOT_NODES,
+  NON_ROOT_COMPONENT_NODES,
+  getFirstHtmlDOM
 } from './core/component';
 export {
   wrapViewModel as VM,
@@ -49,7 +52,8 @@ export {
   Messenger,
   NOTIFY,
   ON,
-  OFF
+  OFF,
+  passListeners as passMessengerListeners
 } from './core/messenger';
 export {
   _t,
