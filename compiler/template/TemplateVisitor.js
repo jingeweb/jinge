@@ -1336,11 +1336,12 @@ ${body}
     if (etag.startsWith('_') && etag !== '_t' && etag !== '_slot') {
       this._throwParseError(ctx.start, 'html tag starts with "_" is compiler preserved tag name. Current version only support: "<_t>" and "<_slot>". see https://todo"');
     }
+
     if (etag === '_t') {
       return this._parse_translate(ctx);
     } else if (etag === '_slot') {
       return this._parse_component_ele(etag, etag, ctx);
-    } else if (/^[a-z\d-]+$/.test(etag)) {
+    } else if (/^[a-z\d_-]+$/.test(etag)) {
       if (etag in this._alias) {
         const [c, source] = this._alias[etag];
         let arr = this._aliasImports[source];
