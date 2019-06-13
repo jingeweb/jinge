@@ -23,11 +23,17 @@ export function obj2class(obj, prepend) {
   return prepend ? `${prepend} ${classes}` : classes; 
 }
 
+export function obj2style(obj) {
+  return Object.keys(obj).map(k => {
+    return obj[k] ? k : '';
+  }).join(';').trim();
+}
+
 export function defineProperties(...args) {
   return Object.defineProperties(...args);
 }
 
-export function simpleUUID() {
+export function uid() {
   return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
 }
 

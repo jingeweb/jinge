@@ -11,7 +11,7 @@ import {
 import {
   assert_fail,
   startsWith,
-  simpleUUID
+  uid
 } from './common';
 
 let nextHandle = 1; // Spec says greater than zero
@@ -54,7 +54,7 @@ function runIfPresent(handle) {
 
 if (isUndefined(window.setImmediate)) {
   tasksByHandle = new Map();
-  const messagePrefix = 'setImmediate$' + simpleUUID() + '$';
+  const messagePrefix = 'setImmediate$' + uid() + '$';
   window.addEventListener('message', event => {
     if (event.source === window &&
       isString(event.data) &&

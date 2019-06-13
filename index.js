@@ -38,7 +38,8 @@ export {
   ARG_COMPONENTS,
   ROOT_NODES,
   NON_ROOT_COMPONENT_NODES,
-  getFirstHtmlDOM
+  getFirstHtmlDOM,
+  isComponent
 } from './core/component';
 export {
   wrapViewModel as VM,
@@ -51,6 +52,7 @@ export {
 export {
   Messenger,
   NOTIFY,
+  LISTENERS,
   ON,
   OFF,
   passListeners as passMessengerListeners
@@ -78,7 +80,9 @@ export {
   instanceOf,
   isUndefined,
   isBoolean,
+  uid,
   obj2class,
+  obj2style,
   setImmediate,
   clearImmediate
 } from './util';

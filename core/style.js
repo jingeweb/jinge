@@ -1,6 +1,6 @@
 import {
   Symbol,
-  simpleUUID
+  uid
 } from '../util';
 import {
   createElement,
@@ -66,7 +66,7 @@ class ComponentStyleManager {
     this.s = 1;
     if (!isHideCssExists()) {
       this._c({
-        dom: `__jgsty_${simpleUUID()}__`,
+        dom: `__jgsty_${uid()}__`,
         css: '.jg-hide{display:none!important}.jg-hide.jg-hide-enter,.jg-hide.jg-hide-leave{display:block!important}'
       });
     }
