@@ -9,7 +9,7 @@ const TPL = require('./tpl');
 
 const IMPORTS = (function() {
   const map = {
-    'jinge/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createFragment,'
+    'jinge/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createSVGElement,createSVGElementWithoutAttrs,createFragment,'
       + 'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
     'jinge/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
     'jinge/viewmodel/common': 'VM_DEBUG_NAME',

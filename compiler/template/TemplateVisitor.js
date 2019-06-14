@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
+const SVGTags = require('svg-tags');
 const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
 const helper = require('./helper');
 const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
@@ -12,7 +13,8 @@ const { HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS } = require('./const');
 
 const {
   replaceTplStr,
-  prependTab
+  prependTab,
+  attrN
 } = require('../util');
 
 const TPL = require('./tpl');
@@ -679,7 +681,7 @@ class TemplateVisitor extends TemplateParserVisitor {
   }
   _parse_html_ele(etag, ctx) {
     const result = this._parse_attrs('html', etag, ctx, this._parent);
-    const elements = this._visit_child_nodes(ctx, result.vms, { type: 'html' });
+    const elements = this._visit_child_nodes(ctx, result.vms, { type: 'html', isSVG: this._parent.isSVG || etag === 'svg' });
     const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
@@ -687,10 +689,11 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (this._componentStyleId) {
       constAttrs.unshift([this._componentStyleId, '']);
     }
-    const ce = `${constAttrs.length > 0 ? 'createElement' : 'createElementWithoutAttrs'}_${this._id}`;
+    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 ? '' : 'WithoutAttrs'}`;
+    const ce = `${ceFn}_${this._id}`;
     const arr = [`"${etag}"`];
     if (constAttrs.length > 0) {
-      arr.push('{\n' + this._prependTab(result.constAttrs.map(at => `${at[0]}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}');
+      arr.push('{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}');
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -952,8 +955,8 @@ return el;`, true) + '\n})()';
     }
 
     const attrs = [];
-    result.argAttrs.length > 0 && attrs.push(...result.argAttrs.map(at => `${at[0]}: null`));
-    result.constAttrs.length > 0 && attrs.push(...result.constAttrs.map(at => `${at[0]}: ${JSON.stringify(at[1])}`));
+    result.argAttrs.length > 0 && attrs.push(...result.argAttrs.map(at => `${attrN(at[0])}: null`));
+    result.constAttrs.length > 0 && attrs.push(...result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`));
     if (elements.length > 0) attrs.push(`[ARG_COMPONENTS_${this._id}]: {
 ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT_${this._id}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
 }`);
@@ -1353,8 +1356,10 @@ ${body}
         }
         return this._parse_component_ele(etag, this._aliasLocalMap[source][c], ctx);
       }
-
-      if (HTMLTags.indexOf(etag) < 0) {
+      if (etag !== 'svg' && this._parent.isSVG && SVGTags.indexOf(etag) < 0) {
+        this._logParseError(ctx.start, `${etag} is not known svg tag.`);
+      }
+      if (etag !== 'svg' && !this._parent.isSVG && HTMLTags.indexOf(etag) < 0) {
         this._logParseError(ctx.start, `'${etag}' is not known html tag, do you forgot to config component alias?`, 'Warning');
       }
       return this._parse_html_ele(etag, ctx);

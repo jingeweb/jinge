@@ -25,7 +25,7 @@ export function obj2class(obj, prepend) {
 
 export function obj2style(obj) {
   return Object.keys(obj).map(k => {
-    return obj[k] ? k : '';
+    return `${k}: ${obj[k]}`;
   }).join(';').trim();
 }
 

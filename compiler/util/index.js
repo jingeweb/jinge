@@ -89,6 +89,10 @@ function calcTranslateId(info, file, opts) {
   return file + '/' + info.key;
 }
 
+function convertAttributeName(an) {
+  return /^[\w\d$_]+$/.test(an) ? an : JSON.stringify(an);
+}
+
 module.exports = {
   uuid,
   isSimpleType,
@@ -104,5 +108,6 @@ module.exports = {
   isBoolean,
   replaceTplStr,
   prependTab,
+  attrN: convertAttributeName,
   calcTranslateId
 };

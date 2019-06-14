@@ -23,17 +23,33 @@ export function setInputValue($inputOrTextarea, value) {
   $inputOrTextarea.value = value;
 }
 
-export function createElement(tag, attrs, ...children) {
-  const $e = document.createElement(tag);
+function _createEl($el, attrs, children) {
   if (attrs) for(const an in attrs) {
-    setAttribute($e, an, attrs[an]);
+    setAttribute($el, an, attrs[an]);
   }
-  children.forEach(child => appendChild($e, child));
-  return $e;
+  children.forEach(child => appendChild($el, child));
+  return $el;
+}
+export function createElement(tag, attrs, ...children) {
+  return _createEl(
+    document.createElement(tag),
+    attrs, children
+  );
 }
 
 export function createElementWithoutAttrs(tag, ...children) {
   return createElement(tag, null, ...children);
+}
+
+export function createSVGElement(tag, attrs, ...children) {
+  return _createEl(
+    document.createElementNS('http://www.w3.org/2000/svg', tag),
+    attrs, children
+  );
+}
+
+export function createSVGElementWithoutAttrs(tag, ...children) {
+  return createSVGElement(tag, null, ...children);
 }
 
 export function createFragment(children) {
