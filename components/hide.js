@@ -5,12 +5,8 @@ import {
   ToggleClassComponent
 } from './class';
 import {
-  vmWatch,
-  vmUnwatch
+  vmWatch
 } from '../viewmodel/notify';
-import {
-  BEFORE_DESTROY
-} from '../core/component';
 
 export const STR_JG_HIDE = 'jg-hide';
 
@@ -26,9 +22,5 @@ export class HideComponent extends ToggleClassComponent {
     });
     // eslint-disable-next-line constructor-super
     return super(attrs);
-  }
-  [BEFORE_DESTROY]() {
-    /* this.attrs is same as 'attrs' passed to constructor */
-    vmUnwatch(this.attrs, 'test');
   }
 }

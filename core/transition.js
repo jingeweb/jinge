@@ -36,3 +36,26 @@ export function getDurationType(el) {
   }
   return null;
 }
+
+function parseDuration(v) {
+  if (/ms$/.test(v)) {
+    return parseInt(v);
+  } else if (/s$/.test(v)) {
+    return parseFloat(v) * 1000;
+  } else {
+    return 0;
+  }
+}
+
+export function getDuration(el) {
+  const cst = getComputedStyle(el);
+  let dur = getCSPropertyValue(cst, TS_TRANSITION_DURATION);
+  if (dur !== TS_ZERO_S) {
+    return [TS_TRANSITION_END, parseDuration(dur)];
+  }
+  dur = getCSPropertyValue(cst, TS_ANIMATION_DURATION);
+  if (dur !== TS_ZERO_S) {
+    return [TS_ANIMATION_END, parseDuration(dur)];
+  }
+  return [null, 0];
+}

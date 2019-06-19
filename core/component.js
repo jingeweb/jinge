@@ -70,6 +70,9 @@ export const AFTER_RENDER = Symbol('afterRender');
 export const HANDLE_AFTER_RENDER = Symbol('handleAfterRender');
 export const HANDLE_REMOVE_ROOT_DOMS = Symbol('handle_remove_root_doms');
 export const HANDLE_BEFORE_DESTROY = Symbol('handleBeforeDestroy');
+export const GET_FIRST_DOM = Symbol('getFirstHtmlDOM');
+export const GET_LAST_DOM = Symbol('getLastHtmlDOM');
+export const GET_TRANSITION_DOM = Symbol('getTransitionDOM');
 export const BEFORE_DESTROY = Symbol('beforeDestroy');
 export const GET_CONTEXT = Symbol('getContext');
 export const SET_CONTEXT = Symbol('setContext');
@@ -190,6 +193,24 @@ export class Component extends Messenger {
     this[RELATED_VM_REFS] = null;
 
     return wrapComponent(this);
+  }
+  [GET_TRANSITION_DOM]() {
+    const rns = this[ROOT_NODES];
+    if (rns.length === 0) assert_fail();
+    const el = rns[0];
+    return isComponent(el) ? el[GET_TRANSITION_DOM]() : el;
+  }
+  [GET_FIRST_DOM]() {
+    const rns = this[ROOT_NODES];
+    if (rns.length === 0) assert_fail();
+    const el = rns[0];
+    return isComponent(el) ? el[GET_FIRST_DOM]() : el;
+  }
+  [GET_LAST_DOM]() {
+    const rns = this[ROOT_NODES];
+    if (rns.length === 0) assert_fail();
+    const el = rns[rns.length - 1];
+    return isComponent(el) ? el[GET_LAST_DOM]() : el;
   }
   [VM_ON](prop, handler, componentCtx) {
     vmAddListener(this, prop, handler);
@@ -472,21 +493,6 @@ export function assertRenderResults(renderResults) {
     throw new Error('Render results of component is empty');
   }
   return renderResults;
-}
-
-export function getFirstHtmlDOM(el) {
-  const ns = el[ROOT_NODES];
-  if (!ns || ns.length === 0) assert_fail();
-  if (isComponent(ns[0])) return getFirstHtmlDOM(ns[0]);
-  else return ns[0];
-}
-
-export function getLastHtmlDOM(el) {
-  const ns = el[ROOT_NODES];
-  if (!ns || ns.length === 0) assert_fail();
-  const le = ns[ns.length - 1];
-  if (isComponent(le)) return getFirstHtmlDOM(le);
-  else return le;
 }
 
 export function operateRootHtmlDOM(fn, el, ...args) {

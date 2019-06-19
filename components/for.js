@@ -7,10 +7,10 @@ import {
   UPDATE,
   DESTROY,
   isComponent,
-  getFirstHtmlDOM,
+  GET_FIRST_DOM,
   CONTEXT,
   HANDLE_AFTER_RENDER,
-  getLastHtmlDOM
+  GET_LAST_DOM
 } from '../core/component';
 import {
   isArray,
@@ -246,7 +246,7 @@ export class ForComponent extends Component {
       const newKey = keyName === KEY_EACH ? item : keyName(item);
       const oldKey = keys[index];
       if (newKey !== oldKey) {
-        const $fd = getFirstHtmlDOM(oldEl);
+        const $fd = oldEl[GET_FIRST_DOM]();
         const newEl = createEl(
           item, index, oldEl.isLast, 
           itemRenderFn, this[CONTEXT]
@@ -281,7 +281,7 @@ export class ForComponent extends Component {
     const keyName = this[FOR_KEY_NAME];
     // if new length equal 0, clear & render comment.
     if (nl === 0 && ol > 0) {
-      const fd = getFirstHtmlDOM(roots[0]);
+      const fd = roots[0][GET_FIRST_DOM]();
       const $cmt = createComment(STR_EMPTY);
       insertBefore(getParent(fd), $cmt, fd);
       for(let i = 0; i < ol; i++) {
@@ -299,7 +299,7 @@ export class ForComponent extends Component {
     this[FOR_LENGTH] = nl;
     const ctx = this[CONTEXT];
     const firstEl = roots[0]; // if ol === 0, firstEl is comment, else is component
-    const $parent = getParent(ol === 0 ? firstEl : getFirstHtmlDOM(firstEl));
+    const $parent = getParent(ol === 0 ? firstEl : firstEl[GET_FIRST_DOM]());
 
     if (keyName === KEY_INDEX) {
       let $f = null;
@@ -314,7 +314,7 @@ export class ForComponent extends Component {
         }
       }
       if ($f) {
-        const $le = ol === 0 ? firstEl : getLastHtmlDOM(roots[ol - 1]);
+        const $le = ol === 0 ? firstEl : roots[ol - 1][GET_LAST_DOM]();
         insertAfter($parent, $f, $le);
         for(let i = ol; i < nl; i++) {
           roots[i][HANDLE_AFTER_RENDER]();
@@ -367,12 +367,12 @@ export class ForComponent extends Component {
           oi++;
         } else if (newKeyMap.has(oldKeys[oi]) && newKeyMap.get(oldKeys[oi]) >= ni) {
           if (oi === ol - 1) {
-            $lastS = getLastHtmlDOM(roots[oi]).nextSibling;
+            $lastS = roots[oi][GET_LAST_DOM]().nextSibling;
           }
           break;
         } else {
           if (oi === ol - 1) {
-            $lastS = getLastHtmlDOM(roots[oi]).nextSibling;
+            $lastS = roots[oi][GET_LAST_DOM]().nextSibling;
           }
           roots[oi][DESTROY]();
           oi++;
@@ -431,7 +431,7 @@ export class ForComponent extends Component {
         assert_fail('unimpossible?!');
       }
       const el = roots[oi];
-      $f && insertBefore($parent, $f, getFirstHtmlDOM(el));
+      $f && insertBefore($parent, $f, el[GET_FIRST_DOM]());
       $nes && $nes.forEach(el => el[HANDLE_AFTER_RENDER]());
       updateEl(el, ni, newItems);
       newRoots.push(el);

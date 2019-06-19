@@ -38,7 +38,9 @@ export {
   ARG_COMPONENTS,
   ROOT_NODES,
   NON_ROOT_COMPONENT_NODES,
-  getFirstHtmlDOM,
+  GET_FIRST_DOM,
+  GET_LAST_DOM,
+  GET_TRANSITION_DOM,
   isComponent
 } from './core/component';
 export {

@@ -4,7 +4,7 @@ import {
   UPDATE,
   STATE_RENDERED,
   STATE,
-  getFirstHtmlDOM,
+  GET_TRANSITION_DOM,
   operateRootHtmlDOM
 } from '../core/component';
 import {
@@ -78,7 +78,7 @@ export class ToggleClassComponent extends Component {
     return rr;
   }
   [UPDATE](init) {
-    const el = this.trans ? getFirstHtmlDOM(this) : this;
+    const el = this.trans ? this[GET_TRANSITION_DOM]() : this;
     if (el.nodeType !== Node.ELEMENT_NODE) {
       // ignore comment or text-node
       return;

@@ -7,9 +7,10 @@ import {
   UPDATE,
   ROOT_NODES,
   HANDLE_AFTER_RENDER,
-  getFirstHtmlDOM,
+  GET_FIRST_DOM,
   CONTEXT,
-  isComponent
+  isComponent,
+  GET_TRANSITION_DOM
 } from '../core/component';
 import {
   NOTIFY
@@ -32,7 +33,6 @@ import {
 import {
   STR_DEFAULT,
   STR_EMPTY,
-  assert_fail,
   raf,
   createEmptyObject,
   Symbol
@@ -128,7 +128,7 @@ function doUpdate(component) {
   const roots = component[ROOT_NODES];
   const el = roots[0];
   const isC = isComponent(el);
-  const fd = isC ? getFirstHtmlDOM(el) : el;
+  const fd = isC ? el[GET_FIRST_DOM]() : el;
   const pa = getParent(isC ? fd : el);
   const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][component[C_VAL]] : null;
   const ne = renderFn ? createEl(renderFn, component[CONTEXT]) : null;
@@ -178,7 +178,6 @@ function startTs(t, tn, e, component) {
   );
   addClass(el, class_a);
   const t_end = getDurationType(el);
-  // console.log(t_end);
   if (!t_end) {
     raf(onEnd);
     return;
@@ -197,7 +196,7 @@ function updateSwitch_ts(component) {
   let pt = component[T_MAP][pv];
   if (!pt) {
     pt = [
-      TS_STATE_ENTERED,
+      pv === IF_STR_ELSE ? TS_STATE_LEAVED : TS_STATE_ENTERED,
       null, null
     ];
     component[T_MAP][pv] = pt;
@@ -212,10 +211,11 @@ function updateSwitch_ts(component) {
     cancelTs(pt, tn, false, component);
     startTs(pt, tn, true, component);
   } else if (pt[0] === TS_STATE_ENTERED) {
-    pt[1] = getFirstHtmlDOM(component);
+    pt[1] = component[GET_TRANSITION_DOM]();
     startTs(pt, tn, false, component);
   } else if (pt[0] === TS_STATE_LEAVED) {
-    assert_fail();
+    pt[1] = component[GET_TRANSITION_DOM]();
+    startTs(pt, tn, true, component);
   }
 }
 
@@ -244,7 +244,7 @@ function updateSwitch_ts_end(component) {
   doUpdate(component, renderFn);
   component[P_VAL] = value;
   const ct = component[T_MAP][value];
-  const fd = getFirstHtmlDOM(component);
+  const fd = component[GET_TRANSITION_DOM]();
   if (fd.nodeType !== Node.ELEMENT_NODE) {
     ct[0] = TS_STATE_ENTERED;
     return;
