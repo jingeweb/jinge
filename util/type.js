@@ -37,8 +37,9 @@ export function isDOMNode(ele) {
 }
 
 export function isPropertyEnumerable(obj, key) {
-  return obj.propertyIsEnumerable(key);
+  return Object.prototype.propertyIsEnumerable.call(obj, key);
 }
+
 export function getOwnPropertySymbols(obj) {
   return Object.getOwnPropertySymbols(obj);
 }

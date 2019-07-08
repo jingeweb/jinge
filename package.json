@@ -24,8 +24,8 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "dependencies": {
-    "acorn": "^6.1.1",
-    "acorn-walk": "^6.1.1",
+    "acorn": "^6.2.0",
+    "acorn-walk": "^6.2.0",
     "antlr4": "^4.7.2",
     "clean-css": "^4.2.1",
     "escodegen": "^1.11.1",
@@ -38,12 +38,12 @@
     "svg-tags": "^1.0.0"
   },
   "devDependencies": {
-    "eslint": "^5.16.0",
+    "eslint": "^6.0.1",
     "precommit-hook": "^3.0.0",
-    "rollup": "^1.15.3",
+    "rollup": "^1.16.6",
     "rollup-plugin-banner": "^0.2.0",
-    "rollup-plugin-node-resolve": "^5.0.2",
-    "rollup-plugin-terser": "^5.0.0"
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-terser": "^5.1.1"
   },
   "pre-commit": [
     "lint"
