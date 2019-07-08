@@ -23,9 +23,7 @@ import {
   removeClass,
   removeEvent,
   addClass,
-  addEvent,
-  getComputedStyle,
-  getCSPropertyValue
+  addEvent
 } from '../dom';
 import {
   wrapAttrs
@@ -171,11 +169,8 @@ function startTs(t, tn, e, component) {
   const class_a = tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
 
   addClass(el, class_n);
-  // force render
-  getCSPropertyValue(
-    getComputedStyle(el),
-    'width'
-  );
+  // force render by calling getComputedStyle
+  getDurationType(el);
   addClass(el, class_a);
   const t_end = getDurationType(el);
   if (!t_end) {

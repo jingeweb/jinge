@@ -391,8 +391,8 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (validateErr) {
           this._throwParseError(attrCtx.start, validateErr);
         }
-        constAttrs[a_name] = info.text;
-        return;
+        aval = info.text;
+        a_category = 'str';
       }
 
       if (a_category === 'expr') {

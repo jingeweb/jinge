@@ -11,8 +11,7 @@ import {
   addClass,
   removeClass,
   addEvent,
-  removeEvent,
-  getCSPropertyValue
+  removeEvent
 } from '../dom';
 import {
   isObject,
@@ -128,11 +127,8 @@ export class ToggleClassComponent extends Component {
       const class_n = k + (v ? TS_C_ENTER : TS_C_LEAVE);
       const class_a = k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
       addClass(el, class_n);
-      // force render
-      getCSPropertyValue(
-        getComputedStyle(el),
-        'width'
-      );
+      // force render by calling getComputedStyle
+      getDurationType(el);
       addClass(el, class_a);
       const t_end = getDurationType(el);        
       if (!t_end) {
