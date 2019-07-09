@@ -1,6 +1,8 @@
 import {
   Symbol,
-  uid
+  uid,
+  createEmptyObject,
+  assignObject
 } from '../util';
 import {
   createElement,
@@ -8,9 +10,24 @@ import {
   getCSPropertyValue
 } from '../dom';
 
+export const CSTYLE_PID = Symbol('cstyle_pids');
 export const CSTYLE_ADD = Symbol('add');
 export const CSTYLE_DEL = Symbol('del');
 export const CSTYLE_ATTACH = Symbol('attach');
+
+export function addParentStyleId(component, inheritIds, styleId) {
+  if (!inheritIds && !styleId) return;
+  let ids = component[CSTYLE_PID];
+  if (!ids) {
+    ids = component[CSTYLE_PID] = createEmptyObject();
+  }
+  if (inheritIds) {
+    assignObject(ids, inheritIds);
+  }
+  if (styleId) {
+    ids[styleId] = '';
+  }
+}
 
 function isHideCssExists() {
   const $e = createElement('span', {

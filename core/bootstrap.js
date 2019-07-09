@@ -4,7 +4,8 @@ import {
 } from './component';
 import {
   assert_fail,
-  createEmptyObject
+  createEmptyObject,
+  assignObject
 } from '../util';
 import {
   config,
@@ -26,7 +27,7 @@ export function bootstrap(Component, dom, attrs) {
    * we simple pass an empty attrs. 
    */
   const bootAttrs = createEmptyObject();
-  attrs && Object.assign(bootAttrs, attrs);
+  attrs && assignObject(bootAttrs, attrs);
 
   if (config[CFG_VM_DEBUG]) {
     bootAttrs[VM_DEBUG_NAME] = 'attrs_of_<root>';

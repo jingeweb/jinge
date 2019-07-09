@@ -16,6 +16,10 @@ export function defineProperty(...args) {
   return Object.defineProperty(...args);
 }
 
+export function assignObject(target, ...srcs) {
+  return Object.assign(target, ...srcs);
+}
+
 export function obj2class(obj, prepend) {
   const classes = Object.keys(obj).map(k => {
     return obj[k] ? k : '';

@@ -14,9 +14,10 @@ const IMPORTS = (function() {
     'jinge/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
     'jinge/viewmodel/common': 'VM_DEBUG_NAME',
     'jinge/core/messenger': 'ON',
+    'jinge/core/style': 'CSTYLE_PID,addParentStyleId',
     'jinge/core/component': 'assertRenderResults,emptyRenderFn,errorRenderFn,textRenderFn,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
     'jinge/viewmodel/proxy': 'wrapViewModel,wrapAttrs',
-    'jinge/util': 'STR_EMPTY,STR_DEFAULT,arrayEqual',
+    'jinge/util': 'STR_EMPTY,STR_DEFAULT,arrayEqual,assignObject',
     'jinge/components/parameter': 'ParameterComponent'
   };
   const rtn = {

@@ -6,7 +6,8 @@ import {
   startsWith,
   isString,
   createEmptyObject,
-  setImmediate
+  setImmediate,
+  assignObject
 } from '../util';
 import {
   config,
@@ -34,7 +35,7 @@ function loopCreateNode(vm, props, level = 0) {
   if (!node) {
     // node can't have any prototype function.
     node = createEmptyObject();
-    Object.assign(node, {
+    assignObject(node, {
       [VM_LISTENERS_PARENT]: vm,
       [VM_LISTENERS_ID]: propN,
       [VM_LISTENERS_HANDLERS]: [],

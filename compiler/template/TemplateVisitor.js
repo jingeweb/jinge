@@ -689,11 +689,19 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (this._componentStyleId) {
       constAttrs.unshift([this._componentStyleId, '']);
     }
-    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 ? '' : 'WithoutAttrs'}`;
+    const needAssignStyleId = this._parent.type === 'component' && this._parent.sub === 'root';
+    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAssignStyleId ? '' : 'WithoutAttrs'}`;
     const ce = `${ceFn}_${this._id}`;
     const arr = [`"${etag}"`];
     if (constAttrs.length > 0) {
-      arr.push('{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}');
+      const attrsCode = '{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}';
+      if (needAssignStyleId) {
+        arr.push(`assignObject_${this._id}(${attrsCode}, component[CSTYLE_PID_${this._id}])`);
+      } else {
+        arr.push(attrsCode);
+      }
+    } else if (needAssignStyleId) {
+      arr.push(`component[CSTYLE_PID_${this._id}]`);
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -973,9 +981,14 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
   })).join('\n')}
 `;
 
+    let styleIdCode = '';
+    if ((this._parent.type === 'component' && this._parent.sub === 'root') || this._parent.type === 'html') {
+      styleIdCode += `addParentStyleId_${this._id}(el, component[CSTYLE_PID_${this._id}]${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`;
+    }
     const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
 const el = new ${Component}(attrs);
+${styleIdCode}
 ${result.listeners.map(lt => `el[ON_${this._id}]('${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}

@@ -1,6 +1,7 @@
 import {
   isString,
-  isArray
+  isArray,
+  isUndefined
 } from '../util';
 
 export function getParent($ele) {
@@ -25,7 +26,9 @@ export function setInputValue($inputOrTextarea, value) {
 
 function _createEl($el, attrs, children) {
   if (attrs) for(const an in attrs) {
-    setAttribute($el, an, attrs[an]);
+    if (an && !isUndefined(attrs[an])) {
+      setAttribute($el, an, attrs[an]);
+    }
   }
   children.forEach(child => appendChild($el, child));
   return $el;

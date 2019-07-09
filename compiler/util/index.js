@@ -90,7 +90,7 @@ function calcTranslateId(info, file, opts) {
 }
 
 function convertAttributeName(an) {
-  return /^[\w\d$_]+$/.test(an) ? an : JSON.stringify(an);
+  return (an.startsWith('[') && an.endsWith(']')) || /^[\w\d$_]+$/.test(an) ? an : JSON.stringify(an);
 }
 
 module.exports = {

@@ -17,7 +17,11 @@ import {
   CLEAR
 } from './messenger';
 import {
-  manager as StyleManager, CSTYLE_ADD, CSTYLE_DEL, CSTYLE_ATTACH
+  manager as StyleManager,
+  CSTYLE_PID,
+  CSTYLE_ADD,
+  CSTYLE_DEL,
+  CSTYLE_ATTACH
 } from './style';
 import {
   Symbol,
@@ -33,7 +37,8 @@ import {
   arrayEqual,
   STR_EMPTY,
   setImmediate,
-  clearImmediate
+  clearImmediate,
+  assignObject
 } from '../util';
 import {
   getParent,
@@ -91,7 +96,7 @@ export const STATE_NAMES = [
 
 function copyContext(context) {
   if (!context) return null;
-  return Object.assign(createEmptyObject(), context);
+  return assignObject(createEmptyObject(), context);
 }
 
 function getOrCreateMap(comp, prop) {
@@ -99,7 +104,6 @@ function getOrCreateMap(comp, prop) {
   if (!m) m = comp[prop] = new Map();
   return m;
 }
-
 
 export class Component extends Messenger {
   /**
@@ -119,6 +123,7 @@ export class Component extends Messenger {
     this[VM_PARENTS] = null;
     this[VM_LISTENERS] = null;
     this[UPDATE_NEXT_MAP] = null;
+    this[CSTYLE_PID] = null;
     this[CONTEXT] = attrs[CONTEXT];
     this[CONTEXT_STATE] = 0;
     this[ARG_COMPONENTS] = attrs[ARG_COMPONENTS];
