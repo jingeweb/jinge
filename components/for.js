@@ -143,12 +143,12 @@ function _parse_index_path(p) {
 
 export class ForComponent extends Component {
   constructor(attrs) {
-    const kn = attrs._key || KEY_INDEX;
-    if (kn && !/^(index|each(.[\w\d$_]+)*)$/.test(kn)) {
+    if (attrs.key && !/^(index|each(.[\w\d$_]+)*)$/.test(attrs.key)) {
       throw new Error('Value of "_key" attribute of <for> component is invalidate. See https://[todo]');
     }
     super(attrs);
     this.loop = attrs.loop;
+    const kn = attrs.key || KEY_INDEX;
     this[FOR_KEY_NAME] = kn;
     this[FOR_LENGTH] = 0;
     this[FOR_KEYS] = null;

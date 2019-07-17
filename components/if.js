@@ -69,7 +69,6 @@ const OE_H = Symbol('on_end_handler');
 
 const C_BV = Symbol('current_branch_value');
 const C_VAL = Symbol('current_value');
-const ENABLE_TRANSITION = Symbol('enable_ts');
 const ON_TS_END = Symbol('on_ts_end');
 
 function createEl(renderFn, context) {
@@ -85,7 +84,7 @@ function createEl(renderFn, context) {
 function renderSwitch(component) {
   const value = component[C_VAL];
   const acs = component[ARG_COMPONENTS];
-  if (component[ENABLE_TRANSITION] && acs) {
+  if (component.ts && acs) {
     const t = createEmptyObject();
     for(const k in acs) {
       t[k] = [
@@ -187,7 +186,7 @@ function startTs(t, tn, e, component) {
 function updateSwitch_ts(component) {
   const value = component[C_VAL];
   const pv = component[P_VAL];
-  const tn = component[ENABLE_TRANSITION];
+  const tn = component.ts;
   let pt = component[T_MAP][pv];
   if (!pt) {
     pt = [
@@ -218,7 +217,7 @@ function updateSwitch_ts_end(component) {
   // console.log('on end')
   const value = component[C_VAL];
   const pv = component[P_VAL];
-  const tn = component[ENABLE_TRANSITION];
+  const tn = component.ts;
   const pt = component[T_MAP][pv];
   const e = pt[0] === TS_STATE_ENTERING;
   const el = pt[1];
@@ -252,20 +251,20 @@ function updateSwitch_ts_end(component) {
 export class IfComponent extends Component {
   constructor(attrs) {
     super(attrs);
-    this.e = attrs.expect;
-    this[ENABLE_TRANSITION] = attrs.transition; // enable transition
+    this.expect = attrs.expect;
+    this.ts = attrs.transition;
   }
-  get e() {
+  get expect() {
     return this[C_VAL] === STR_DEFAULT;
   }
-  set e(v) {
+  set expect(v) {
     v = v ? STR_DEFAULT : IF_STR_ELSE;
     if (this[C_VAL] === v) return;
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
   get [C_BV]() {
-    return this.e;
+    return this.expect;
   }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);
@@ -281,13 +280,13 @@ export class IfComponent extends Component {
 export class SwitchComponent extends Component {
   constructor(attrs) {
     super(attrs);
-    this.t = attrs.test;
-    this[ENABLE_TRANSITION] = attrs.transition; // enable transition
+    this.test = attrs.test;
+    this.ts = attrs.transition;
   }
-  get t() {
+  get test() {
     return this[C_VAL];
   }
-  set t(v) {
+  set test(v) {
     const acs = this[ARG_COMPONENTS];
     if (!acs || !(v in acs)) {
       v = STR_DEFAULT;
@@ -297,7 +296,7 @@ export class SwitchComponent extends Component {
     this[UPDATE_IF_NEED]();
   }
   get [C_BV]() {
-    return this.t;
+    return this.test;
   }
   [ON_TS_END]() {
     updateSwitch_ts_end(this);

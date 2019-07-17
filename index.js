@@ -82,6 +82,7 @@ export {
   instanceOf,
   isUndefined,
   isBoolean,
+  isArray,
   uid,
   obj2class,
   obj2style,

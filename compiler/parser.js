@@ -448,7 +448,12 @@ import {
           newBody.push(replaceThis(stmt));
         }
       } else if (expr.type === 'AssignmentExpression') {
-        if (expr.left.type !== 'MemberExpression' || expr.left.object.type !== 'ThisExpression') {
+        const exprLeft = expr.left;
+        if (exprLeft.type !== 'MemberExpression'
+          || exprLeft.object.type !== 'ThisExpression'
+          || exprLeft.property.type !== 'Identifier'
+          || exprLeft.property.name.startsWith('_')
+          || exprLeft.computed) {
           newBody.push(replaceThis(stmt));
           return;
         }

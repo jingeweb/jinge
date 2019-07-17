@@ -79,7 +79,7 @@ export class I18nComponent extends Component {
     super(attrs);
     this.k = attrs.key;
     this.p = attrs.params;
-    this._h = !!attrs._html; // render html mode
+    this._h = !!attrs.html; // render html mode
     this._f = ''; // prefix
     this._o = this[UPDATE_IF_NEED].bind(this);
     vmWatch(this, 'p.**', this._o);
@@ -115,8 +115,8 @@ export class _TComponent extends Component {
   constructor(attrs) {
     super(attrs);
     this.p = attrs.params;
-    this._t = attrs._text;
-    this._h = !!attrs._html; // render html mode
+    this._t = attrs.text;
+    this._h = !!attrs.html; // render html mode
     vmWatch(this, 'p.**', () => this[UPDATE_IF_NEED]());
   }
   beforeDestroy() {
