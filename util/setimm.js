@@ -9,7 +9,7 @@ import {
   isString
 } from './type';
 import {
-  assert_fail,
+  assertFail,
   startsWith,
   uid
 } from './common';
@@ -19,15 +19,15 @@ let tasksByHandle;
 let currentlyRunningATask = false;
 let registerImmediate;
 
-function setImmediate_fb(callback) {
-  if (!isFunction(callback) || arguments.length > 1) assert_fail();
+function setImmediateFallback(callback) {
+  if (!isFunction(callback) || arguments.length > 1) assertFail();
   tasksByHandle.set(nextHandle, callback);
   registerImmediate(nextHandle);
   // console.log('siiii', callback);
   return nextHandle++;
 }
 
-function clearImmediate_fb(handle) {
+function clearImmediateFallback(handle) {
   tasksByHandle.delete(handle);
 }
 
@@ -47,7 +47,7 @@ function runIfPresent(handle) {
   try {
     callback();
   } finally {
-    clearImmediate_fb(handle);
+    clearImmediateFallback(handle);
     currentlyRunningATask = false;
   }
 }
@@ -63,10 +63,10 @@ if (isUndefined(window.setImmediate)) {
     }
   }, false);
 
-  registerImmediate = function (handle) {
+  registerImmediate = function(handle) {
     window.postMessage(messagePrefix + handle, '*');
   };
 }
 
-export const setImmediate = window.setImmediate || setImmediate_fb;
-export const clearImmediate = window.clearImmediate || clearImmediate_fb;
+export const setImmediate = window.setImmediate || setImmediateFallback;
+export const clearImmediate = window.clearImmediate || clearImmediateFallback;

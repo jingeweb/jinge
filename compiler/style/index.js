@@ -6,7 +6,7 @@ const CleanCSS = require('clean-css');
 
 const plugin = postcss.plugin('postcss-jinge-component-style', () => {
   // Work with options here
-  return function (root, result) {
+  return function(root, result) {
     // Transform each rule here
     const styleId = result.opts.styleId;
     function transform(root) {
@@ -16,10 +16,10 @@ const plugin = postcss.plugin('postcss-jinge-component-style', () => {
             selector.insertAfter(n, parser.attribute({
               attribute: styleId
             }));
-          } else if ((n.type === 'combinator' && n.value === '/deep/')
-            || (n.type === 'pseudo' && n.value === '::deep')
+          } else if ((n.type === 'combinator' && n.value === '/deep/') ||
+            (n.type === 'pseudo' && n.value === '::deep')
           ) {
-            selector.insertAfter(n, parser.string({value: ' '}));
+            selector.insertAfter(n, parser.string({ value: ' ' }));
             selector.removeChild(n);
             return false;
           }
@@ -71,7 +71,7 @@ class CSSParser {
       from: opts.resourcePath,
       styleId,
       map: sourceMap ? {
-        inline: opts.extractStyle ? false : true,
+        inline: !opts.extractStyle,
         prev: sourceMap
       } : false
     }).then(result => {
@@ -102,6 +102,7 @@ class CSSParser {
       };
     });
   }
+
   static parseInline(code, opts) {
     const plugins = [plugin];
     if (opts.extractStyle && !opts.keepStyleComments) {
@@ -115,7 +116,7 @@ class CSSParser {
       styleId: opts.styleId,
       map: false
     }).css;
-    
+
     if (css && opts.compress) {
       css = new CleanCSS().minify(css).styles;
     }

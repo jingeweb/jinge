@@ -1,3 +1,8 @@
+/* eslint-disable */
+/**
+ * This file has been deprecated.
+ * 这个 <for> 组件的实现采用 diff 算法来处理， 性能很差，已废弃
+ */
 import {
   Component,
   RENDER,
@@ -14,7 +19,7 @@ import {
   STR_DEFAULT,
   isObject,
   diffArray,
-  assert_fail
+  assertFail
 } from '../util';
 import {
   createComment,
@@ -39,9 +44,10 @@ export class ForEachComponent extends Component {
     this.each = item;
     this.index = index;
   }
+
   [RENDER]() {
     const renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
-    if (!renderFn) assert_fail();
+    if (!renderFn) assertFail();
     const result = renderFn(this);
     if (result.length <= 0) {
       /*
@@ -57,7 +63,7 @@ export class ForEachComponent extends Component {
 }
 function getFirstHtmlNode(el) {
   const ns = el[ROOT_NODES];
-  if (!ns || ns.length === 0) assert_fail();
+  if (!ns || ns.length === 0) assertFail();
   if (isComponent(ns[0])) return getFirstHtmlNode(ns[0]);
   else return ns[0];
 }
@@ -89,7 +95,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName) {
   items.forEach((item, i) => {
     assert_vm(item, i);
     if (keyName !== KEY_INDEX) {
-      keys.push(prepare_key(item, i, tmpKeyMap, keyName));    
+      keys.push(prepare_key(item, i, tmpKeyMap, keyName));
     }
     result.push(...appendRenderEach(item, i, itemRenderFn, roots));
   });
@@ -119,13 +125,16 @@ export class ForComponent extends Component {
       this[FOR_KEY_NAME] = new Function('each', `return ${kn}`);
     }
   }
+
   get loop() {
     return this._l;
   }
+
   set loop(v) {
     this._l = v;
     this[UPDATE_IF_NEED]();
   }
+
   [RENDER]() {
     const items = this.loop;
     const roots = this[ROOT_NODES];
@@ -142,6 +151,7 @@ export class ForComponent extends Component {
     result.unshift($cmt);
     return result;
   }
+
   [UPDATE]() {
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
     if (!itemRenderFn) return;
@@ -159,7 +169,7 @@ export class ForComponent extends Component {
     if (keyName === KEY_INDEX) {
       const st = Date.now();
       let $f = null;
-      for(let i = 0; i < nl; i++) {
+      for (let i = 0; i < nl; i++) {
         if (i < ol) {
           const el = roots[i + 1];
           if (newItems[i] !== el.each) {
@@ -174,7 +184,7 @@ export class ForComponent extends Component {
         appendChild($parent, $f);
       }
       if (nl >= ol) return console.log(Date.now() - st);
-      for(let i = nl; i < ol; i++) {
+      for (let i = nl; i < ol; i++) {
         roots[i + 1][DESTROY]();
       }
       roots.splice(1 + nl);
@@ -190,7 +200,7 @@ export class ForComponent extends Component {
      *   this is a special optimization.
      */
     if (nl === 0) {
-      for(let i = 0; i < ol; i++) {
+      for (let i = 0; i < ol; i++) {
         roots[i + 1][DESTROY]();
       }
       roots.length = 1;
@@ -220,7 +230,7 @@ export class ForComponent extends Component {
     console.log(Date.now() - st);
     st = Date.now();
     let newRoots = null;
-    // First loop, calculate all reused nodes. 
+    // First loop, calculate all reused nodes.
     let oldIdx = 0;
     const reusedMap = new Map();
     diffs.forEach(diff => {
@@ -245,7 +255,7 @@ export class ForComponent extends Component {
     });
     console.log(Date.now() - st);
     st = Date.now();
-    if (!newRoots) assert_fail(); // this should never happen
+    if (!newRoots) assertFail(); // this should never happen
 
     // Second loop, move reused nodes or insert new nodes
     oldIdx = 0;
@@ -257,7 +267,7 @@ export class ForComponent extends Component {
         const $rd = (newIdx + 1 > newRoots.length - 1) ? null : getFirstHtmlNode(newRoots[newIdx + 1]);
 
         const $f = createFragment();
-       
+
         diff.value.forEach((newKey, i) => {
           const idx = newIdx + i;
           const item = newItems[idx];
@@ -271,7 +281,6 @@ export class ForComponent extends Component {
             if (el.each !== item) {
               el.each = item;
             }
-
           } else {
             el = new ForEachComponent(itemRenderFn, item, idx);
             appendChild($f, ...el[RENDER]());
@@ -282,7 +291,7 @@ export class ForComponent extends Component {
         else appendChild($parent, $f);
         newIdx += diff.count;
       } else { // key and dom position not changed.
-        for(let i = 0; i < diff.count; i++) {
+        for (let i = 0; i < diff.count; i++) {
           const el = roots[1 + oldIdx + i];
           const it = newItems[newIdx + i];
           if (el.each !== it) {
@@ -300,6 +309,5 @@ export class ForComponent extends Component {
     st = Date.now();
     this[ROOT_NODES] = newRoots;
     this[FOR_KEYS] = newKeys;
-
   }
 }

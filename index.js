@@ -1,3 +1,10 @@
+import * as components from './components';
+import * as config from './config';
+import * as dom from './dom';
+import * as core from './core';
+import * as util from './util';
+import * as viewmodel from './viewmodel';
+
 export {
   ForComponent
 } from './components/for';
@@ -89,13 +96,6 @@ export {
   setImmediate,
   clearImmediate
 } from './util';
-
-import * as components from './components';
-import * as config from './config';
-import * as dom from './dom';
-import * as core from './core';
-import * as util from './util';
-import * as viewmodel from './viewmodel';
 
 export {
   components,

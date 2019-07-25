@@ -14,6 +14,7 @@ import {
 } from '../viewmodel/common';
 import {
   Messenger,
+  LISTENERS,
   CLEAR
 } from './messenger';
 import {
@@ -27,7 +28,7 @@ import {
   Symbol,
   isDOMNode,
   instanceOf,
-  assert_fail,
+  assertFail,
   isFunction,
   STR_DEFAULT,
   isObject,
@@ -112,14 +113,16 @@ export class Component extends Messenger {
   static get template() {
     return null;
   }
+
   static get style() {
     return null;
   }
+
   constructor(attrs) {
     if (attrs === null || !isObject(attrs) || !(VM_PARENTS in attrs)) {
       throw new Error('First argument passed to Component constructor must be ViewModel with Messenger interface. See https://[todo]');
     }
-    super();
+    super(attrs[LISTENERS]);
     this[VM_PARENTS] = null;
     this[VM_LISTENERS] = null;
     this[UPDATE_NEXT_MAP] = null;
@@ -151,7 +154,7 @@ export class Component extends Messenger {
      *
      * The nearest non-root component-nodes of RootApp include C,
      *   but not include A(as it's root) or D(as it's not nearest).
-     * 
+     *
      * By the way, the ROOT_NODES of view-tree above is [h1, h2, A]
      */
     this[NON_ROOT_COMPONENT_NODES] = [];
@@ -160,20 +163,20 @@ export class Component extends Messenger {
      */
     this[REF_NODES] = null;
     /**
-     * If some child of this component is passed as argument(ie. 
+     * If some child of this component is passed as argument(ie.
      * use arg:pass attribute) like ng-tranclude in angular 1.x,
-     * the child may contain some messenger listeners not belong to 
+     * the child may contain some messenger listeners not belong to
      * this component but belong to outer parent.
-     * 
+     *
      * When destroy this component, we should also remove messenger listeners
      *   belong to outer parent to prevent memory leak.
      * To implement this goal, we maitain RELATED_VM_LISTENERS.
      * When render view-tree, any messenger listeners belong to outer
-     * parent, will be also linked under RELATED_VM_LISTENERS, then 
+     * parent, will be also linked under RELATED_VM_LISTENERS, then
      * when we destroy this component, the listeners can also be clear.
-     * 
+     *
      * For examle:
-     * 
+     *
      * <!-- outer parent: RootApp -->
      * <div>
      * <if expect="show">
@@ -184,10 +187,10 @@ export class Component extends Messenger {
      * </Tooltip>
      * </if>
      * </div>
-     * 
+     *
      * when the `show` variable changed from true to false, the
      * Tooltip component will be destroy. The messenger listener belong
-     * to the outer parent RootApp which watch `name` variable should 
+     * to the outer parent RootApp which watch `name` variable should
      * also be removed.
      */
     this[RELATED_VM_LISTENERS] = null;
@@ -199,29 +202,34 @@ export class Component extends Messenger {
 
     return wrapComponent(this);
   }
+
   [GET_TRANSITION_DOM]() {
     const rns = this[ROOT_NODES];
-    if (rns.length === 0) assert_fail();
+    if (rns.length === 0) assertFail();
     const el = rns[0];
     return isComponent(el) ? el[GET_TRANSITION_DOM]() : el;
   }
+
   [GET_FIRST_DOM]() {
     const rns = this[ROOT_NODES];
-    if (rns.length === 0) assert_fail();
+    if (rns.length === 0) assertFail();
     const el = rns[0];
     return isComponent(el) ? el[GET_FIRST_DOM]() : el;
   }
+
   [GET_LAST_DOM]() {
     const rns = this[ROOT_NODES];
-    if (rns.length === 0) assert_fail();
+    if (rns.length === 0) assertFail();
     const el = rns[rns.length - 1];
     return isComponent(el) ? el[GET_LAST_DOM]() : el;
   }
+
   [VM_ON](prop, handler, componentCtx) {
     vmAddListener(this, prop, handler);
     if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
     componentCtx[RELATED_VM_ON](this, prop, handler);
   }
+
   [RELATED_VM_ON](vm, prop, handler) {
     const rvl = getOrCreateMap(this, RELATED_VM_LISTENERS);
     let hook = rvl.get(vm);
@@ -231,7 +239,8 @@ export class Component extends Messenger {
     }
     hook.push([prop, handler]);
   }
-  [RELATED_VM_OFF](vm ,prop, handler) {
+
+  [RELATED_VM_OFF](vm, prop, handler) {
     const rvl = this[RELATED_VM_LISTENERS];
     if (!rvl) return;
     const hook = rvl.get(vm);
@@ -246,20 +255,25 @@ export class Component extends Messenger {
     });
     if (i >= 0) hook.splice(i, 1);
   }
+
   [VM_OFF](prop, handler, componentCtx) {
     vmRemoveListener(this, prop, handler);
     if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
     componentCtx[RELATED_VM_OFF](this, prop, handler);
   }
+
   [VM_CLEAR]() {
     vmClearListener(this);
   }
+
   [VM_NOTIFY](prop) {
     return vmNotifyChanged(this, prop);
   }
+
   [CLONE]() {
     throw new Error('abstract method');
   }
+
   [RENDER]() {
     const Clazz = this.constructor;
     let renderFn = Clazz.template;
@@ -267,20 +281,21 @@ export class Component extends Messenger {
       renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
     }
     if (!isFunction(renderFn)) {
-      assert_fail(`render function of ${Clazz.name} not found. Forget static getter "template"?`);
+      assertFail(`render function of ${Clazz.name} not found. Forget static getter "template"?`);
     }
     StyleManager[CSTYLE_ADD](Clazz.style);
     return renderFn(this);
   }
+
   /**
-   * 
-   * @param {HTMLElement} $targetDOM 
+   *
+   * @param {HTMLElement} $targetDOM
    * @param {Boolean} replaceMode if false, use append mode
    */
   [RENDER_TO_DOM]($targetDOM, replaceMode = true) {
-    if (!isDOMNode($targetDOM)) assert_fail();
+    if (!isDOMNode($targetDOM)) assertFail();
     if (this[STATE] !== STATE_INITIALIZE) {
-      assert_fail();
+      assertFail();
     }
     const rr = assertRenderResults(this[RENDER]());
     StyleManager[CSTYLE_ATTACH]();
@@ -291,12 +306,13 @@ export class Component extends Messenger {
     }
     this[HANDLE_AFTER_RENDER]();
   }
+
   [DESTROY](removeDOM = true) {
     if (this[STATE] > STATE_WILLDESTROY) return;
     this[STATE] = STATE_WILLDESTROY;
     this[BEFORE_DESTROY]();
-    super[CLEAR]();   // dont forgot call super clear.
-    // clear next tick update setImmediate 
+    super[CLEAR](); // dont forgot call super clear.
+    // clear next tick update setImmediate
     if (this[UPDATE_NEXT_MAP]) {
       this[UPDATE_NEXT_MAP].forEach(imm => {
         clearImmediate(imm);
@@ -317,12 +333,13 @@ export class Component extends Messenger {
       this[REF_NODES] =
       this[ARG_COMPONENTS] =
       this[CONTEXT] = null;
-    
+
     // remove dom
     if (removeDOM) {
       this[HANDLE_REMOVE_ROOT_DOMS]();
     }
   }
+
   [HANDLE_BEFORE_DESTROY]() {
     this[NON_ROOT_COMPONENT_NODES].forEach(component => {
       component[DESTROY](false);
@@ -333,6 +350,7 @@ export class Component extends Messenger {
       }
     });
   }
+
   [HANDLE_REMOVE_ROOT_DOMS]($parent) {
     this[ROOT_NODES].forEach(node => {
       if (isComponent(node)) {
@@ -344,6 +362,7 @@ export class Component extends Messenger {
     });
     this[ROOT_NODES] = null;
   }
+
   [HANDLE_AFTER_RENDER]() {
     this[ROOT_NODES].forEach(n => {
       if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
@@ -355,10 +374,11 @@ export class Component extends Messenger {
     this[CONTEXT_STATE] = -1; // has been rendered, can't modify context
     this[AFTER_RENDER]();
   }
+
   /**
-   * 
-   * @param {Function|boolean} handler 
-   * @param {boolean} nextTick 
+   *
+   * @param {Function|boolean} handler
+   * @param {boolean} nextTick
    */
   [UPDATE_IF_NEED](handler = null, nextTick = true) {
     if (this[STATE] !== STATE_RENDERED) {
@@ -367,7 +387,7 @@ export class Component extends Messenger {
     if (handler === false) {
       return this[UPDATE]();
     }
-  
+
     if (!isFunction(handler)) {
       handler = this[UPDATE];
     }
@@ -390,12 +410,15 @@ export class Component extends Messenger {
       handler.call(this);
     }));
   }
+
   [UPDATE]() {
     throw new Error('abstract method');
   }
+
   [GET_STATE_NAME]() {
     return STATE_NAMES[this[STATE]];
   }
+
   [SET_CONTEXT](id, ctx, forceOverride = false) {
     if (this[CONTEXT_STATE] < 0) {
       throw new Error('Can\'t setContext after component has been rendered. Try put setContext code into constructor.');
@@ -413,15 +436,17 @@ export class Component extends Messenger {
     }
     if (id in this[CONTEXT]) {
       // override exist may case hidden bug hard to debug.
-      // so we force programmer to pass third argument to 
+      // so we force programmer to pass third argument to
       //   tell us he/she know what he/she is doing.
       if (!forceOverride) throw new Error(`Contenxt with id: ${id} is exist. Pass third argument forceOverride=true to override it.`);
     }
     this[CONTEXT][id] = ctx;
   }
+
   [GET_CONTEXT](id) {
     return this[CONTEXT] ? this[CONTEXT][id] : null;
   }
+
   [SET_REF_NODE](ref, el, relatedComponent) {
     const rns = getOrCreateMap(this, REF_NODES);
     let elOrArr = rns.get(ref);
@@ -442,9 +467,10 @@ export class Component extends Messenger {
     }
     rs.push(ref);
   }
+
   /**
-   * Get child node(or nodes) marked by 'ref:' attribute in template 
-   * @param {String} ref 
+   * Get child node(or nodes) marked by 'ref:' attribute in template
+   * @param {String} ref
    * @returns {Node|Array<Node>}
    */
   [GET_REF](ref) {
@@ -453,12 +479,14 @@ export class Component extends Messenger {
     }
     return this[REF_NODES] ? this[REF_NODES].get(ref) : null;
   }
+
   /**
    * lifecycle hook, called after rendered.
    */
   [AFTER_RENDER]() {
     // lifecycle hook, default do nothing.
   }
+
   /**
    * lifecycle hook, called before destroy.
    */
@@ -503,18 +531,18 @@ export function assertRenderResults(renderResults) {
 export function operateRootHtmlDOM(fn, el, ...args) {
   if (!isComponent(el)) return fn(el, ...args);
   el[ROOT_NODES].forEach(ce => {
-    operateRootHtmlDOM(fn, ce, ...args);    
+    operateRootHtmlDOM(fn, ce, ...args);
   });
 }
 
-export function emptyRenderFn(component)  {
+export function emptyRenderFn(component) {
   const el = createComment(STR_EMPTY);
   component[ROOT_NODES].push(el);
   return [el];
 }
 
 export function errorRenderFn(component) {
-  const el = createElement('span', {style: 'color: red !important;'});
+  const el = createElement('span', { style: 'color: red !important;' });
   el.textContent = 'template parsing failed! please check webpack log.';
   component[ROOT_NODES].push(el);
   return [el];

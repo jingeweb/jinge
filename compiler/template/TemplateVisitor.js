@@ -31,12 +31,14 @@ const KNOWN_ATTR_TYPES = [
 ];
 
 function mergeAlias(src, dst) {
-  if (src) for (const k in src) {
-    if (!src[k] || typeof src[k] !== 'object') throw new Error('bad alias format');
-    if (k in dst) {
-      Object.assign(dst[k], src[k]);
-    } else {
-      dst[k] = src[k];
+  if (src) {
+    for (const k in src) {
+      if (!src[k] || typeof src[k] !== 'object') throw new Error('bad alias format');
+      if (k in dst) {
+        Object.assign(dst[k], src[k]);
+      } else {
+        dst[k] = src[k];
+      }
     }
   }
   return dst;
@@ -85,13 +87,16 @@ class TemplateVisitor extends TemplateParserVisitor {
           this._aliasLocalMap[source][c] = c === 'default' ? `Component_${rid}` : `${c}_${rid}`;
         }
         const as = Array.isArray(m[c]) ? m[c] : [m[c]];
-        as.forEach(a => this._alias[a] = [c, source]);
+        as.forEach(a => {
+          this._alias[a] = [c, source];
+        });
       });
     }
   }
+
   _logParseError(tokenPosition, msg, type = 'Error') {
     let idx = -1;
-    for(let i = 0; i < tokenPosition.line - 1; i++) {
+    for (let i = 0; i < tokenPosition.line - 1; i++) {
       idx = this._source.indexOf('\n', idx + 1);
     }
     idx = idx + 1;
@@ -101,15 +106,18 @@ class TemplateVisitor extends TemplateParserVisitor {
   > ${this._resourcePath}
   > ${msg}\n`);
   }
+
   _throwParseError(tokenPosition, msg) {
     this._logParseError(tokenPosition, msg);
     throw new Error('parsing aborted as error occur.');
   }
+
   _replace_tpl(str, ctx) {
     ctx = ctx || {};
     ctx.ID = this._id;
     return replaceTplStr(str, ctx);
   }
+
   _walkAcorn(node, visitors) {
     const baseVisitor = acornWalk.base;
     (function c(node, st, override) {
@@ -123,10 +131,12 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
     })(node);
   }
+
   _prependTab(str, replaceStartEndEmpty = false) {
     // console.log(this._tabSize);
     return prependTab(str, replaceStartEndEmpty, this._tabSize);
   }
+
   _enter(vms, info) {
     this._stack.push({
       vms: this._vms.slice(),
@@ -135,11 +145,13 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._parent = info;
     this._vms = this._vms.concat(vms || []);
   }
+
   _exit() {
     const r = this._stack.pop();
     this._vms = r.vms;
     this._parent = r.parent;
   }
+
   _parse_listener(str, mode, tag) {
     const tree = acorn.Parser.parse(`function _() {\n ${str} \n}`);
     const block = tree.body[0].body;
@@ -148,7 +160,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (block.body.length === 1 && block.body[0].type === 'ExpressionStatement') {
       /**
        * if listener is identifer or member expression, conver it to function call.
-       * for example, 
+       * for example,
        * <SomeComponent on:click="someFn" />
        * is exactly same as:
        * <SomeComponent on:click="someFn(...args)"/>
@@ -156,13 +168,13 @@ class TemplateVisitor extends TemplateParserVisitor {
       const exp = block.body[0];
       if (exp.expression.type === 'Identifier' || exp.expression.type === 'MemberExpression') {
         exp.expression = {
-          'type': 'CallExpression',
-          'callee': exp.expression,
-          'arguments': [{
-            'type': 'SpreadElement',
-            'argument': {
-              'type': 'Identifier',
-              'name': 'args'
+          type: 'CallExpression',
+          callee: exp.expression,
+          arguments: [{
+            type: 'SpreadElement',
+            argument: {
+              type: 'Identifier',
+              name: 'args'
             }
           }]
         };
@@ -195,16 +207,16 @@ class TemplateVisitor extends TemplateParserVisitor {
         args.forEach((a, i) => {
           if (a.type === 'Identifier' && a.name === '$event') {
             args[i] = {
-              'type': 'MemberExpression',
-              'computed': true,
-              'object': {
-                'type': 'Identifier',
-                'name': 'args'
+              type: 'MemberExpression',
+              computed: true,
+              object: {
+                type: 'Identifier',
+                name: 'args'
               },
-              'property': {
-                'type': 'Literal',
-                'value': 0,
-                'raw': '0'
+              property: {
+                type: 'Literal',
+                value: 0,
+                raw: '0'
               }
             };
           }
@@ -244,22 +256,25 @@ class TemplateVisitor extends TemplateParserVisitor {
       tag
     };
   }
+
   _parse_attrs(mode, tag, ctx, parentInfo) {
     // console.log(this._resourcePath);
     // if (this._resourcePath.endsWith('button.html')) {
     //   debugger;
     // }
     const attrCtxs = ctx.htmlAttribute();
-    if (!attrCtxs || attrCtxs.length === 0) return {
-      constAttrs: [],
-      argAttrs: [],
-      listeners: [],
-      vms: [],
-      vmPass: [],
-      argPass: null,
-      ref: null,
-      argUse: mode !== 'html' && tag === '_slot' ? 'default' : null
-    };
+    if (!attrCtxs || attrCtxs.length === 0) {
+      return {
+        constAttrs: [],
+        argAttrs: [],
+        listeners: [],
+        vms: [],
+        vmPass: [],
+        argPass: null,
+        ref: null,
+        argUse: mode !== 'html' && tag === '_slot' ? 'default' : null
+      };
+    }
     const constAttrs = {};
     const argAttrs = {};
     const listeners = {};
@@ -324,7 +339,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/, but got: ' + a_name);
         if (vms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use type attribute name dulipcated: ' + a_name);
         if (pVms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use attribute reflect vairiable name"' + a_name + '" has been declared in parent context.');
-        vms.push({name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1});
+        vms.push({ name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1 });
         return;
       }
 
@@ -333,7 +348,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!aval) this._throwParseError(attrCtx.start, 'vm-pass type attribute require attribute value');
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (vmPass.find(v => v.name === a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
-        vmPass.push({name: a_name, expr: aval});
+        vmPass.push({ name: a_name, expr: aval });
         return;
       }
 
@@ -352,7 +367,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (a_category === 'slot-use') {
         if (argUse) {
           this._throwParseError(attrCtx.start, 'slot-use: attribute can only be used once!');
-        } 
+        }
         argUse = a_name;
         return;
       }
@@ -423,7 +438,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     }
 
     /*
-     * The logic is so complex that I have to write 
+     * The logic is so complex that I have to write
      * Chinese comment to keep myself not forget it.
      */
 
@@ -434,15 +449,15 @@ class TemplateVisitor extends TemplateParserVisitor {
      *   和 <_t/> 类似的，以下划线打头的特殊组件 <_slot/>，在编译器
      *   层面专用于 slot 概念。
      * 需要注意，以下注释文档未更新！但只要等价替换就行。
-     * 
+     *
      * # arg-pass:, arg-use:, vm-pass:, vm-use:
-     * 
+     *
      * ## 基本说明
-     * 
+     *
      * #### arg-pass:
-     * 
+     *
      * 该属性指定要将外部元素传递到组件的内部渲染中。比如：
-     * 
+     *
      * ````html
      * <SomeComponent>
      * <argument arg-pass:a>
@@ -450,18 +465,18 @@ class TemplateVisitor extends TemplateParserVisitor {
      * </argument>
      * </SomeComponent>
      * ````
-     * 
+     *
      * 以上代码会将 <argument> 节点内的所有内容，按 key="a" 传递给
      * SomeComponent 组件。SomeComponent 组件在渲染时，可获取到该外部传递进
      * 来的元素。
-     * 
+     *
      * 对于 html 元素，arg-pass 属性本质上是给它包裹了一个父组件，比如：
      *   `<span arg-pass:a>hello</span>` 等价于：
      *   `<argument arg-pass:a><span>hello</span></argument>`，
-     * 
+     *
      * 对于 Component 元素，arg-pass 属性会让编译器忽略该组件的任何性质（或者理解成，
      *   任何有 arg-pass 属性的组件都会被替换成 <argument> 空组件）。
-     * 
+     *
      * 对任何组件元素来说，如果它没有任何根子节点包含 arg-pass 属性，则编译器会
      *   默认将所有根子节点包裹在 <argument arg-pass:default> 里。比如：
      *   `<SomeComponent><span>hello</span>Good<span>world</span></SomeComponent>`
@@ -473,21 +488,21 @@ class TemplateVisitor extends TemplateParserVisitor {
      *   </argument>
      *   </SomeComponent>
      *   ````
-     * 
+     *
      * #### vm-use:
-     * 
+     *
      * vm-use: 可以简化写成 vm: 。
-     * 
+     *
      * 只有 arg-pass: 属性存在时，才能使用 vm-use: 属性。vm-use: 用于指定要通过 arg-pass: 传递到组件内部去的
      * 外部元素，在组件内部被渲染时，可以使用哪些组件内部提供的渲染参数；因此脱离 arg-pass: 属性，vm-use: 属性没有意义。
-     * 
+     *
      * 但为了代码的简介性，当 Component 元素没有根子节点有 arg-pass: 属性（即，它的所有根子节点
      * 被当作默认的 <argument arg-pass:default>）时，
      * 这个组件`可以只有 vm-use: 而没有 arg-pass: 属性`。
      * 这种情况属于语法糖，本质上等价于在其默认的 <argument arg-pass:default> 上添加了这些 vm-use:。比如：
      * `<SomeComponent vm-use:a="b"><span>${b}</span></SomeComponent>` 等价于：
      * `<SomeComponent><argument arg-pass:default vm-use:a="b"><span>${b}</span></argument></SomeComponent>`
-     * 
+     *
      * 一个典型的实际例子是 <for> 循环。<for> 是 ForComponent 组件的别名，
      * 该组件自身的渲染逻辑，是循环渲染通过 arg-pass:default 传递进来的外部元素。
      * 结合上文，常见的代码 `<for e:loop="list" vm:each="item">${item}</for>` 等价于：
@@ -497,15 +512,15 @@ class TemplateVisitor extends TemplateParserVisitor {
      * <argument arg-pass:default vm-use:each="item">${item}</argument>
      * </ForComponent>
      * ````
-     * 
+     *
      * 其中，vm 是 vm-use 的简化写法。
-     * 
+     *
      * #### arg-use:
-     * 
+     *
      * 指定该组件在自己的内部渲染中，使用哪些通过 arg-pass: 传递进来的外部元素。
      * 以上文 arg-pass: 属性下的代码为例， SomeComponent 组件的模板里，
      * 可以这样使用：
-     * 
+     *
      * ````html
      * <!-- SomeComponent.html -->
      * <parameter arg-use:a />
@@ -513,63 +528,63 @@ class TemplateVisitor extends TemplateParserVisitor {
      *   <span>default text</span>
      * </parameter>
      * ````
-     * 
+     *
      * 通过跟 arg-pass: 一致的 key="a"，实现了 arg-use: 和 arg-pass: 的关联，
      * 将外部的元素渲染到自身内部。如果 arg-use: 属性的组件，还有子节点，则这些子节点
      * 代表外部没有传递对应 key 的外部元素时，要默认渲染的元素。
-     * 
+     *
      * 以上代码最终渲染的结果是 `<span>hello</span><span>default text</span>`。
-     * 
+     *
      * 对于 html 元素，arg-use: 属性本质上是给它包裹了一个父组件，比如：
      *   `<span arg-use:a>default</span>` 等价于：
      *   `<parameter arg-use:a><span>default</span></parameter>`，
-     * 
+     *
      * 对于 Component 元素，arg-use: 属性会让编译器忽略该组件的任何性质（或者理解成，
      *   任何有 arg-use: 属性的组件都会被替换成 <parameter> 空组件）。
-     * 
+     *
      * #### vm-pass:
-     * 
+     *
      * 只有 arg-use: 属性存在时，才能使用 vm-pass: 属性。vm-pass: 用于指定要向外部通过 arg-pass: 传递进来的
      * 外部元素传递过去哪些渲染参数，因此脱离 arg-use: 属性，vm-pass: 属性没有意义。
-     * 
+     *
      * 比如常见的 <for> 循环，即 ForComponent 组件，会向外部元素传递 'each' 和 'index' 两
      * 个渲染参数。但对 ForComponent 组件，这种传递是直接在 js 逻辑里写的，而没有
      * 直接通过 vm-pass: 属性（因为 ForComponent 组件自身没有模板）。
-     * 
+     *
      * 如下是在模板中传递渲染参数的示例：
-     * 
+     *
      * ````html
      * <!-- SomeComponent.html -->
      * <div><parameter arg-use:a vm-pass:xx="name + '_oo' ">hello, ${name}</parameter></div>
      * ````
-     * 
+     *
      * 以上代码会向外部组件传递名称为 xx 的渲染参数，这个参数的值是 `name + 'oo'` 这个表达式
      * 的结果。表达式里的 name 是该组件的 property。当 name 发生变化时，向外传递的 xx 也会更新并
      * 通知外部组件重新渲染。
-     * 
+     *
      * 以下是使用 SomeComponent 组件时的用法：
-     * 
+     *
      * ````html
      * <!-- app.html -->
      * <SomeComponent>
      *   <p arg-pass:a vm-use:xx="yy">override ${yy}</p>
      * </SomeComponent>
      * ````
-     * 
+     *
      * 假设 SomeComponent 的 name 是 'jinge'，则 app.html 最终渲染出来是
      * `<p>override jinge_oo</p>`
-     * 
+     *
      * ## 补充说明
-     * 
+     *
      * #### slot-pass: 必须用于 Component 元素的子元素。
-     * 
+     *
      * #### arg-pass: 和 arg-use: 不能同时使用。
-     * 
+     *
      * arg-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
      *   比如：`<span arg-pass:a arg-use:c>hello</span>` 可以设计为等价于：
-     * 
+     *
      * 可以等价于：
-     * 
+     *
      * ````html
      * <_slot slot-pass:a>
      *   <_slot slot-use:b>
@@ -577,7 +592,7 @@ class TemplateVisitor extends TemplateParserVisitor {
      *   </_slot>
      * </_slot>
      * ````
-     * 
+     *
      * 但这种等价有一定的隐晦性。由于这种使用场景很少，
      * 因此不提供这个场景的简化写法。
      *
@@ -587,7 +602,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (argPass && argUse) {
       this._throwParseError(ctx.start, 'slot-pass: and slot-use: attribute can\' be both used on same element');
     }
-    
+
     // html 元素上的必须有 arg-pass: 属性，才能有 vm-use: 属性
     // component 元素可以只有 vm-use: 属性，但需要满足上面注释里详细描述的条件，这个条件的检测在之后的代码逻辑里。
     if (vms.length > 0 && !(argPass) && mode === 'html') {
@@ -605,9 +620,9 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (argPass && (this._parent.type !== 'component' || this._parent.sub === 'root')) {
       this._throwParseError(ctx.start, 'slot-pass: attribute can only be used on Component element\'s root child.');
     }
-    // 
+    //
     if (tag === '_slot' && !argPass && !argUse) {
-      this._throwParseError(ctx. start, '<_slot> component require "slot-pass:" or "slot-use:" attribute.');
+      this._throwParseError(ctx.start, '<_slot> component require "slot-pass:" or "slot-use:" attribute.');
     }
     /**
      * 如果元素上有 arg-pass: 和 vm-use: ，则该元素等价于被包裹在
@@ -615,16 +630,16 @@ class TemplateVisitor extends TemplateParserVisitor {
      * 的其它表达式值属性，是可以使用该 vm-use: 引入的渲染参数的。因此，要将这些参数
      * 先添加到参数列表里，再进行 _parse_expr 或 _parse_listener，
      * parse 结束后，再恢复参数列表。比如如下代码：
-     * 
+     *
      * ````html
      * <SomeComponent>
      *   <p slot-pass:a vm-use:xx="yy" class="c1 ${yy}">override ${yy}</p>
      *   <AnotherComponent slot:b vm:xx="yy"/>
      * </SomeComponent>
      * ````
-     * 
+     *
      * 等价于：
-     * 
+     *
      * ````html
      * <SomeComponent>
      * <_slot slot-pass:a vm-use:xx="yy">
@@ -635,9 +650,9 @@ class TemplateVisitor extends TemplateParserVisitor {
      * </_slot>
      * </SomeComponent>
      * ````
-     * 
+     *
      * 其中的，`class="c1 ${yy}"` 使用了 `vm-use:xx="yy"` 引入的渲染参数。
-     * 
+     *
      */
     if (tag !== '_slot' && vms.length > 0) {
       this._vms = pVms.slice().concat(vms);
@@ -671,14 +686,15 @@ class TemplateVisitor extends TemplateParserVisitor {
     }
 
     if (tag === '_slot' && (
-      rtn.ref || rtn.constAttrs.length > 0
-      || rtn.argAttrs.length > 0
-      || rtn.listeners.length > 0
+      rtn.ref || rtn.constAttrs.length > 0 ||
+      rtn.argAttrs.length > 0 ||
+      rtn.listeners.length > 0
     )) {
       this._throwParseError(ctx.start, '<_slot> component can only have slot-pass: or slot-use: attribute');
     }
     return rtn;
   }
+
   _parse_html_ele(etag, ctx) {
     const result = this._parse_attrs('html', etag, ctx, this._parent);
     const elements = this._visit_child_nodes(ctx, result.vms, { type: 'html', isSVG: this._parent.isSVG || etag === 'svg' });
@@ -750,7 +766,7 @@ return el;`, true) + '\n})()';
     }
 
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
-    const rtnEl = {type: 'html', value: code};
+    const rtnEl = { type: 'html', value: code };
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
@@ -767,6 +783,7 @@ return el;`, true) + '\n})()';
     }
     return rtnEl;
   }
+
   _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel) {
     let vmPassInitCode = '';
     let vmPassSetCode = '';
@@ -803,6 +820,7 @@ return el;`, true) + '\n})()';
       })
     };
   }
+
   _assert_arg_pass(tokenPosition, elements, Component) {
     let found = 0;
     const args = {};
@@ -825,6 +843,7 @@ return el;`, true) + '\n})()';
     });
     return found > 0;
   }
+
   _parse_translate(ctx) {
     if (this._underMode_T) {
       this._throwParseError(ctx.start, '<_t> component cannot have <_t> child');
@@ -832,7 +851,7 @@ return el;`, true) + '\n})()';
     const attrCtxs = ctx.htmlAttribute();
     const info = {
       key: null,
-      ifLocale: null,
+      ifLocale: null
     };
     attrCtxs.forEach(attrCtx => {
       let an = attrCtx.ATTR_NAME().getText().trim().split(':');
@@ -844,7 +863,7 @@ return el;`, true) + '\n})()';
       if (!(an in info)) {
         this._throwParseError(attrCtx.start, `attribute "${an}" is not support on <_t> component. see https://todo`);
       }
-      if (info[an]) this._throwParseError(attrCtx.start, `dulpilcated attribute "${an}"`); 
+      if (info[an]) this._throwParseError(attrCtx.start, `dulpilcated attribute "${an}"`);
       if (!av) this._throwParseError(attrCtx.start, `attribute value of "${an}" must be non-empty.`);
       if (an === 'ifLocale') {
         info.ifLocale = av;
@@ -855,7 +874,7 @@ return el;`, true) + '\n})()';
       }
       info[an] = av;
     });
-   
+
     let cnodes = ctx.htmlNode();
     const { buildLocale, defaultLocale } = this._i18nOptions;
     if (!info.ifLocale) {
@@ -903,7 +922,7 @@ return el;`, true) + '\n})()';
 
     cnodes = tree.htmlNode();
     if (cnodes.length === 0) return null;
-    
+
     this._underMode_T = true;
     const results = cnodes.map(n => this.visitHtmlNode(n)).filter(el => !!el);
     this._underMode_T = false;
@@ -913,6 +932,7 @@ return el;`, true) + '\n})()';
       value: results.map(r => r.value).join(',\n')
     };
   }
+
   _parse_component_ele(tag, Component, ctx) {
     const result = this._parse_attrs('component', Component, ctx, this._parent);
     /**
@@ -965,13 +985,18 @@ return el;`, true) + '\n})()';
     const attrs = [];
     result.argAttrs.length > 0 && attrs.push(...result.argAttrs.map(at => `${attrN(at[0])}: null`));
     result.constAttrs.length > 0 && attrs.push(...result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`));
-    if (elements.length > 0) attrs.push(`[ARG_COMPONENTS_${this._id}]: {
+    if (elements.length > 0) {
+      attrs.push(`[ARG_COMPONENTS_${this._id}]: {
 ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT_${this._id}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
 }`);
+    }
     const vmAttrs = `const attrs = wrapAttrs_${this._id}({
 ${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${this._prependTab(attrs.join(',\n'), true)}
+${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
+${result.listeners.map(lt => `  ${lt[0]}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+}`) : ''}
 });
 ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
     REL_COM: 'component',
@@ -989,12 +1014,11 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
 ${vmAttrs}
 const el = new ${Component}(attrs);
 ${styleIdCode}
-${result.listeners.map(lt => `el[ON_${this._id}]('${lt[0]}', function(...args) {${lt[1].code}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`).join('\n')}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
 return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()';
-   
-    const rtnEl = {type: 'component', sub: 'normal', value: code};
+
+    const rtnEl = { type: 'component', sub: 'normal', value: code };
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
@@ -1011,9 +1035,8 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
     }
     return rtnEl;
   }
-  
-  _parse_expr_memeber_node(memExpr, startLine) {
 
+  _parse_expr_memeber_node(memExpr, startLine) {
     const paths = [];
     let computed = -1;
     let root = null;
@@ -1058,10 +1081,10 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
         }
       }
     };
-    
+
     try {
-      walk(memExpr);      
-    } catch(loc) {
+      walk(memExpr);
+    } catch (loc) {
       this._throwParseError({
         line: startLine + loc.line - 1,
         column: loc.column
@@ -1074,6 +1097,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
       paths
     };
   }
+
   _parse_expr_node(info, expr, levelPath) {
     const computedMemberExprs = [];
     const watchPaths = [];
@@ -1181,14 +1205,14 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
   _update_${levelId}();
 }
 function _notify_${lv_id}() {
-  const _np =	[${__p.join(', ')}];
+  const _np = [${__p.join(', ')}];
   const _eq = _${lv_id}_p && arrayEqual_${this._id}(_${lv_id}_p, _np);
   if (_${lv_id}_p && !_eq) {
     vm_${level}[VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-		vm_${level}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
 }`);
         initCodes.push(`_calc_${lv_id}();`);
@@ -1215,7 +1239,7 @@ function _notify_${lv_id}() {
         initCodes.push(`_calc_${levelId}();`);
         watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
-      
+
       return [
         assignCodes.join('\n'),
         calcCodes.join('\n'),
@@ -1224,8 +1248,8 @@ function _notify_${lv_id}() {
         watchCodes.join('\n')
       ];
     }
-
   }
+
   _parse_expr(txt, ctx) {
     // console.log(txt);
     txt = txt.trim();
@@ -1240,9 +1264,9 @@ function _notify_${lv_id}() {
     let expr;
     try {
       expr = acorn.Parser.parse(txt, {
-        locations: true,
+        locations: true
       });
-    } catch(ex) {
+    } catch (ex) {
       console.error(ex);
       this._throwParseError(ctx.start, 'expression grammar error.');
     }
@@ -1253,13 +1277,15 @@ function _notify_${lv_id}() {
 
     const info = {
       startLine: ctx.start.line,
-      vars: [],
+      vars: []
     };
     return this._parse_expr_node(info, expr.body[0].expression, ['$ROOT_INDEX$']);
   }
+
   _join_elements(elements) {
     return elements.map(el => el.value).join(',\n');
   }
+
   _gen_render(elements, vmLevel = -1) {
     const body = this._prependTab(`${vmLevel >= 0 ? `const vm_${vmLevel} = component;` : ''}
 return [
@@ -1269,6 +1295,7 @@ ${this._join_elements(elements)}
 ${body}
 }`;
   }
+
   _visit_child_nodes(ctx, vms, parent) {
     const cnodes = ctx.htmlNode();
     if (cnodes.length === 0) return [];
@@ -1277,6 +1304,7 @@ ${body}
     this._exit();
     return elements;
   }
+
   visitHtml(ctx) {
     const elements = super.visitHtml(ctx).filter(el => !!el);
     // console.log(elements);
@@ -1288,6 +1316,7 @@ ${body}
       imports: this._importOutputCodes.join('\n')
     };
   }
+
   visitHtmlNode(ctx) {
     const elements = super.visitHtmlNode(ctx).filter(el => !!el);
     if (elements.length === 0) return null;
@@ -1296,6 +1325,7 @@ ${body}
       throw new Error('unexpected?!');
     }
   }
+
   visitHtmlTextContent(ctx) {
     const eles = [];
     // const last = ctx.children.length - 1;
@@ -1305,7 +1335,7 @@ ${body}
         if (!txt.trim()) return;
         try {
           txt = HTMLEntities.decode(txt);
-        } catch(ex) {
+        } catch (ex) {
           this._throwParseError(ctx.start, ex.message);
         }
         txt = JSON.stringify(txt);
@@ -1340,6 +1370,7 @@ ${body}
       return null;
     }
   }
+
   visitHtmlElement(ctx) {
     if (this._needHandleComment) {
       this._needHandleComment = false; // we only handle comment on topest
@@ -1382,20 +1413,21 @@ ${body}
     }
     return this._parse_component_ele(etag, this._imports[etag], ctx);
   }
+
   visitHtmlComment(ctx) {
     if (!this._needHandleComment) return null; // we only handle comment on topest
     const comment = ctx.getText();
     // extract code from comment: <!-- -->
     const code = comment.substring(4, comment.length - 3);
-    // import keyword not found. 
-    if (!/(^|[\s;])import($|\s)/.test(code)) return null; 
+    // import keyword not found.
+    if (!/(^|[\s;])import($|\s)/.test(code)) return null;
     let tree;
     try {
       tree = acorn.Parser.parse(code, {
         locations: true,
         sourceType: 'module'
       });
-    } catch(ex) {
+    } catch (ex) {
       console.error('Warning: keyword "import" is found in comment, but got error when tring to parse it as js code. see https://[todo]');
       console.error(' >', ex.message);
       console.error(' >', this._resourcePath);

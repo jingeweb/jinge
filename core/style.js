@@ -48,6 +48,7 @@ class ComponentStyleManager {
      */
     this.s = 0;
   }
+
   _c(sty) {
     if (this.s === 0) return;
     const $style = createElement('style', {
@@ -61,6 +62,7 @@ class ComponentStyleManager {
       $style.textContent = sty.css;
     }
   }
+
   [CSTYLE_ADD](sty) {
     if (!sty) return;
     const styleMap = this.m;
@@ -78,6 +80,7 @@ class ComponentStyleManager {
     styleMap.set(sty.id, info);
     this._c(info);
   }
+
   [CSTYLE_ATTACH]() {
     if (this.s !== 0) return;
     this.s = 1;
@@ -89,6 +92,7 @@ class ComponentStyleManager {
     }
     this.m.forEach(info => this._c(info));
   }
+
   [CSTYLE_DEL](sty) {
     if (!sty) return;
     const info = this.m.get(sty.id);

@@ -10,7 +10,7 @@ class AttributeValueParser extends AttrParser {
     const parser = new AttributeValueParser(tokens);
     parser.buildParseTrees = false;
     parser.value();
-    
+
     return parser._results.map(r => {
       const t = r[1];
       return {
@@ -19,6 +19,7 @@ class AttributeValueParser extends AttrParser {
       };
     });
   }
+
   constructor(...args) {
     super(...args);
     this._results = [];

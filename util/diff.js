@@ -1,13 +1,13 @@
 /**
  * A javascript array differencing implementation.
  * Based on the algorithm proposed in ["An O(ND) Difference Algorithm and its Variations" (Myers, 1986)](http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.4.6927).
- * 
+ *
  * Code bellow is copied from https://github.com/kpdecker/jsdiff/blob/master/src/diff/base.js
- * Modified by Yuhang Ge. 
+ * Modified by Yuhang Ge.
  */
 
 function createSeg(type, count, value = null) {
-  return {type, count, value};
+  return { type, count, value };
 }
 
 function extractCommon(basePath, newArr, oldArr, diagonalPath) {
@@ -46,7 +46,7 @@ function clonePath(path) {
 }
 
 function createPath(newPos, components) {
-  return {newPos, components};
+  return { newPos, components };
 }
 
 function buildValues(components, newArr, oldArr, useLongestToken) {
@@ -97,7 +97,7 @@ export function diffArray(oldArr, newArr) {
   const newLen = newArr.length;
   const oldLen = oldArr.length;
   const maxEditLength = newLen + oldLen;
-  const bestPath = [ createPath(-1, []) ];
+  const bestPath = [createPath(-1, [])];
 
   // Seed editLength = 0, i.e. the content starts with the same values
   const oldPos = extractCommon(bestPath[0], newArr, oldArr, 0);
@@ -120,7 +120,7 @@ export function diffArray(oldArr, newArr) {
       }
 
       const canAdd = addPath && addPath.newPos + 1 < newLen;
-      const canRemove = removePath && 0 <= oldPos && oldPos < oldLen;
+      const canRemove = removePath && oldPos >= 0 && oldPos < oldLen;
       if (!canAdd && !canRemove) {
         // If this path is a terminal then prune
         bestPath[diagonalPath] = null;
@@ -159,7 +159,7 @@ export function diffArray(oldArr, newArr) {
       return ret;
     }
   }
-  
+
   // This should never happen, but we want to be safe.
   // Return null means nothing changed.
   return null;

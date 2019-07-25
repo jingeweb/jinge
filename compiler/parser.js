@@ -11,99 +11,99 @@ const jingeUtilCommonFile = path.resolve(__dirname, '../util/common.js');
 
 function _n_wrap(attrArgName) {
   return {
-    'type': 'VariableDeclaration',
-    'declarations': [
+    type: 'VariableDeclaration',
+    declarations: [
       {
-        'type': 'VariableDeclarator',
-        'id': {
-          'type': 'Identifier',
-          'name': `vm_${RND_ID}`
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: `vm_${RND_ID}`
         },
-        'init': {
-          'type': 'CallExpression',
-          'callee': {
-            'type': 'Super',
+        init: {
+          type: 'CallExpression',
+          callee: {
+            type: 'Super'
           },
-          'arguments': [{
-            'type': 'Identifier',
-            'name': attrArgName
+          arguments: [{
+            type: 'Identifier',
+            name: attrArgName
           }]
         }
       }
     ],
-    'kind': 'const'
+    kind: 'const'
   };
 }
 
 function _n_vm(idx, stmt, an, props) {
   return [{
-    'type': 'VariableDeclaration',
-    'declarations': [
+    type: 'VariableDeclaration',
+    declarations: [
       {
-        'type': 'VariableDeclarator',
-        'id': {
-          'type': 'Identifier',
-          'name': `fn_${RND_ID}_${idx}`
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: `fn_${RND_ID}_${idx}`
         },
-        'init': {
-          'type': 'ArrowFunctionExpression',
-          'id': null,
-          'params': [],
-          'body': {
-            'type': 'BlockStatement',
-            'body': [
+        init: {
+          type: 'ArrowFunctionExpression',
+          id: null,
+          params: [],
+          body: {
+            type: 'BlockStatement',
+            body: [
               stmt
             ]
           },
-          'generator': false,
-          'expression': false,
-          'async': false
+          generator: false,
+          expression: false,
+          async: false
         }
       }
     ],
-    'kind': 'const'
+    kind: 'const'
   },
   {
-    'type': 'ExpressionStatement',
-    'expression': {
-      'type': 'CallExpression',
-      'callee': {
-        'type': 'Identifier',
-        'name': `fn_${RND_ID}_${idx}`
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'CallExpression',
+      callee: {
+        type: 'Identifier',
+        name: `fn_${RND_ID}_${idx}`
       },
-      'arguments': []
+      arguments: []
     }
   }].concat(props.map(prop => {
     return {
-      'type': 'ExpressionStatement',
-      'expression': {
-        'type': 'CallExpression',
-        'callee': {
-          'type': 'MemberExpression',
-          'computed': true,
-          'object': {
-            'type': 'Identifier',
-            'name': an
+      type: 'ExpressionStatement',
+      expression: {
+        type: 'CallExpression',
+        callee: {
+          type: 'MemberExpression',
+          computed: true,
+          object: {
+            type: 'Identifier',
+            name: an
           },
-          'property': {
-            'type': 'Identifier',
-            'name': `VM_ON_${RND_ID}`
+          property: {
+            type: 'Identifier',
+            name: `VM_ON_${RND_ID}`
           }
         },
-        'arguments': [isArray(prop) ? {
-          'type': 'ArrayExpression',
-          'elements': prop.map(p => ({
+        arguments: [isArray(prop) ? {
+          type: 'ArrayExpression',
+          elements: prop.map(p => ({
             type: 'Literal',
             value: p,
             raw: JSON.stringify(p)
           }))
         } : {
-          'type': 'Literal',
-          'value': prop,
-          'raw': JSON.stringify(prop)
+          type: 'Literal',
+          value: prop,
+          raw: JSON.stringify(prop)
         }, {
-          'type': 'Identifier',
-          'name': `fn_${RND_ID}_${idx}`
+          type: 'Identifier',
+          name: `fn_${RND_ID}_${idx}`
         }]
       }
     };
@@ -114,6 +114,7 @@ class ComponentParser {
   static parse(content, sourceMap, options = {}) {
     return (new ComponentParser(options)).parse(content);
   }
+
   constructor(options) {
     this.jingeBase = options.jingeBase;
     this.resourcePath = options.resourcePath;
@@ -161,6 +162,7 @@ class ComponentParser {
     this._templateLocalImports = [];
     this._templateAliasImports = [];
   }
+
   _walkAcorn(node, visitors) {
     const baseVisitor = acornWalk.base;
     (function c(node, st, override) {
@@ -174,6 +176,7 @@ class ComponentParser {
       }
     })(node);
   }
+
   _resolve(node) {
     return new Promise((resolve, reject) => {
       this.webpackLoaderContext.resolve(this.webpackLoaderContext.context, node.source.value, (err, result) => {
@@ -182,6 +185,7 @@ class ComponentParser {
       });
     });
   }
+
   async walkImport(node) {
     let source = null;
     let testSource = node.source.value;
@@ -191,12 +195,12 @@ class ComponentParser {
     }
     const _isHtml = /\.htm(?:l)?$/.test(testSource);
     const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(testSource);
-    
+
     if (node.specifiers.length === 0) {
       if (_isStyle) {
         source = source || (await this._resolve(node));
         if (!this.componentStyleStore.extractStyles.has(source)) {
-          this.componentStyleStore.extractStyles.set(source, {code: null});
+          this.componentStyleStore.extractStyles.set(source, { code: null });
         }
       }
       return false;
@@ -220,7 +224,6 @@ class ComponentParser {
       if (!imported) {
         continue;
       }
-     
 
       if (_isHtml || _isStyle) {
         if (!source) {
@@ -271,6 +274,7 @@ class ComponentParser {
     }
     return needHandleComponent;
   }
+
   walkClass(node) {
     const sc = node.superClass;
     if (sc.type !== 'Identifier' || !this.componentBaseLocals.has(sc.name)) {
@@ -326,6 +330,7 @@ class ComponentParser {
       this.walkTemplate(tplNode, styInfo);
     }
   }
+
   _addConstructorImports() {
     if (!this._constructorImports) {
       this._constructorImports = `
@@ -393,8 +398,8 @@ import {
     if (privateIdx >= 0) return null;
     return computed < 0 ? paths.join('.') : paths;
   }
-  walkConstructor(node, ClassName) {
 
+  walkConstructor(node, ClassName) {
     if (this._needHandleI18NTranslate) {
       this.walkI18NTranslate(node, 1);
       this._constructorRanges.push({
@@ -449,11 +454,11 @@ import {
         }
       } else if (expr.type === 'AssignmentExpression') {
         const exprLeft = expr.left;
-        if (exprLeft.type !== 'MemberExpression'
-          || exprLeft.object.type !== 'ThisExpression'
-          || exprLeft.property.type !== 'Identifier'
-          || exprLeft.property.name.startsWith('_')
-          || exprLeft.computed) {
+        if (exprLeft.type !== 'MemberExpression' ||
+          exprLeft.object.type !== 'ThisExpression' ||
+          exprLeft.property.type !== 'Identifier' ||
+          exprLeft.property.name.startsWith('_') ||
+          exprLeft.computed) {
           newBody.push(replaceThis(stmt));
           return;
         }
@@ -480,10 +485,10 @@ import {
       }
     });
     newBody.push({
-      'type': 'ReturnStatement',
-      'argument': {
-        'type': 'Identifier',
-        'name': `vm_${RND_ID}`
+      type: 'ReturnStatement',
+      argument: {
+        type: 'Identifier',
+        name: `vm_${RND_ID}`
       }
     });
     fn.body.body = newBody;
@@ -503,6 +508,7 @@ import {
       code: newCode
     });
   }
+
   walkStyle(node, ci) {
     // debugger;
     if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
@@ -546,6 +552,7 @@ import {
       id: ci.id
     };
   }
+
   walkTemplate(node, styInfo) {
     if (node.value.body.body.length === 0) throw new Error('static getter `template` must return.');
     const st = node.value.body.body[0];
@@ -589,7 +596,7 @@ import {
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
-    
+
     const result = TemplateParser._parse(tpl, {
       componentStyleStore: this.componentStyleStore,
       componentStyleId: styInfo ? styInfo.styleId : null,
@@ -623,6 +630,7 @@ import {
       code
     });
   }
+
   walkI18NTranslate(rootNode, level) {
     this._walkAcorn(rootNode, {
       VariableDeclarator: node => {
@@ -632,7 +640,7 @@ import {
       },
       CallExpression: node => {
         if (node.callee.type === 'Identifier' && node.callee.name === '_t') {
-          for(let i = 0; i < this._constructorRanges.length; i++) {
+          for (let i = 0; i < this._constructorRanges.length; i++) {
             const r = this._constructorRanges[i];
             if (node.start >= r.start && node.end <= r.end) {
               // console.log('skip constructor');
@@ -643,7 +651,7 @@ import {
           if (args.length === 0 || args.length > 3) {
             throw new Error('_t require count of arguments to be 1 to 3.');
           }
-          let [text, params, key]  = args;
+          let [text, params, key] = args;
           if (!text || text.type !== 'Literal' || typeof text.value !== 'string') {
             throw new Error('_t require first argument to be literal string.');
           } else {
@@ -668,7 +676,7 @@ import {
             }
           }
 
-          const info = {text, key, params};
+          const info = { text, key, params };
           const validateErr = this._i18nManager.validate(
             this.resourcePath,
             info,
@@ -687,7 +695,7 @@ import {
                   type: 'Identifier',
                   name: '_t'
                 },
-                arguments: [{type: 'Literal', value: info.text}, params]
+                arguments: [{ type: 'Literal', value: info.text }, params]
               });
             } else {
               code = JSON.stringify(info.text);
@@ -700,9 +708,9 @@ import {
           } else {
             if (params) {
               this.walkI18NTranslate(params, level + 1);
-              node.arguments = [{type: 'Literal', value: info.text}, params];
+              node.arguments = [{ type: 'Literal', value: info.text }, params];
             } else {
-              node.type = 'Literal',
+              node.type = 'Literal';
               node.value = info.text;
             }
           }
@@ -711,6 +719,7 @@ import {
       }
     });
   }
+
   async parse(code) {
     const comments = [];
     let tree;
@@ -800,7 +809,6 @@ import {
     };
   }
 }
-
 
 module.exports = {
   ComponentParser

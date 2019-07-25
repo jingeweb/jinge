@@ -37,6 +37,7 @@ class ExtractImportLocalParser extends ImportParser {
       imports
     };
   }
+
   constructor(...args) {
     super(...args);
     this.__jingeLocals = [];

@@ -23,7 +23,8 @@ export function _t(text, params) {
   return text.replace(/\$\{\s*([\w\d._$]+)\s*\}/g, function(m, n) {
     // 因为支持 ${ a.b.c } 这样的写法，所以直接构造 eval 函数获取。
     if (n.indexOf('.') >= 0) {
-      return (new Function(`return obj.${n}`, 'obj'))(params);        
+      /* eslint no-new-func: "off" */
+      return (new Function(`return obj.${n}`, 'obj'))(params);
     } else {
       return params[n];
     }
@@ -57,13 +58,13 @@ export function registerData(dict) {
      *   文本赋予一个常量，然后在其它地方使用。
      *   我们认为，这种使用方式下，不应该再使用 registerI18nData 来覆盖
      *   字典数据（从而实现不重新加载 app 的情况下，热更新界面的多语言文本展示）。
-     * 
+     *
      * 如果想要通过 registerI18nData 来覆盖字典数据实现热更新，则 i18n 函数
      *   不应该在文件顶部书写。原因在于，文件顶部的代码，在整个 bundle 加载时就已经被
      *   执行了，这时候 bootstrap 函数和 registerI18nData 函数是否已经执行
      *   很难确定（因为各文件的顶部代码的执行顺序取决于文件之间的依赖关系，即打包
      *   后在 bundle 里的次序）。
-     * 
+     *
      * 对于 window.JINGE_I18N_DATA 已经存在的情况下，仍然试图热更新的行为，
      *   我们给予告警提示，帮助用户尽量避免踩坑。
      */

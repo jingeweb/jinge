@@ -25,7 +25,9 @@ export function onHelper(listenersMap, notifyKey, listener) {
 export function offHelper(listenersMap, notifyKey, listener) {
   if (!listenersMap) return;
   if (!notifyKey) {
-    listenersMap.forEach(ls => ls.length = 0);
+    listenersMap.forEach(ls => {
+      ls.length = 0;
+    });
     listenersMap.clear();
     return;
   }
@@ -63,12 +65,23 @@ export const OFF = Symbol('off');
 export const CLEAR = Symbol('clear');
 
 export class Messenger {
-  constructor() {
+  /**
+   * Listeners compiled from template.
+   * @param {Object} templateListeners
+   */
+  constructor(templateListeners) {
     this[LISTENERS] = null;
+    if (templateListeners) {
+      for (const eventName in templateListeners) {
+        this[ON](eventName, ...templateListeners[eventName]);
+      }
+    }
   }
+
   [NOTIFY](eventName, ...args) {
     notifyHelper(this[LISTENERS], eventName, ...args);
   }
+
   [ON](eventName, eventListener, opts) {
     const me = this;
     if (!me[LISTENERS]) {
@@ -83,9 +96,11 @@ export class Messenger {
       onHelper(me[LISTENERS], eventName, eventListener);
     }
   }
+
   [OFF](eventName, eventListener) {
     offHelper(this[LISTENERS], eventName, eventListener);
   }
+
   [CLEAR](eventName) {
     clearHelper(this[LISTENERS], eventName);
   }
@@ -93,8 +108,8 @@ export class Messenger {
 
 /**
  * pass all listeners on srcMessenger to dstMessenger
- * @param {Messenger} srcMessenger 
- * @param {Messenger} dstMessenger 
+ * @param {Messenger} srcMessenger
+ * @param {Messenger} dstMessenger
  */
 export function passListeners(srcMessenger, dstMessenger) {
   if (!(LISTENERS in srcMessenger) || !(LISTENERS in dstMessenger)) {

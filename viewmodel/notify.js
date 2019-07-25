@@ -57,7 +57,6 @@ export function vmAddListener(vm, prop, handler) {
   arrayPushIfNotExist(node[VM_LISTENERS_HANDLERS], handler);
 }
 
-
 function loopGetNode(vm, props, level = 0) {
   const propN = '' + props[level]; // force to string
   const lis = vm[VM_LISTENERS];
@@ -93,7 +92,7 @@ export function vmRemoveListener(vm, prop, handler) {
   const hs = node[VM_LISTENERS_HANDLERS];
   if (!handler) hs.length = 0; // remove all
   else arrayRemove(hs, handler);
-  
+
   loopDelNode(node);
 }
 
@@ -103,7 +102,7 @@ function loopClearNode(node) {
 
   node[VM_LISTENERS_HANDLERS].length = 0;
 
-  node[VM_LISTENERS_ID] = 
+  node[VM_LISTENERS_ID] =
     node[VM_LISTENERS_PARENT] =
     node[VM_LISTENERS_HANDLERS] = null;
 }
@@ -120,7 +119,6 @@ export function vmAddMessengerInterface(vm) {
   vm[VM_NOTIFY] = prop => vmNotifyChanged(vm, prop);
   vm[VM_CLEAR] = () => vmClearListener(vm);
 }
-
 
 const _handleTasks = new Map();
 function _handleOnce(handler, propPath) {

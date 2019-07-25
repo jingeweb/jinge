@@ -13,7 +13,12 @@ export function setText($element, text) {
 }
 
 export function setAttribute($ele, attrName, attrValue) {
-  $ele.setAttribute(attrName, attrValue);
+  if (!attrName) return;
+  if (isUndefined(attrValue)) {
+    removeAttribute($ele, attrName);
+  } else {
+    $ele.setAttribute(attrName, attrValue);
+  }
 }
 
 export function removeAttribute($ele, attrName) {
@@ -25,9 +30,11 @@ export function setInputValue($inputOrTextarea, value) {
 }
 
 function _createEl($el, attrs, children) {
-  if (attrs) for(const an in attrs) {
-    if (an && !isUndefined(attrs[an])) {
-      setAttribute($el, an, attrs[an]);
+  if (attrs) {
+    for (const an in attrs) {
+      if (an && !isUndefined(attrs[an])) {
+        setAttribute($el, an, attrs[an]);
+      }
     }
   }
   children.forEach(child => appendChild($el, child));

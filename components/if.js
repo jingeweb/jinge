@@ -86,7 +86,7 @@ function renderSwitch(component) {
   const acs = component[ARG_COMPONENTS];
   if (component.ts && acs) {
     const t = createEmptyObject();
-    for(const k in acs) {
+    for (const k in acs) {
       t[k] = [
         k === value ? TS_STATE_ENTERED : TS_STATE_LEAVED,
         null // element
@@ -115,9 +115,9 @@ function updateSwitch(component) {
   }
 
   if (component[T_MAP]) {
-    return updateSwitch_ts(component);
+    return updateSwitchWithTransition(component);
   }
-  
+
   doUpdate(component);
 }
 
@@ -164,26 +164,26 @@ function startTs(t, tn, e, component) {
     raf(onEnd);
     return;
   }
-  const class_n = tn + (e ? TS_C_ENTER : TS_C_LEAVE);
-  const class_a = tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
+  const classOfStart = tn + (e ? TS_C_ENTER : TS_C_LEAVE);
+  const classOfActive = tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
 
-  addClass(el, class_n);
+  addClass(el, classOfStart);
   // force render by calling getComputedStyle
   getDurationType(el);
-  addClass(el, class_a);
-  const t_end = getDurationType(el);
-  if (!t_end) {
+  addClass(el, classOfActive);
+  const tsEndName = getDurationType(el);
+  if (!tsEndName) {
     raf(onEnd);
     return;
   }
   t[0] = e ? TS_STATE_ENTERING : TS_STATE_LEAVING;
-  addEvent(el, t_end, onEnd);
+  addEvent(el, tsEndName, onEnd);
   component[NOTIFY](TS_TRANSITION, e ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, el);
   raf(() => {
     component[NOTIFY](TS_TRANSITION, e ? TS_ENTER : TS_LEAVE, el);
   });
 }
-function updateSwitch_ts(component) {
+function updateSwitchWithTransition(component) {
   const value = component[C_VAL];
   const pv = component[P_VAL];
   const tn = component.ts;
@@ -213,7 +213,7 @@ function updateSwitch_ts(component) {
   }
 }
 
-function updateSwitch_ts_end(component) {
+function updateSwitchOnTransitionEnd(component) {
   // console.log('on end')
   const value = component[C_VAL];
   const pv = component[P_VAL];
@@ -225,13 +225,13 @@ function updateSwitch_ts_end(component) {
   if (el.nodeType === Node.ELEMENT_NODE) {
     removeEvent(el, TS_TRANSITION_END, component[OE_H]);
     removeEvent(el, TS_ANIMATION_END, component[OE_H]);
-    removeClass(el, tn + (e  ? TS_C_ENTER : TS_C_LEAVE));
+    removeClass(el, tn + (e ? TS_C_ENTER : TS_C_LEAVE));
     removeClass(el, tn + (e ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE));
     component[NOTIFY](TS_TRANSITION, e ? TS_AFTER_ENTER : TS_AFTER_LEAVE);
   }
-  
+
   pt[0] = e ? TS_STATE_ENTERED : TS_STATE_LEAVED;
-  
+
   if (e) return;
 
   const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][value] : null;
@@ -244,7 +244,7 @@ function updateSwitch_ts_end(component) {
     return;
   }
 
-  ct[1] = fd; 
+  ct[1] = fd;
   startTs(ct, tn, true, component);
 }
 
@@ -254,24 +254,30 @@ export class IfComponent extends Component {
     this.expect = attrs.expect;
     this.ts = attrs.transition;
   }
+
   get expect() {
     return this[C_VAL] === STR_DEFAULT;
   }
+
   set expect(v) {
     v = v ? STR_DEFAULT : IF_STR_ELSE;
     if (this[C_VAL] === v) return;
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
+
   get [C_BV]() {
     return this.expect;
   }
+
   [ON_TS_END]() {
-    updateSwitch_ts_end(this);
+    updateSwitchOnTransitionEnd(this);
   }
+
   [RENDER]() {
     return renderSwitch(this);
   }
+
   [UPDATE]() {
     updateSwitch(this);
   }
@@ -283,9 +289,11 @@ export class SwitchComponent extends Component {
     this.test = attrs.test;
     this.ts = attrs.transition;
   }
+
   get test() {
     return this[C_VAL];
   }
+
   set test(v) {
     const acs = this[ARG_COMPONENTS];
     if (!acs || !(v in acs)) {
@@ -295,15 +303,19 @@ export class SwitchComponent extends Component {
     this[C_VAL] = v;
     this[UPDATE_IF_NEED]();
   }
+
   get [C_BV]() {
     return this.test;
   }
+
   [ON_TS_END]() {
-    updateSwitch_ts_end(this);
+    updateSwitchOnTransitionEnd(this);
   }
+
   [RENDER]() {
     return renderSwitch(this);
   }
+
   [UPDATE]() {
     updateSwitch(this);
   }

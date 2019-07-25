@@ -47,10 +47,7 @@ const HTML_COMMON_IDL_ATTRS = {
   }
 };
 
-
 module.exports = {
   HTML_BOOL_IDL_ATTRS,
   HTML_COMMON_IDL_ATTRS
 };
-
-

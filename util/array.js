@@ -26,7 +26,7 @@ export function arrayFind(array, predicate) {
 }
 
 export function arrayFindIndex(array, predicate) {
-  for(let i = 0; i < array.length; i++) {
+  for (let i = 0; i < array.length; i++) {
     if (predicate(array[i], i)) return i;
   }
   return -1;
@@ -34,7 +34,7 @@ export function arrayFindIndex(array, predicate) {
 
 export function arrayEqual(arr1, arr2) {
   if (arr1.length !== arr2.length) return false;
-  for(let i = 0; i < arr1.length; i++) {
+  for (let i = 0; i < arr1.length; i++) {
     if (arr1[i] !== arr2[i]) return false;
   }
   return true;

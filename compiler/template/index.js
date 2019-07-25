@@ -9,11 +9,11 @@ const TPL = require('./tpl');
 
 const IMPORTS = (function() {
   const map = {
-    'jinge/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createSVGElement,createSVGElementWithoutAttrs,createFragment,'
-      + 'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
+    'jinge/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createSVGElement,createSVGElementWithoutAttrs,createFragment,' +
+      'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
     'jinge/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
     'jinge/viewmodel/common': 'VM_DEBUG_NAME',
-    'jinge/core/messenger': 'ON',
+    'jinge/core/messenger': 'ON,LISTENERS',
     'jinge/core/style': 'CSTYLE_PID,addParentStyleId',
     'jinge/core/component': 'assertRenderResults,emptyRenderFn,errorRenderFn,textRenderFn,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',
     'jinge/viewmodel/proxy': 'wrapViewModel,wrapAttrs',
@@ -51,15 +51,17 @@ class JingeTemplateParser {
       renderFn: result.renderFn
     };
   }
+
   static async parse(content, sourceMap, options = {}) {
     return new Promise((resolve, reject) => {
       try {
         resolve(JingeTemplateParser._parse(content, options));
-      } catch(err) {
+      } catch (err) {
         reject(err);
       }
     });
   }
+
   constructor(options) {
     this.tabSize = options.tabSize || 2;
     this.alias = options.componentAlias;
@@ -73,19 +75,22 @@ class JingeTemplateParser {
       info ? info.styleId : null
     );
   }
+
   parse(source) {
-    if (!source.trim()) return {
-      aliasImports: '',
-      imports: '',
-      renderFn: replaceTplStr(TPL.EMPTY, {ID: RND_ID})
-    };
+    if (!source.trim()) {
+      return {
+        aliasImports: '',
+        imports: '',
+        renderFn: replaceTplStr(TPL.EMPTY, { ID: RND_ID })
+      };
+    }
     const [meetErr, tree] = helper.parse(source);
     if (meetErr) {
       this._logParseError(source, meetErr, 'syntax of template is error.');
       return {
         aliasImports: '',
         imports: '',
-        renderFn: replaceTplStr(TPL.ERROR, {ID: RND_ID})
+        renderFn: replaceTplStr(TPL.ERROR, { ID: RND_ID })
       };
     }
     const visitor = new TemplateVisitor({
@@ -102,19 +107,20 @@ class JingeTemplateParser {
     });
     try {
       return visitor.visit(tree);
-    } catch(ex) {
+    } catch (ex) {
       // debugger;
       // console.error(ex);
       return {
         aliasImports: '',
         imports: '',
-        renderFn: replaceTplStr(TPL.ERROR, {ID: RND_ID})
+        renderFn: replaceTplStr(TPL.ERROR, { ID: RND_ID })
       };
     }
   }
+
   _logParseError(source, tokenPosition, msg) {
     let idx = -1;
-    for(let i = 0; i < tokenPosition.line - 1; i++) {
+    for (let i = 0; i < tokenPosition.line - 1; i++) {
       idx = source.indexOf('\n', idx + 1);
     }
     idx = idx + 1;

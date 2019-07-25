@@ -3,7 +3,7 @@ import {
   isComponent
 } from './component';
 import {
-  assert_fail,
+  assertFail,
   createEmptyObject,
   assignObject
 } from '../util';
@@ -24,7 +24,7 @@ export function bootstrap(Component, dom, attrs) {
   }
   /**
    * as we must pass ViewModel-Object as first argument to Component constructor,
-   * we simple pass an empty attrs. 
+   * we simple pass an empty attrs.
    */
   const bootAttrs = createEmptyObject();
   attrs && assignObject(bootAttrs, attrs);
@@ -33,6 +33,6 @@ export function bootstrap(Component, dom, attrs) {
     bootAttrs[VM_DEBUG_NAME] = 'attrs_of_<root>';
   }
   const bootComponent = new Component(wrapAttrs(bootAttrs));
-  if (!isComponent(bootComponent)) assert_fail();
+  if (!isComponent(bootComponent)) assertFail();
   bootComponent[RENDER_TO_DOM](dom);
 }

@@ -17,7 +17,7 @@ import {
   Symbol,
   STR_DEFAULT,
   isObject,
-  assert_fail,
+  assertFail,
   STR_EMPTY,
   STR_LENGTH,
   isNumber,
@@ -61,9 +61,10 @@ export class ForEachComponent extends Component {
     this.isFirst = index === 0;
     this.isLast = isLast;
   }
+
   [RENDER]() {
     const renderFn = this[ARG_COMPONENTS][STR_DEFAULT];
-    if (!renderFn) assert_fail();
+    if (!renderFn) assertFail();
     return renderFn(this);
   }
 }
@@ -84,13 +85,13 @@ function appendRenderEach(item, i, isLast, itemRenderFn, roots, context) {
   return el[RENDER]();
 }
 
-function assert_vm(item, i) {
+function _assertVm(item, i) {
   if (item !== null && isObject(item) && !(VM_PARENTS in item)) {
     throw new Error(`loop item [${i}] of <for> component must be ViewModel.`);
   }
 }
 
-function prepare_key(item, i, keyMap, keyName) {
+function _prepareKey(item, i, keyMap, keyName) {
   const key = keyName === KEY_EACH ? item : keyName(item);
   if (keyMap.has(key)) {
     console.error(`loop items [${i}] and [${keyMap.get(key)}] of <for> component both have key '${key}', dulplicated key may cause update error.`);
@@ -103,9 +104,9 @@ function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
   const result = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
-    assert_vm(item, i);
+    _assertVm(item, i);
     if (keyName !== KEY_INDEX) {
-      keys.push(prepare_key(item, i, tmpKeyMap, keyName));  
+      keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
     result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context));
   });
@@ -137,7 +138,7 @@ function updateEl(el, i, items) {
   }
 }
 
-function _parse_index_path(p) {
+function _parseIndexPath(p) {
   return (isString(p) && p !== STR_LENGTH && /^\d+$/.test(p)) ? Number(p) : p;
 }
 
@@ -155,6 +156,7 @@ export class ForComponent extends Component {
     this[FOR_WAIT_UPDATE] = false;
 
     if (kn !== KEY_INDEX && kn !== KEY_EACH) {
+      /* eslint no-new-func:"off" */
       this[FOR_KEY_NAME] = new Function(KEY_EACH, `return ${kn}`);
       // console.log('loop.*.' + kn.slice(5));
       const propCount = kn.split('.').length + 1;
@@ -169,7 +171,7 @@ export class ForComponent extends Component {
         // console.log(propPath);
         const items = this.loop;
         if (!isArray(items) || items.length === 0) return;
-        const p = _parse_index_path(propPath[1]);
+        const p = _parseIndexPath(propPath[1]);
         if (!isNumber(p) || p >= items.length) {
           return;
         }
@@ -185,7 +187,7 @@ export class ForComponent extends Component {
         return;
       }
       // console.log(propPath);
-      const p = _parse_index_path(propPath[1]);
+      const p = _parseIndexPath(propPath[1]);
       if (p === STR_LENGTH) {
         this[FOR_WAIT_UPDATE] = true;
         this[UPDATE_IF_NEED]();
@@ -195,15 +197,18 @@ export class ForComponent extends Component {
       }
     });
   }
+
   get loop() {
     return this._l;
   }
+
   set loop(v) {
     // console.log('set loop');
     this._l = v;
     this[FOR_WAIT_UPDATE] = true;
     this[UPDATE_IF_NEED]();
   }
+
   [RENDER]() {
     const roots = this[ROOT_NODES];
     const itemRenderFn = this[ARG_COMPONENTS] ? this[ARG_COMPONENTS][STR_DEFAULT] : null;
@@ -228,6 +233,7 @@ export class ForComponent extends Component {
       this[CONTEXT]
     );
   }
+
   [FOR_UPDATE_ITEM](index) {
     const items = this.loop;
     const roots = this[ROOT_NODES];
@@ -248,7 +254,7 @@ export class ForComponent extends Component {
       if (newKey !== oldKey) {
         const $fd = oldEl[GET_FIRST_DOM]();
         const newEl = createEl(
-          item, index, oldEl.isLast, 
+          item, index, oldEl.isLast,
           itemRenderFn, this[CONTEXT]
         );
         const rr = newEl[RENDER]();
@@ -265,6 +271,7 @@ export class ForComponent extends Component {
       oldEl.each = item;
     }
   }
+
   [UPDATE]() {
     this[FOR_WAIT_UPDATE] = false;
     // console.log('for update');
@@ -284,7 +291,7 @@ export class ForComponent extends Component {
       const fd = roots[0][GET_FIRST_DOM]();
       const $cmt = createComment(STR_EMPTY);
       insertBefore(getParent(fd), $cmt, fd);
-      for(let i = 0; i < ol; i++) {
+      for (let i = 0; i < ol; i++) {
         roots[i][DESTROY]();
       }
       roots.length = 1;
@@ -305,7 +312,7 @@ export class ForComponent extends Component {
       let $f = null;
       if (ol === 0) roots.length = 0;
 
-      for(let i = 0; i < nl; i++) {
+      for (let i = 0; i < nl; i++) {
         if (i < ol) {
           updateEl(roots[i], i, newItems);
         } else {
@@ -316,7 +323,7 @@ export class ForComponent extends Component {
       if ($f) {
         const $le = ol === 0 ? firstEl : roots[ol - 1][GET_LAST_DOM]();
         insertAfter($parent, $f, $le);
-        for(let i = ol; i < nl; i++) {
+        for (let i = ol; i < nl; i++) {
           roots[i][HANDLE_AFTER_RENDER]();
         }
       }
@@ -324,7 +331,7 @@ export class ForComponent extends Component {
         removeChild($parent, firstEl);
       }
       if (nl >= ol) return;
-      for(let i = nl; i < ol; i++) {
+      for (let i = nl; i < ol; i++) {
         roots[i][DESTROY]();
       }
       roots.splice(nl);
@@ -336,7 +343,7 @@ export class ForComponent extends Component {
     if (ol === 0) {
       roots.length = 0;
       const rs = renderItems(
-        newItems, itemRenderFn, roots, 
+        newItems, itemRenderFn, roots,
         oldKeys, keyName, this[CONTEXT]
       );
       insertAfter($parent, createFragment(rs), firstEl);
@@ -352,17 +359,17 @@ export class ForComponent extends Component {
     const newKeys = [];
     const newKeyMap = new Map();
     newItems.forEach((item, i) => {
-      assert_vm(item, i);
-      newKeys.push(prepare_key(item, i, newKeyMap, keyName));
+      _assertVm(item, i);
+      newKeys.push(_prepareKey(item, i, newKeyMap, keyName));
     });
-    
+
     let oi = 0;
     let ni = 0;
     let $lastS = null;
     const newRoots = [];
     const oldTags = new Uint8Array(ol);
-    while(oi < ol || ni < nl) {
-      while(oi < ol) {
+    while (oi < ol || ni < nl) {
+      while (oi < ol) {
         if (oldTags[oi] !== 0) {
           oi++;
         } else if (newKeyMap.has(oldKeys[oi]) && newKeyMap.get(oldKeys[oi]) >= ni) {
@@ -381,7 +388,7 @@ export class ForComponent extends Component {
       if (oi >= ol) {
         let $f = null;
         const cei = newRoots.length;
-        for(; ni < nl; ni++) {
+        for (; ni < nl; ni++) {
           const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
           if (!$f) $f = createFragment();
           appendChild($f, ...el[RENDER]());
@@ -393,7 +400,7 @@ export class ForComponent extends Component {
           } else {
             appendChild($parent, $f);
           }
-          for(let i = cei; i < newRoots.length; i++) {
+          for (let i = cei; i < newRoots.length; i++) {
             newRoots[i][HANDLE_AFTER_RENDER]();
           }
         }
@@ -402,17 +409,17 @@ export class ForComponent extends Component {
       const oldKey = oldKeys[oi];
       let $f = null;
       let $nes = null;
-      while(ni < nl) {
+      while (ni < nl) {
         const newKey = newKeys[ni];
         if (newKey === oldKey) break;
-        
+
         let reuseEl = null;
         if (oldKeyMap.has(newKey)) {
           const oldIdx = oldKeyMap.get(newKey);
           if (oldIdx > oi && oldTags[oldIdx] === 0) {
             reuseEl = roots[oldIdx];
             oldTags[oldIdx] = 1;
-          } 
+          }
         }
         if (!$f) $f = createFragment();
         if (!reuseEl) {
@@ -428,7 +435,7 @@ export class ForComponent extends Component {
         ni++;
       }
       if (ni >= nl) {
-        assert_fail('unimpossible?!');
+        assertFail('unimpossible?!');
       }
       const el = roots[oi];
       $f && insertBefore($parent, $f, el[GET_FIRST_DOM]());
@@ -441,6 +448,5 @@ export class ForComponent extends Component {
 
     this[ROOT_NODES] = newRoots;
     this[FOR_KEYS] = newKeys;
-
   }
 }

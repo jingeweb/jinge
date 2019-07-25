@@ -17,7 +17,7 @@ import {
   isObject,
   setImmediate,
   clearImmediate,
-  raf,
+  raf
 } from '../util';
 import {
   vmWatch,
@@ -68,14 +68,17 @@ export class ToggleClassComponent extends Component {
       });
     });
   }
+
   beforeDestroy() {
     vmUnwatch(this, 'class.**');
   }
+
   [RENDER]() {
     const rr = super[RENDER]();
     this[UPDATE](true);
     return rr;
   }
+
   [UPDATE](init) {
     const el = this.trans ? this[GET_TRANSITION_DOM]() : this;
     if (el.nodeType !== Node.ELEMENT_NODE) {
@@ -91,7 +94,7 @@ export class ToggleClassComponent extends Component {
       if (!this.trans) {
         operateRootHtmlDOM(
           v ? addClass : removeClass,
-          el, k 
+          el, k
         );
         return;
       }
@@ -99,7 +102,7 @@ export class ToggleClassComponent extends Component {
       if (init) {
         this._t.set(k, [
           v ? TS_STATE_ENTERED : TS_STATE_LEAVED, // state
-          null   // saved onEnd callback
+          null // saved onEnd callback
         ]);
         v ? addClass(el, k) : removeClass(el, k);
         return;
@@ -111,7 +114,7 @@ export class ToggleClassComponent extends Component {
         return;
       }
       const s = t[0];
-      if (v && s <= TS_STATE_ENTERED || !v && s >= TS_STATE_LEAVING) {
+      if ((v && s <= TS_STATE_ENTERED) || (!v && s >= TS_STATE_LEAVING)) {
         return;
       }
 
@@ -124,16 +127,16 @@ export class ToggleClassComponent extends Component {
         t[1] = null;
         this[NOTIFY](TS_TRANSITION, v ? TS_LEAVE_CANCELLED : TS_ENTER_CANCELLED, k, el);
       }
-      const class_n = k + (v ? TS_C_ENTER : TS_C_LEAVE);
-      const class_a = k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
-      addClass(el, class_n);
+      const classOfStart = k + (v ? TS_C_ENTER : TS_C_LEAVE);
+      const classOfActive = k + (v ? TS_C_ENTER_ACTIVE : TS_C_LEAVE_ACTIVE);
+      addClass(el, classOfStart);
       // force render by calling getComputedStyle
       getDurationType(el);
-      addClass(el, class_a);
-      const t_end = getDurationType(el);        
-      if (!t_end) {
-        removeClass(el, class_n);
-        removeClass(el, class_a);
+      addClass(el, classOfActive);
+      const tsEndName = getDurationType(el);
+      if (!tsEndName) {
+        removeClass(el, classOfStart);
+        removeClass(el, classOfActive);
         t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
         v ? addClass(el, k) : removeClass(el, k);
         return;
@@ -141,8 +144,8 @@ export class ToggleClassComponent extends Component {
       const onEnd = () => {
         removeEvent(el, TS_TRANSITION_END, onEnd);
         removeEvent(el, TS_ANIMATION_END, onEnd);
-        removeClass(el, class_n);
-        removeClass(el, class_a);
+        removeClass(el, classOfStart);
+        removeClass(el, classOfActive);
         t[1] = null;
         t[0] = v ? TS_STATE_ENTERED : TS_STATE_LEAVED;
         v ? addClass(el, k) : removeClass(el, k);
@@ -150,7 +153,7 @@ export class ToggleClassComponent extends Component {
       };
       t[0] = v ? TS_STATE_ENTERING : TS_STATE_LEAVING;
       t[1] = onEnd;
-      addEvent(el, t_end, onEnd);
+      addEvent(el, tsEndName, onEnd);
       this[NOTIFY](TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
       raf(() => {
         this[NOTIFY](TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);

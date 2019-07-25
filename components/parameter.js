@@ -10,7 +10,9 @@ export class ParameterComponent extends Component {
     super(attrs);
     params.forEach(p => {
       this[p] = attrs[p];
-      attrs[VM_ON](p, () => this[p] = attrs[p]);
+      attrs[VM_ON](p, () => {
+        this[p] = attrs[p];
+      });
     });
   }
 }

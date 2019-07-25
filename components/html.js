@@ -4,7 +4,7 @@ import {
   ARG_COMPONENTS,
   UPDATE_IF_NEED,
   UPDATE,
-  ROOT_NODES,
+  ROOT_NODES
 } from '../core/component';
 import {
   createElementWithoutAttrs,
@@ -36,17 +36,21 @@ export class BindHtmlComponent extends Component {
     super(attrs);
     this.c = attrs.content;
   }
+
   get c() {
     return this._c;
   }
+
   set c(v) {
     if (this._c === v) return;
     this._c = v;
     this[UPDATE_IF_NEED]();
   }
+
   [RENDER]() {
     return (this[ROOT_NODES] = renderHtml(this._c));
   }
+
   [UPDATE]() {
     const roots = this[ROOT_NODES];
     const oldFirstEl = roots[0];

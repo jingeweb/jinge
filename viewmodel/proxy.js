@@ -5,7 +5,7 @@ import {
   isNumber,
   isArray,
   isObject,
-  assert_fail,
+  assertFail,
   STR_LENGTH,
   isFunction
 } from '../util';
@@ -60,7 +60,7 @@ function objectPropSetHandler(target, prop, value) {
   }
   /**
    * we must ensure `this` in setter function to be `Proxy`
-   * 
+   *
    * 首先判断当前赋值的变量名，是否对应了一个 setter 函数，
    * 如果是 setter 函数，则应该显式地调用，
    *   并将 `this` 设置为该 target 的包装 Proxy，
@@ -94,19 +94,20 @@ function arrayNotifyItems(target, idxStart, idxEnd) {
     i = idxEnd;
     idxEnd = idxStart;
   }
-  for(; i < idxEnd; i++) {
+  for (; i < idxEnd; i++) {
     // console.log('npc', i);
     notifyPropChanged(target, i);
   }
 }
 
-
 function arrayLengthSetHandler(target, value) {
   if (!isNumber(value)) throw new Error('bad argument. array length must be validate number.');
   const oldLen = target.length;
-  if (oldLen > value) for(let i = value; i < oldLen; i++) {
-    const v = target[i];
-    isViewModel(v) && removeVMParent(v, target, i);
+  if (oldLen > value) {
+    for (let i = value; i < oldLen; i++) {
+      const v = target[i];
+      isViewModel(v) && removeVMParent(v, target, i);
+    }
   }
   target.length = value;
   // console.log('set .length from', oldLen, 'to', value);
@@ -121,7 +122,7 @@ export const ObjectProxyHandler = {
   set: objectPropSetHandler
 };
 
-function array_fill_reverse_sort(target, fn, arg) {
+function _arrayFillReverseSort(target, fn, arg) {
   target.forEach((it, i) => {
     if (isViewModel(it)) {
       removeVMParent(it, target, i);
@@ -138,7 +139,7 @@ function array_fill_reverse_sort(target, fn, arg) {
   return target[VM_WRAPPER_PROXY];
 }
 
-function _array_wrap_sub(arr, wrapEachItem = false) {
+function _arrayWrapSub(arr, wrapEachItem = false) {
   const rtn = wrapProxy(arr, true);
   handleVMDebug(arr);
   arr.forEach((it, i) => {
@@ -151,7 +152,7 @@ function _array_wrap_sub(arr, wrapEachItem = false) {
   return rtn;
 }
 
-function _array_shift_unshift_prop(arr, delta) {
+function _arrayShiftOrUnshiftProp(arr, delta) {
   arr.forEach((el, i) => {
     if (!isViewModel(el)) return;
     const ps = el[VM_PARENTS];
@@ -162,10 +163,10 @@ function _array_shift_unshift_prop(arr, delta) {
   });
 }
 
-function _arg_asert(arg, fn) {
+function _argAssert(arg, fn) {
   if (arg !== null && isObject(arg)) {
     if (!(VM_PARENTS in arg)) {
-      throw new Error(`argument passed to Array.${fn} must be ViewModel if the array is ViewModel`);      
+      throw new Error(`argument passed to Array.${fn} must be ViewModel if the array is ViewModel`);
     } else {
       return true;
     }
@@ -178,11 +179,11 @@ const ArrayFns = {
   splice(target, idx, delCount, ...args) {
     if (idx < 0) idx = 0;
     args.forEach((arg, i) => {
-      if (_arg_asert(arg, 'splice')) {
+      if (_argAssert(arg, 'splice')) {
         addVMParent(arg, target, idx + i);
       }
     });
-    for(let i = 0; i < delCount; i++) {
+    for (let i = 0; i < delCount; i++) {
       if (idx + i >= target.length) break;
       const el = target[idx + i];
       if (isViewModel(el)) {
@@ -191,7 +192,7 @@ const ArrayFns = {
     }
     const delta = args.length - delCount;
     if (delta !== 0) {
-      for(let i = idx + delCount; i < target.length; i++) {
+      for (let i = idx + delCount; i < target.length; i++) {
         const el = target[i];
         if (!isViewModel(el)) continue;
         const ps = el[VM_PARENTS];
@@ -201,10 +202,10 @@ const ArrayFns = {
         }
       }
     }
-    const rtn = _array_wrap_sub(target.splice(idx, delCount, ...args));
+    const rtn = _arrayWrapSub(target.splice(idx, delCount, ...args));
     if (delta !== 0) {
       notifyPropChanged(target, STR_LENGTH);
-      for(let i = idx; i < target.length; i++) {
+      for (let i = idx; i < target.length; i++) {
         notifyPropChanged(target, i);
       }
     }
@@ -212,13 +213,13 @@ const ArrayFns = {
   },
   shift(target) {
     if (target.length === 0) return target.shift();
-    _array_shift_unshift_prop(target, -1);
+    _arrayShiftOrUnshiftProp(target, -1);
     const el = target.shift();
     if (isViewModel(el)) {
       removeVMParent(el, target, -1);
     }
     notifyPropChanged(target, STR_LENGTH);
-    for(let i = 0; i < target.length + 1; i++) {
+    for (let i = 0; i < target.length + 1; i++) {
       notifyPropChanged(target, i);
     }
     return el;
@@ -226,14 +227,14 @@ const ArrayFns = {
   unshift(target, ...args) {
     if (args.length === 0) return target.unshift();
     args.forEach((arg, i) => {
-      if (_arg_asert(arg, 'unshift')) {
+      if (_argAssert(arg, 'unshift')) {
         addVMParent(arg, target, i);
       }
     });
-    _array_shift_unshift_prop(target, args.length);
+    _arrayShiftOrUnshiftProp(target, args.length);
     const rtn = target.unshift(...args);
     notifyPropChanged(target, STR_LENGTH);
-    for(let i = 0; i < target.length; i++) {
+    for (let i = 0; i < target.length; i++) {
       notifyPropChanged(target, i);
     }
     return rtn;
@@ -253,43 +254,41 @@ const ArrayFns = {
   push(target, ...args) {
     if (args.length === 0) return target.push();
     args.forEach((arg, i) => {
-      if (_arg_asert(arg, 'push')) {
+      if (_argAssert(arg, 'push')) {
         addVMParent(arg, target, target.length + i);
       }
     });
     const rtn = target.push(...args);
     notifyPropChanged(target, STR_LENGTH);
-    for(let i = target.length - 1 - args.length; i < target.length; i++) {
+    for (let i = target.length - 1 - args.length; i < target.length; i++) {
       notifyPropChanged(target, i);
     }
     return rtn;
   },
   fill(target, v) {
-    _arg_asert(v, 'fill');
-    return array_fill_reverse_sort(target, 'fill', v);
+    _argAssert(v, 'fill');
+    return _arrayFillReverseSort(target, 'fill', v);
   },
   reverse(target) {
-    return array_fill_reverse_sort(target, 'reverse');
+    return _arrayFillReverseSort(target, 'reverse');
   },
   sort(target, fn) {
-    return array_fill_reverse_sort(target, 'sort', fn);
+    return _arrayFillReverseSort(target, 'sort', fn);
   },
   concat(target, arr) {
-    _arg_asert(arr, 'concat');
-    return _array_wrap_sub(target.concat(arr));
+    _argAssert(arr, 'concat');
+    return _arrayWrapSub(target.concat(arr));
   },
   filter(target, fn) {
-    return _array_wrap_sub(target.filter(fn));
+    return _arrayWrapSub(target.filter(fn));
   },
   slice(target, si, ei) {
-    return _array_wrap_sub(target.slice(si, ei));
+    return _arrayWrapSub(target.slice(si, ei));
   },
   map(target, fn) {
-    return _array_wrap_sub(target.map(fn), true);
+    return _arrayWrapSub(target.map(fn), true);
   }
 };
-
-
 
 export const ArrayProxyHandler = {
   get(target, prop) {
@@ -304,7 +303,6 @@ export const ArrayProxyHandler = {
   },
   set: arrayPropSetHandler
 };
-
 
 function wrapProp(vm, prop) {
   const v = vm[prop];
@@ -337,12 +335,12 @@ function loopWrapVM(plainObjectOrArray) {
       plainObjectOrArray[VM_PARENTS] = VM_EMPTY_PARENTS;
       return plainObjectOrArray;
     } else if (isArray(plainObjectOrArray)) {
-      for(let i = 0; i < plainObjectOrArray.length; i++) {
+      for (let i = 0; i < plainObjectOrArray.length; i++) {
         wrapProp(plainObjectOrArray, i);
       }
       return wrapProxy(plainObjectOrArray, true);
     } else {
-      for(const k in plainObjectOrArray) {
+      for (const k in plainObjectOrArray) {
         if (isPublicProp(k)) {
           wrapProp(plainObjectOrArray, k);
         }
@@ -365,11 +363,10 @@ export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false)
   return vm;
 }
 
-
 function handleVMDebug(vm) {
   if (!config[CFG_VM_DEBUG]) return;
   let _di = window._VM_DEBUG;
-  if (!_di) _di = window._VM_DEBUG = {id: 0, vms: []};
+  if (!_di) _di = window._VM_DEBUG = { id: 0, vms: [] };
   vm[VM_DEBUG_ID] = _di.id++;
   // if (isComponent(vm) && !(VM_DEBUG_NAME in vm)) {
   //   vm[VM_DEBUG_NAME] = `<${vm.constructor.name}>`;
@@ -404,7 +401,7 @@ export function wrapComponent(component) {
 
 /**
  * @notice Don't use this function. It can only be used for compiler generated code.
- * @param {Compiler Generated Attrs Object} attrsObj 
+ * @param {Compiler Generated Attrs Object} attrsObj
  */
 export function wrapAttrs(attrsObj) {
   if (attrsObj === null || !isObject(attrsObj) || (VM_PARENTS in attrsObj)) {
@@ -412,9 +409,9 @@ export function wrapAttrs(attrsObj) {
      * this should never happen,
      * as `wrapAttrs` should only be used in compiler generated code.
      */
-    assert_fail();
+    assertFail();
   }
-  for(const k in attrsObj) {
+  for (const k in attrsObj) {
     if (isPublicProp(k)) {
       const v = attrsObj[k];
       if (v !== null && isObject(v) && !(VM_PARENTS in v)) {
@@ -423,7 +420,7 @@ export function wrapAttrs(attrsObj) {
     }
   }
   return wrapViewModel(attrsObj, true);
-  
+
   // attrsObj[VM_PARENTS] = VM_EMPTY_PARENTS;
   // vmAddMessengerInterface(attrsObj);
   // handleVMDebug(attrsObj);

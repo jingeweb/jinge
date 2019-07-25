@@ -61,6 +61,7 @@ export class I18nComponent extends Component {
   static prefix(prefix, cache = true) {
     let C = I18nComponentsCache.get(prefix);
     if (C) return C;
+    /* eslint no-new-func:"off" */
     C = new Function('BaseI18n', `
     return class I18n_${prefix.replace(/\./g, '_')} extends BaseI18n {
       constructor(attrs) {
@@ -74,6 +75,7 @@ export class I18nComponent extends Component {
     }
     return C;
   }
+
   constructor(attrs) {
     if (!attrs.key) throw new Error('I18n component require attribute "key". see https://todo');
     super(attrs);
@@ -85,27 +87,33 @@ export class I18nComponent extends Component {
     vmWatch(this, 'p.**', this._o);
     i18nMessenger[ON](I18N_DATA_CHANGED, this._o);
   }
+
   [BEFORE_DESTROY]() {
     vmUnwatch(this, 'p.**', this._o);
     i18nMessenger[OFF](I18N_DATA_CHANGED, this._o);
   }
+
   get k() {
     return this._k;
   }
+
   set k(v) {
     if (this._k === v) return;
     this._k = v;
     this[UPDATE_IF_NEED]();
   }
+
   /**
    * render text
    */
   _r() {
     return i18n((this._f ? `${this._f}.` : '') + this._k, this.p);
   }
+
   [RENDER]() {
     return render.call(this);
   }
+
   [UPDATE]() {
     update.call(this);
   }
@@ -119,15 +127,19 @@ export class _TComponent extends Component {
     this._h = !!attrs.html; // render html mode
     vmWatch(this, 'p.**', () => this[UPDATE_IF_NEED]());
   }
+
   beforeDestroy() {
     vmUnwatch(this, 'p.**');
   }
+
   _r() {
     return i18nRender(this._t, this.p);
   }
+
   [RENDER]() {
     return render.call(this);
   }
+
   [UPDATE]() {
     update.call(this);
   }

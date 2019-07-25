@@ -7,7 +7,7 @@ async function mkdir(dirname) {
   try {
     await fs.access(dirname);
     return;
-  } catch(err) {
+  } catch (err) {
     if (err.code !== 'ENOENT') {
       throw err;
     }
@@ -20,6 +20,7 @@ class JingeWebpackPlugin {
   constructor(options = {}) {
     this.options = options;
   }
+
   async _genStyle(outputDir, compress) {
     const opts = this.options.extractStyle;
     let output = `.jg-hide {
@@ -48,6 +49,7 @@ class JingeWebpackPlugin {
       output
     );
   }
+
   async _genTranslate() {
     const opts = this.options.i18n || {};
     if (opts.buildLocale !== opts.defaultLocale || opts.generateCSV === false) {
@@ -57,6 +59,7 @@ class JingeWebpackPlugin {
     await mkdir(dir);
     await store.i18n.writeTranslateCSV(dir, opts);
   }
+
   apply(compiler) {
     const copt = compiler.options;
     const popt = this.options;
@@ -65,7 +68,7 @@ class JingeWebpackPlugin {
     compiler.hooks.emit.tapAsync('JINGE_EXTRACT_PLUGIN', (compilation, callback) => {
       Promise.all([
         popt.extractStyle ? this._genStyle(outputDir, needCompress) : Promise.resolve(),
-        store.i18n.size > 0 ? this._genTranslate() : Promise.resolve(),
+        store.i18n.size > 0 ? this._genTranslate() : Promise.resolve()
       ]).catch((error) => {
         compilation.errors.push(error);
       }).then(() => {

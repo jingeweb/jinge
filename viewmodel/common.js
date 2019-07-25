@@ -1,4 +1,4 @@
-import { 
+import {
   isObject,
   isString,
   Symbol,
@@ -19,7 +19,7 @@ export function isPublicProp(v) {
 
 export function addVMParent(vm, parent, prop) {
   const ps = vm[VM_PARENTS];
-  for(let i = 0; i < ps.length; i++) {
+  for (let i = 0; i < ps.length; i++) {
     if (ps[i][0] === parent && ps[i][1] === prop) return;
   }
   ps.push([parent, prop]);
@@ -27,7 +27,7 @@ export function addVMParent(vm, parent, prop) {
 
 export function removeVMParent(vm, parent, prop) {
   const ps = vm[VM_PARENTS];
-  for(let i = 0; i < ps.length; i++) {
+  for (let i = 0; i < ps.length; i++) {
     if (ps[i][0] === parent && ps[i][1] === prop) {
       ps.splice(i, 1);
       return;

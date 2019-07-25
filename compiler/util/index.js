@@ -42,7 +42,7 @@ function isArray(v) {
 
 function arrayIsEqual(arr1, arr2) {
   if (arr1.length !== arr2.length) return false;
-  for(let i = 0; i < arr1.length; i++) {
+  for (let i = 0; i < arr1.length; i++) {
     if (arr1[i] !== arr2[i]) return false;
   }
   return true;
@@ -57,7 +57,7 @@ function isSimpleType(v) {
 }
 
 function replaceTplStr(tpl, ctx) {
-  for(const k in ctx) {
+  for (const k in ctx) {
     tpl = tpl.replace(new RegExp('\\$' + k + '\\$', 'g'), ctx[k]);
   }
   return tpl;

@@ -32,9 +32,9 @@ function jingeLoader(source, sourceMap) {
     };
   } else {
     if (!/\.(js|html)$/.test(resourcePath)) {
-      return callback('jingeLoader only support .js,.html,.css,.less,.scss file');
+      return callback(new Error('jingeLoader only support .js,.html,.css,.less,.scss file'));
     }
-    const iopt = opts.i18n || {mode: 'dictionary-reflect'};
+    const iopt = opts.i18n || { mode: 'dictionary-reflect' };
     if (iopt.mode === 'compiler-translate') {
       I18N_OPTION_NAMES.forEach(n => {
         if (!iopt[n]) throw new Error(`jinge loader require non-empty option "i18n.${n}" when "i18n.mode" is "compiler-translate"`);
@@ -43,7 +43,7 @@ function jingeLoader(source, sourceMap) {
         iopt.idBaseDir = process.cwd();
       }
     } else if (iopt.mode !== 'dictionary-reflect') {
-      return callback('jingeLoader option "i18n.mode" must be "dictionary-reflect" or "compiler-translate". see https://todo');
+      return callback(new Error('jingeLoader option "i18n.mode" must be "dictionary-reflect" or "compiler-translate". see https://todo'));
     }
     if (iopt.buildLocale !== iopt.defaultLocale) {
       store.i18n.loadTranslateCSV(iopt);

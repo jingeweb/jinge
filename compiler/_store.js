@@ -8,7 +8,7 @@ function parseCSVLine(line) {
   const end = line.length - 1;
   let STATE = -1;
   let startIdx = 0;
-  for(let i = 0; i <= end; i++) {
+  for (let i = 0; i <= end; i++) {
     const c = line.charCodeAt(i);
     if (STATE < 0) {
       if (c !== 34) continue;
@@ -22,7 +22,7 @@ function parseCSVLine(line) {
       }
       if (c !== 34) continue;
       STATE = -1;
-      results.push(JSON.parse(line.substring(startIdx, i+1)));
+      results.push(JSON.parse(line.substring(startIdx, i + 1)));
     }
   }
   return results;
@@ -33,21 +33,26 @@ class I18NManager {
     this._dict = new Map();
     this._csvLoaded = false;
   }
+
   has(id) {
     return this._dict.has(id);
   }
+
   get(id) {
     return this._dict.get(id);
   }
+
   set(id, defaultLocaleText, buildLocalText) {
     return this._dict.set(id, [
       defaultLocaleText,
       buildLocalText || defaultLocaleText
     ]);
   }
+
   get size() {
     return this._dict.size;
   }
+
   async writeTranslateCSV(transDir, options) {
     const lines = [];
     this._dict.forEach((texts, id) => {
@@ -68,11 +73,12 @@ class I18NManager {
       `"id","${defaultLocale}"\n` + lines.map(l => `${JSON.stringify(l[0])},${JSON.stringify(l[1])}`).join('\n')
     );
   }
+
   validate(resourcePath, info, opts) {
     if (info.key && !/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/.test(info.key)) {
       return 'i18n "key" must match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/';
     }
-    const {buildLocale, defaultLocale} = opts;
+    const { buildLocale, defaultLocale } = opts;
     const translateId = calcTranslateId(info, resourcePath, opts);
     if (buildLocale !== defaultLocale) {
       if (!this.has(translateId)) {
@@ -97,6 +103,7 @@ class I18NManager {
       }
     }
   }
+
   loadTranslateCSV(options) {
     if (this._csvLoaded) return;
     this._csvLoaded = true;
@@ -115,7 +122,7 @@ class I18NManager {
     }
     lines.forEach((line, i) => {
       if (i === 0) return; // skip first line
-      if (!line || !line.trim()) throw new Error(`Bad format for "translate.${defaultLocale}.csv". Wrong line format. see https://todo.`);      
+      if (!line || !line.trim()) throw new Error(`Bad format for "translate.${defaultLocale}.csv". Wrong line format. see https://todo.`);
       const ws = parseCSVLine(line.trim());
       if (ws.length !== 2) throw new Error(`Bad format for "translate.${defaultLocale}.csv". Wrong line format. see https://todo.`);
       if (defaultDict.has(ws[0])) throw new Error(`dulplicate id "${ws[0]}" in "translate.${defaultLocale}.csv" at line ${i + 1}`);
@@ -164,4 +171,3 @@ module.exports = {
   extractComponentStyles: new Map(),
   i18n: new I18NManager()
 };
-

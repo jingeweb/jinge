@@ -14,13 +14,16 @@ export class LogComponent extends Component {
     super(attrs);
     this.msg = attrs.msg;
   }
+
   set msg(v) {
     console.log(v);
     this._msg = v;
   }
+
   get msg() {
     return this._msg;
   }
+
   [RENDER]() {
     return [createComment('log placeholder')];
   }

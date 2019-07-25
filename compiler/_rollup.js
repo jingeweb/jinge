@@ -9,7 +9,7 @@ const { ComponentParser } = require('./parser');
 function jingeBuildSelfPlugin(opts) {
   return {
     name: 'jinge-build-self-plugin', // this name will show up in warnings and errors
-    transform ( code, id ) {
+    transform(code, id) {
       if (!id.startsWith(opts.innerComponentsDir)) return;
       if (path.basename(id) === 'index.js') return;
       return ComponentParser.parse(code, null, {

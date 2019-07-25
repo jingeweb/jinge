@@ -15,7 +15,7 @@ function parse(source) {
   parser.removeErrorListeners();
   parser.addErrorListener({
     syntaxError(recognizer, offendingSymbol, line, column) {
-      if (!meetErr) meetErr = {line, column};
+      if (!meetErr) meetErr = { line, column };
     },
     reportContextSensitivity() {},
     reportAttemptingFullContext() {},
