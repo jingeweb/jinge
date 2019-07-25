@@ -48,12 +48,15 @@ import {
   createComment,
   createElement,
   createTextNode,
-  appendChild
+  appendChild,
+  addEvent,
+  removeEvent
 } from '../dom';
 import {
   wrapComponent
 } from '../viewmodel/proxy';
 
+export const BINDED_DOM_LISTENERS = Symbol('binded_dom_listeners');
 export const NOTIFY_TRANSITION = Symbol('notify_transition');
 export const TEMPLATE_RENDER = Symbol('template_render');
 export const RENDER = Symbol('render');
@@ -199,7 +202,10 @@ export class Component extends Messenger {
      *   ref elements of parent component.
      */
     this[RELATED_VM_REFS] = null;
-
+    /**
+     * Only be used by bindDOMListeners and unbindDOMListeners
+     */
+    this[BINDED_DOM_LISTENERS] = null;
     return wrapComponent(this);
   }
 
@@ -334,6 +340,9 @@ export class Component extends Messenger {
       this[ARG_COMPONENTS] =
       this[CONTEXT] = null;
 
+    if (this[BINDED_DOM_LISTENERS]) {
+      unbindDOMListeners(this);
+    }
     // remove dom
     if (removeDOM) {
       this[HANDLE_REMOVE_ROOT_DOMS]();
@@ -552,4 +561,63 @@ export function textRenderFn(component, txtContent) {
   const el = createTextNode(txtContent);
   component[ROOT_NODES].push(el);
   return el;
+}
+
+/**
+ * bind(attach) listeners to rendered DOM element.
+ * @param {Component} component
+ * @param {Array<String>} ignoredEventNames
+ */
+export function bindDOMListeners(component, ignoredEventNames) {
+  if (component[STATE] !== STATE_RENDERED) {
+    throw new Error('bindDOMListeners must be applied to component which is rendered.');
+  }
+  const lis = component[LISTENERS];
+  if (!lis || lis.length === 0) {
+    return;
+  }
+  const $el = component[GET_FIRST_DOM]();
+  if ($el.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
+  let bindedListeners = component[BINDED_DOM_LISTENERS];
+  if (bindedListeners) {
+    throw new Error('bindedDOMListeners can only be applied once.');
+  } else {
+    bindedListeners = component[BINDED_DOM_LISTENERS] = {
+      el: $el,
+      ar: []
+    };
+  }
+  lis.forEach((handlers, eventName) => {
+    if (ignoredEventNames && ignoredEventNames.indexOf(eventName) >= 0) return;
+    handlers.forEach(fn => {
+      const tag = fn.tag || false;
+      let handler = fn;
+      if (tag && (tag.stop || tag.prevent)) {
+        handler = function($evt) {
+          fn($evt);
+          tag.stop && $evt.stopPropagation();
+          tag.prevent && $evt.preventDefault();
+        };
+      }
+      addEvent($el, eventName, handler, tag);
+      bindedListeners.ar.push([eventName, handler]);
+    });
+  });
+}
+
+/**
+ * unbind(detach) listeners from rendered DOM element.
+ * @param {Component} component
+ */
+export function unbindDOMListeners(component) {
+  const bindedListeners = component[BINDED_DOM_LISTENERS];
+  if (!bindedListeners) {
+    return;
+  }
+  bindedListeners.ar.forEach(saved => {
+    removeEvent(bindedListeners.el, saved[0], saved[1]);
+  });
+  component[BINDED_DOM_LISTENERS] = null;
 }

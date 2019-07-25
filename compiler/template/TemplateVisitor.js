@@ -993,10 +993,10 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
     const vmAttrs = `const attrs = wrapAttrs_${this._id}({
 ${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
-${this._prependTab(attrs.join(',\n'), true)}
 ${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
-${result.listeners.map(lt => `  ${lt[0]}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
-}`) : ''}
+${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+},`) : ''}
+${this._prependTab(attrs.join(',\n'), true)}
 });
 ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
     REL_COM: 'component',
