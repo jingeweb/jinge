@@ -447,7 +447,9 @@ export class Component extends Messenger {
       // override exist may case hidden bug hard to debug.
       // so we force programmer to pass third argument to
       //   tell us he/she know what he/she is doing.
-      if (!forceOverride) throw new Error(`Contenxt with id: ${id} is exist. Pass third argument forceOverride=true to override it.`);
+      if (!forceOverride) {
+        throw new Error(`Contenxt with id: ${id.toString()} is exist. Pass third argument forceOverride=true to override it.`);
+      }
     }
     this[CONTEXT][id] = ctx;
   }

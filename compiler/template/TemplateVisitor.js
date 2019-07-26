@@ -355,7 +355,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (a_category === 'slot-pass') {
         if (argPass) this._throwParseError(attrCtx.start, 'slot-pass: attribute can only be used once!');
         if (parentInfo.sub === 'argument') {
-          this._throwParseError(attrCtx.start, 'if parent component has slot-pass: or vm-use: attribute, child component can\'t also have arg-pass: attribue.');
+          this._throwParseError(attrCtx.start, 'if parent component has slot-pass: or vm-use: attribute, child component can\'t also have slot-pass: attribue. Try to put component under <_slot>.');
         }
         if (parentInfo.type !== 'component') {
           this._throwParseError(attrCtx.start, 'slot-pass: attribute can only be used as root child of Component element.');
@@ -443,49 +443,43 @@ class TemplateVisitor extends TemplateParserVisitor {
      */
 
     /**
-     * 从 1.0.6 版本开始，出于和 web components 概念一致的目的，
-     *   arg-pass: 和 arg-use: 更名为 slot-pass: 和 slot-use: 。
-     *   同时，原先含糊的组件别名 <argument/> 和 <parameter/> 也改成
-     *   和 <_t/> 类似的，以下划线打头的特殊组件 <_slot/>，在编译器
-     *   层面专用于 slot 概念。
-     * 需要注意，以下注释文档未更新！但只要等价替换就行。
      *
-     * # arg-pass:, arg-use:, vm-pass:, vm-use:
+     * # slot-pass:, arg-use:, vm-pass:, vm-use:
      *
      * ## 基本说明
      *
-     * #### arg-pass:
+     * #### slot-pass:
      *
      * 该属性指定要将外部元素传递到组件的内部渲染中。比如：
      *
      * ````html
      * <SomeComponent>
-     * <argument arg-pass:a>
+     * <_slot slot-pass:a>
      *  <span>hello</span>
-     * </argument>
+     * </_slot>
      * </SomeComponent>
      * ````
      *
-     * 以上代码会将 <argument> 节点内的所有内容，按 key="a" 传递给
+     * 以上代码会将 <_slot> 节点内的所有内容，按 key="a" 传递给
      * SomeComponent 组件。SomeComponent 组件在渲染时，可获取到该外部传递进
      * 来的元素。
      *
-     * 对于 html 元素，arg-pass 属性本质上是给它包裹了一个父组件，比如：
-     *   `<span arg-pass:a>hello</span>` 等价于：
-     *   `<argument arg-pass:a><span>hello</span></argument>`，
+     * 对于 html 元素，slot-pass 属性本质上是给它包裹了一个父组件，比如：
+     *   `<span slot-pass:a>hello</span>` 等价于：
+     *   `<_slot slot-pass:a><span>hello</span></_slot>`，
      *
-     * 对于 Component 元素，arg-pass 属性会让编译器忽略该组件的任何性质（或者理解成，
-     *   任何有 arg-pass 属性的组件都会被替换成 <argument> 空组件）。
+     * 对于 Component 元素，slot-pass 属性会让编译器忽略该组件的任何性质（或者理解成，
+     *   任何有 slot-pass 属性的组件都会被替换成 <_slot> 空组件）。
      *
-     * 对任何组件元素来说，如果它没有任何根子节点包含 arg-pass 属性，则编译器会
-     *   默认将所有根子节点包裹在 <argument arg-pass:default> 里。比如：
+     * 对任何组件元素来说，如果它没有任何根子节点包含 slot-pass 属性，则编译器会
+     *   默认将所有根子节点包裹在 <_slot slot-pass:default> 里。比如：
      *   `<SomeComponent><span>hello</span>Good<span>world</span></SomeComponent>`
      *   等价于：
      *   ````html
      *   <SomeComponent>
-     *   <argument arg-pass:default>
+     *   <_slot slot-pass:default>
      *     <span>hello</span>Good<span>world</span>
-     *   </argument>
+     *   </_slot>
      *   </SomeComponent>
      *   ````
      *
@@ -493,23 +487,23 @@ class TemplateVisitor extends TemplateParserVisitor {
      *
      * vm-use: 可以简化写成 vm: 。
      *
-     * 只有 arg-pass: 属性存在时，才能使用 vm-use: 属性。vm-use: 用于指定要通过 arg-pass: 传递到组件内部去的
-     * 外部元素，在组件内部被渲染时，可以使用哪些组件内部提供的渲染参数；因此脱离 arg-pass: 属性，vm-use: 属性没有意义。
+     * 只有 slot-pass: 属性存在时，才能使用 vm-use: 属性。vm-use: 用于指定要通过 slot-pass: 传递到组件内部去的
+     * 外部元素，在组件内部被渲染时，可以使用哪些组件内部提供的渲染参数；因此脱离 slot-pass: 属性，vm-use: 属性没有意义。
      *
-     * 但为了代码的简介性，当 Component 元素没有根子节点有 arg-pass: 属性（即，它的所有根子节点
-     * 被当作默认的 <argument arg-pass:default>）时，
-     * 这个组件`可以只有 vm-use: 而没有 arg-pass: 属性`。
-     * 这种情况属于语法糖，本质上等价于在其默认的 <argument arg-pass:default> 上添加了这些 vm-use:。比如：
+     * 但为了代码的简介性，当 Component 元素没有根子节点有 slot-pass: 属性（即，它的所有根子节点
+     * 被当作默认的 <_slot slot-pass:default>）时，
+     * 这个组件`可以只有 vm-use: 而没有 slot-pass: 属性`。
+     * 这种情况属于语法糖，本质上等价于在其默认的 <_slot slot-pass:default> 上添加了这些 vm-use:。比如：
      * `<SomeComponent vm-use:a="b"><span>${b}</span></SomeComponent>` 等价于：
-     * `<SomeComponent><argument arg-pass:default vm-use:a="b"><span>${b}</span></argument></SomeComponent>`
+     * `<SomeComponent><_slot slot-pass:default vm-use:a="b"><span>${b}</span></_slot></SomeComponent>`
      *
      * 一个典型的实际例子是 <for> 循环。<for> 是 ForComponent 组件的别名，
-     * 该组件自身的渲染逻辑，是循环渲染通过 arg-pass:default 传递进来的外部元素。
+     * 该组件自身的渲染逻辑，是循环渲染通过 slot-pass:default 传递进来的外部元素。
      * 结合上文，常见的代码 `<for e:loop="list" vm:each="item">${item}</for>` 等价于：
      * ````html
      * <!-- import {ForComponent} from 'jinge' -->
      * <ForComponent e:loop="list">
-     * <argument arg-pass:default vm-use:each="item">${item}</argument>
+     * <_slot slot-pass:default vm-use:each="item">${item}</_slot>
      * </ForComponent>
      * ````
      *
@@ -517,8 +511,8 @@ class TemplateVisitor extends TemplateParserVisitor {
      *
      * #### arg-use:
      *
-     * 指定该组件在自己的内部渲染中，使用哪些通过 arg-pass: 传递进来的外部元素。
-     * 以上文 arg-pass: 属性下的代码为例， SomeComponent 组件的模板里，
+     * 指定该组件在自己的内部渲染中，使用哪些通过 slot-pass: 传递进来的外部元素。
+     * 以上文 slot-pass: 属性下的代码为例， SomeComponent 组件的模板里，
      * 可以这样使用：
      *
      * ````html
@@ -529,7 +523,7 @@ class TemplateVisitor extends TemplateParserVisitor {
      * </parameter>
      * ````
      *
-     * 通过跟 arg-pass: 一致的 key="a"，实现了 arg-use: 和 arg-pass: 的关联，
+     * 通过跟 slot-pass: 一致的 key="a"，实现了 arg-use: 和 slot-pass: 的关联，
      * 将外部的元素渲染到自身内部。如果 arg-use: 属性的组件，还有子节点，则这些子节点
      * 代表外部没有传递对应 key 的外部元素时，要默认渲染的元素。
      *
@@ -544,7 +538,7 @@ class TemplateVisitor extends TemplateParserVisitor {
      *
      * #### vm-pass:
      *
-     * 只有 arg-use: 属性存在时，才能使用 vm-pass: 属性。vm-pass: 用于指定要向外部通过 arg-pass: 传递进来的
+     * 只有 arg-use: 属性存在时，才能使用 vm-pass: 属性。vm-pass: 用于指定要向外部通过 slot-pass: 传递进来的
      * 外部元素传递过去哪些渲染参数，因此脱离 arg-use: 属性，vm-pass: 属性没有意义。
      *
      * 比如常见的 <for> 循环，即 ForComponent 组件，会向外部元素传递 'each' 和 'index' 两
@@ -567,7 +561,7 @@ class TemplateVisitor extends TemplateParserVisitor {
      * ````html
      * <!-- app.html -->
      * <SomeComponent>
-     *   <p arg-pass:a vm-use:xx="yy">override ${yy}</p>
+     *   <p slot-pass:a vm-use:xx="yy">override ${yy}</p>
      * </SomeComponent>
      * ````
      *
@@ -578,10 +572,10 @@ class TemplateVisitor extends TemplateParserVisitor {
      *
      * #### slot-pass: 必须用于 Component 元素的子元素。
      *
-     * #### arg-pass: 和 arg-use: 不能同时使用。
+     * #### slot-pass: 和 arg-use: 不能同时使用。
      *
-     * arg-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
-     *   比如：`<span arg-pass:a arg-use:c>hello</span>` 可以设计为等价于：
+     * slot-pass: 和 arg-use: 同时存在，可以设计来没有歧义，
+     *   比如：`<span slot-pass:a arg-use:c>hello</span>` 可以设计为等价于：
      *
      * 可以等价于：
      *
@@ -598,12 +592,12 @@ class TemplateVisitor extends TemplateParserVisitor {
      *
      */
 
-    // arg-pass: 属性和 arg-use: 属性不能同时存在，详见上面的注释。
+    // slot-pass: 属性和 arg-use: 属性不能同时存在，详见上面的注释。
     if (argPass && argUse) {
       this._throwParseError(ctx.start, 'slot-pass: and slot-use: attribute can\' be both used on same element');
     }
 
-    // html 元素上的必须有 arg-pass: 属性，才能有 vm-use: 属性
+    // html 元素上的必须有 slot-pass: 属性，才能有 vm-use: 属性
     // component 元素可以只有 vm-use: 属性，但需要满足上面注释里详细描述的条件，这个条件的检测在之后的代码逻辑里。
     if (vms.length > 0 && !(argPass) && mode === 'html') {
       this._throwParseError(ctx.start, 'vm-use: attribute require slot-pass: attribute on html element. see https://[todo]');
@@ -625,8 +619,8 @@ class TemplateVisitor extends TemplateParserVisitor {
       this._throwParseError(ctx.start, '<_slot> component require "slot-pass:" or "slot-use:" attribute.');
     }
     /**
-     * 如果元素上有 arg-pass: 和 vm-use: ，则该元素等价于被包裹在
-     * arg-pass: 和 vm-use: 的 <argument> 组件里。这种情况下，html 元素上
+     * 如果元素上有 slot-pass: 和 vm-use: ，则该元素等价于被包裹在
+     * slot-pass: 和 vm-use: 的 <_slot> 组件里。这种情况下，html 元素上
      * 的其它表达式值属性，是可以使用该 vm-use: 引入的渲染参数的。因此，要将这些参数
      * 先添加到参数列表里，再进行 _parse_expr 或 _parse_listener，
      * parse 结束后，再恢复参数列表。比如如下代码：
@@ -950,7 +944,7 @@ return el;`, true) + '\n})()';
       vms: result.vms
     });
     if (tag === '_slot' && elements.length === 0 && result.argPass) {
-      this._throwParseError(ctx.start, '<_slot> component with arg-pass: attribute must have child.');
+      this._throwParseError(ctx.start, '<_slot> component with slot-pass: attribute must have child.');
     }
     const hasArg = this._assert_arg_pass(ctx.start, elements, tag);
     if (result.vms.length > 0 && !result.argPass && hasArg) {
