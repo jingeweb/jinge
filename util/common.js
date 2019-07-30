@@ -12,6 +12,10 @@ export function startsWith(str, search, position = 0) {
   return str.startsWith(search, position);
 }
 
+export function endsWith(str, search, endPosition) {
+  return str.endsWith(search, endPosition);
+}
+
 export function defineProperty(...args) {
   return Object.defineProperty(...args);
 }

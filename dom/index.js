@@ -160,6 +160,18 @@ export function removeEvent($element, eventName, handler) {
   $element.removeEventListener(eventName, handler);
 }
 
+export function addObserveEvent($element, eventName, handler, capture) {
+  function killObserver() {
+    removeEvent($element, eventName, handler);
+  }
+
+  addEvent(eventName, $element, handler, capture);
+
+  return {
+    destroy: killObserver
+  };
+}
+
 export function getComputedStyle(el, p) {
   return window.getComputedStyle(el, p);
 }
