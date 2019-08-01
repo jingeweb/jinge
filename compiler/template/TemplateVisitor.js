@@ -27,7 +27,11 @@ const KNOWN_ATTR_TYPES = [
   /* bellow is compiler related attribute types */
   'vm', 'vm-pass', 'vm-use',
   'slot-pass', 'slot-use',
-  'ref', '_t'
+  'ref',
+  /* translate attribute */
+  '_t',
+  /* compiler options */
+  '_co'
 ];
 
 function mergeAlias(src, dst) {
@@ -265,6 +269,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     const attrCtxs = ctx.htmlAttribute();
     if (!attrCtxs || attrCtxs.length === 0) {
       return {
+        compilerOpts: {},
         constAttrs: [],
         argAttrs: [],
         listeners: [],
@@ -281,6 +286,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     const vms = [];
     const vmPass = [];
     const pVms = this._vms;
+    const compilerOpts = {};
     let argPass = null;
     let argUse = null;
     let ref = null;
@@ -308,6 +314,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         };
         a_category = '_t';
       }
+
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
         this._throwParseError(attrCtx.start, 'unkown attribute type ' + a_category);
       }
@@ -316,6 +323,13 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
       a_category = a_category.toLowerCase();
 
+      if (a_category === '_co') {
+        if (!a_name) this._throwParseError(attrCtx.start, '_co attribute require name.');
+        a_name.split('|').forEach(optName => {
+          if (optName) compilerOpts[optName] = true;
+        });
+        return;
+      }
       if (a_category === 'ref') {
         if (!a_name) this._throwParseError(attrCtx.start, 'ref attribute require name.');
         if (ref) this._throwParseError(attrCtx.start, 'ref attribute can only be used once!');
@@ -652,6 +666,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       this._vms = pVms.slice().concat(vms);
     }
     const rtn = {
+      compilerOpts,
       constAttrs: obj2arr(constAttrs),
       argAttrs: obj2arr(argAttrs).map(at => {
         const e = this._parse_expr(at[1], ctx).join('\n');
@@ -699,19 +714,19 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (this._componentStyleId) {
       constAttrs.unshift([this._componentStyleId, '']);
     }
-    const needAssignStyleId = this._parent.type === 'component' && this._parent.sub === 'root';
-    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAssignStyleId ? '' : 'WithoutAttrs'}`;
+    const needAssignParentStyleId = result.compilerOpts.csty || (this._parent.type === 'component' && this._parent.sub === 'root');
+    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAssignParentStyleId ? '' : 'WithoutAttrs'}`;
     const ce = `${ceFn}_${this._id}`;
     const arr = [`"${etag}"`];
     if (constAttrs.length > 0) {
       const attrsCode = '{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}';
-      if (needAssignStyleId) {
-        arr.push(`assignObject_${this._id}(${attrsCode}, component[CSTYLE_PID_${this._id}])`);
+      if (needAssignParentStyleId) {
+        arr.push(`assignObject_${this._id}(${attrsCode}, vm_0[CSTYLE_PID_${this._id}])`);
       } else {
         arr.push(attrsCode);
       }
-    } else if (needAssignStyleId) {
-      arr.push(`component[CSTYLE_PID_${this._id}]`);
+    } else if (needAssignParentStyleId) {
+      arr.push(`vm_0[CSTYLE_PID_${this._id}]`);
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -1001,8 +1016,10 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
 `;
 
     let styleIdCode = '';
-    if ((this._parent.type === 'component' && this._parent.sub === 'root') || this._parent.type === 'html') {
-      styleIdCode += `addParentStyleId_${this._id}(el, component[CSTYLE_PID_${this._id}]${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`;
+    if (result.compilerOpts.csty || (this._parent.type === 'component' && this._parent.sub === 'root')) {
+      styleIdCode += `addParentStyleId_${this._id}(el, vm_0[CSTYLE_PID_${this._id}]${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`;
+    } else if (this._componentStyleId) {
+      styleIdCode += `addParentStyleId_${this._id}(el, null, '${this._componentStyleId}');`;
     }
     const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}

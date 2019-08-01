@@ -1,7 +1,8 @@
 import {
   isString,
   isArray,
-  isUndefined
+  isUndefined,
+  isObject
 } from '../util';
 
 export function getParent($ele) {
@@ -14,6 +15,12 @@ export function setText($element, text) {
 
 export function setAttribute($ele, attrName, attrValue) {
   if (!attrName) return;
+  if (isObject(attrName)) {
+    for (const attrN in attrName) {
+      setAttribute($ele, attrN, attrName[attrN]);
+    }
+    return;
+  }
   if (isUndefined(attrValue)) {
     removeAttribute($ele, attrName);
   } else {
@@ -22,6 +29,13 @@ export function setAttribute($ele, attrName, attrValue) {
 }
 
 export function removeAttribute($ele, attrName) {
+  if (!attrName) return;
+  if (isObject(attrName)) {
+    for (const attrN in attrName) {
+      removeAttribute($ele, attrN);
+    }
+    return;
+  }
   return $ele.removeAttribute(attrName);
 }
 

@@ -95,7 +95,7 @@ class CSSParser {
         }
       }
       return {
-        code: opts.extractStyle ? `export default null; // extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `export default ${JSON.stringify({
+        code: opts.extractStyle ? `export default null; // ${styleId} is extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `export default ${JSON.stringify({
           css,
           id: styleId
         })};`
@@ -133,7 +133,7 @@ class CSSParser {
       }
     }
     return {
-      code: opts.extractStyle ? `null; // extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `return ${JSON.stringify({
+      code: opts.extractStyle ? `null; // ${opts.styleId} is extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `return ${JSON.stringify({
         css,
         id: opts.styleId
       })};`
