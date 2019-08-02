@@ -61,6 +61,10 @@ import {
   TS_C_LEAVE_ACTIVE,
   getDurationType
 } from '../core/transition';
+import {
+  addParentStyleId,
+  CSTYLE_PID
+} from '../core/style';
 
 const IF_STR_ELSE = 'else';
 const T_MAP = Symbol('transition_map');
@@ -71,14 +75,16 @@ const C_BV = Symbol('current_branch_value');
 const C_VAL = Symbol('current_value');
 const ON_TS_END = Symbol('on_ts_end');
 
-function createEl(renderFn, context) {
-  return new Component(wrapAttrs({
+function createEl(renderFn, context, parentStyleIds) {
+  const el = new Component(wrapAttrs({
     [VM_DEBUG_NAME]: 'attrs_of_<if>',
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: renderFn
     }
   }));
+  parentStyleIds && addParentStyleId(el, parentStyleIds);
+  return el;
 }
 
 function renderSwitch(component) {
@@ -102,7 +108,7 @@ function renderSwitch(component) {
     roots.push(createComment(STR_EMPTY));
     return roots;
   }
-  const el = createEl(renderFn, component[CONTEXT]);
+  const el = createEl(renderFn, component[CONTEXT], component[CSTYLE_PID]);
   roots.push(el);
   return el[RENDER]();
 }
@@ -128,7 +134,7 @@ function doUpdate(component) {
   const fd = isC ? el[GET_FIRST_DOM]() : el;
   const pa = getParent(isC ? fd : el);
   const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][component[C_VAL]] : null;
-  const ne = renderFn ? createEl(renderFn, component[CONTEXT]) : null;
+  const ne = renderFn ? createEl(renderFn, component[CONTEXT], component[CSTYLE_PID]) : null;
   roots[0] = ne || createComment(STR_EMPTY);
   insertBefore(
     pa,

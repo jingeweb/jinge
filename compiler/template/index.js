@@ -1,7 +1,9 @@
 
 const RND_ID = require('crypto').randomBytes(4).toString('hex');
 const helper = require('./helper');
-const { TemplateVisitor } = require('./TemplateVisitor');
+const {
+  TemplateVisitor
+} = require('./TemplateVisitor');
 const {
   replaceTplStr
 } = require('../util');
@@ -81,7 +83,9 @@ class JingeTemplateParser {
       return {
         aliasImports: '',
         imports: '',
-        renderFn: replaceTplStr(TPL.EMPTY, { ID: RND_ID })
+        renderFn: replaceTplStr(TPL.EMPTY, {
+          ID: RND_ID
+        })
       };
     }
     const [meetErr, tree] = helper.parse(source);
@@ -90,7 +94,9 @@ class JingeTemplateParser {
       return {
         aliasImports: '',
         imports: '',
-        renderFn: replaceTplStr(TPL.ERROR, { ID: RND_ID })
+        renderFn: replaceTplStr(TPL.ERROR, {
+          ID: RND_ID
+        })
       };
     }
     const visitor = new TemplateVisitor({
@@ -113,7 +119,9 @@ class JingeTemplateParser {
       return {
         aliasImports: '',
         imports: '',
-        renderFn: replaceTplStr(TPL.ERROR, { ID: RND_ID })
+        renderFn: replaceTplStr(TPL.ERROR, {
+          ID: RND_ID
+        })
       };
     }
   }

@@ -1,6 +1,10 @@
 const antlr = require('antlr4');
-const { ImportParser } = require('./parser/ImportParser');
-const { ImportLexer } = require('./parser/ImportLexer');
+const {
+  ImportParser
+} = require('./parser/ImportParser');
+const {
+  ImportLexer
+} = require('./parser/ImportLexer');
 
 class ExtractImportLocalParser extends ImportParser {
   static parse(content) {

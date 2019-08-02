@@ -4,7 +4,9 @@
  */
 const path = require('path');
 const store = require('./_store');
-const { ComponentParser } = require('./parser');
+const {
+  ComponentParser
+} = require('./parser');
 
 function jingeBuildSelfPlugin(opts) {
   return {

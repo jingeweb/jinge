@@ -3,9 +3,14 @@
 import banner from 'rollup-plugin-banner';
 
 const path = require('path');
-const { terser } = require('rollup-plugin-terser');
+const {
+  terser
+} = require('rollup-plugin-terser');
 const resolve = require('rollup-plugin-node-resolve');
-const { jingeBuildSelfPlugin } = require('./compiler/_rollup');
+const {
+  jingeBuildSelfPlugin
+} = require('./compiler/_rollup');
+
 const needComporess = 'COMPRESS' in process.env;
 const plugins = [
   resolve(),

@@ -4,10 +4,14 @@
  *
  * Code bellow is copied from https://github.com/kpdecker/jsdiff/blob/master/src/diff/base.js
  * Modified by Yuhang Ge.
+ *
+ * NOTICE: This file is not used!
  */
 
 function createSeg(type, count, value = null) {
-  return { type, count, value };
+  return {
+    type, count, value
+  };
 }
 
 function extractCommon(basePath, newArr, oldArr, diagonalPath) {
@@ -46,7 +50,9 @@ function clonePath(path) {
 }
 
 function createPath(newPos, components) {
-  return { newPos, components };
+  return {
+    newPos, components
+  };
 }
 
 function buildValues(components, newArr, oldArr, useLongestToken) {

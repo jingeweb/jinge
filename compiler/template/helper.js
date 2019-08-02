@@ -1,5 +1,9 @@
-const { TemplateParser } = require('./parser/TemplateParser');
-const { TemplateLexer } = require('./parser/TemplateLexer');
+const {
+  TemplateParser
+} = require('./parser/TemplateParser');
+const {
+  TemplateLexer
+} = require('./parser/TemplateLexer');
 const antlr = require('antlr4/index');
 
 function parse(source) {
@@ -15,7 +19,11 @@ function parse(source) {
   parser.removeErrorListeners();
   parser.addErrorListener({
     syntaxError(recognizer, offendingSymbol, line, column) {
-      if (!meetErr) meetErr = { line, column };
+      if (!meetErr) {
+        meetErr = {
+          line, column
+        };
+      }
     },
     reportContextSensitivity() {},
     reportAttemptingFullContext() {},

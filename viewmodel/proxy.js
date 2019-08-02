@@ -366,7 +366,11 @@ export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false)
 function handleVMDebug(vm) {
   if (!config[CFG_VM_DEBUG]) return;
   let _di = window._VM_DEBUG;
-  if (!_di) _di = window._VM_DEBUG = { id: 0, vms: [] };
+  if (!_di) {
+    _di = window._VM_DEBUG = {
+      id: 0, vms: []
+    };
+  }
   vm[VM_DEBUG_ID] = _di.id++;
   // if (isComponent(vm) && !(VM_DEBUG_NAME in vm)) {
   //   vm[VM_DEBUG_NAME] = `<${vm.constructor.name}>`;

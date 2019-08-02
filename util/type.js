@@ -5,9 +5,11 @@ export function typeOf(v) {
 export function isObject(v) {
   return typeOf(v) === 'object' && v !== null;
 }
+
 export function isString(v) {
   return typeOf(v) === 'string';
 }
+
 export function isNumber(v) {
   return typeOf(v) === 'number' && !Number.isNaN(v) && Number.isFinite(v);
 }

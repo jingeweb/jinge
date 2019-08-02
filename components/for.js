@@ -42,6 +42,10 @@ import {
 import {
   vmWatch
 } from '../viewmodel/notify';
+import {
+  CSTYLE_PID,
+  addParentStyleId
+} from '../core/style';
 
 export const FOR_LENGTH = Symbol('length');
 export const FOR_KEYS = Symbol('keys');
@@ -69,18 +73,20 @@ export class ForEachComponent extends Component {
   }
 }
 
-function createEl(item, i, isLast, itemRenderFn, context) {
-  return new ForEachComponent(wrapAttrs({
+function createEl(item, i, isLast, itemRenderFn, context, cstyPid) {
+  const el = new ForEachComponent(wrapAttrs({
     [VM_DEBUG_NAME]: 'attrs_of_<for-each>',
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: itemRenderFn
     }
   }), item, i, isLast);
+  cstyPid && addParentStyleId(el, cstyPid);
+  return el;
 }
 
-function appendRenderEach(item, i, isLast, itemRenderFn, roots, context) {
-  const el = createEl(item, i, isLast, itemRenderFn, context);
+function appendRenderEach(item, i, isLast, itemRenderFn, roots, context, cstyPid) {
+  const el = createEl(item, i, isLast, itemRenderFn, context, cstyPid);
   roots.push(el);
   return el[RENDER]();
 }
@@ -100,7 +106,7 @@ function _prepareKey(item, i, keyMap, keyName) {
   return key;
 }
 
-function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
+function renderItems(items, itemRenderFn, roots, keys, keyName, context, cstyPid) {
   const result = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
@@ -108,7 +114,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName, context) {
     if (keyName !== KEY_INDEX) {
       keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
-    result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context));
+    result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context, cstyPid));
   });
   return result;
 }
@@ -230,7 +236,8 @@ export class ForComponent extends Component {
       roots,
       this[FOR_KEYS],
       keyName,
-      this[CONTEXT]
+      this[CONTEXT],
+      this[CSTYLE_PID]
     );
   }
 
@@ -255,7 +262,7 @@ export class ForComponent extends Component {
         const $fd = oldEl[GET_FIRST_DOM]();
         const newEl = createEl(
           item, index, oldEl.isLast,
-          itemRenderFn, this[CONTEXT]
+          itemRenderFn, this[CONTEXT], this[CSTYLE_PID]
         );
         const rr = newEl[RENDER]();
         insertBefore(getParent($fd), rr, $fd);
@@ -305,6 +312,7 @@ export class ForComponent extends Component {
 
     this[FOR_LENGTH] = nl;
     const ctx = this[CONTEXT];
+    const cstyPid = this[CSTYLE_PID];
     const firstEl = roots[0]; // if ol === 0, firstEl is comment, else is component
     const $parent = getParent(ol === 0 ? firstEl : firstEl[GET_FIRST_DOM]());
 
@@ -317,7 +325,7 @@ export class ForComponent extends Component {
           updateEl(roots[i], i, newItems);
         } else {
           if (!$f) $f = createFragment();
-          appendChild($f, ...appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx));
+          appendChild($f, ...appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx, cstyPid));
         }
       }
       if ($f) {
@@ -344,7 +352,7 @@ export class ForComponent extends Component {
       roots.length = 0;
       const rs = renderItems(
         newItems, itemRenderFn, roots,
-        oldKeys, keyName, this[CONTEXT]
+        oldKeys, keyName, this[CONTEXT], this[CSTYLE_PID]
       );
       insertAfter($parent, createFragment(rs), firstEl);
       removeChild($parent, firstEl);
@@ -389,7 +397,7 @@ export class ForComponent extends Component {
         let $f = null;
         const cei = newRoots.length;
         for (; ni < nl; ni++) {
-          const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
+          const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx, cstyPid);
           if (!$f) $f = createFragment();
           appendChild($f, ...el[RENDER]());
           newRoots.push(el);
@@ -423,7 +431,7 @@ export class ForComponent extends Component {
         }
         if (!$f) $f = createFragment();
         if (!reuseEl) {
-          reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
+          reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx, cstyPid);
           appendChild($f, ...reuseEl[RENDER]());
           if (!$nes) $nes = [];
           $nes.push(reuseEl);

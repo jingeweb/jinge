@@ -26,6 +26,7 @@ const PARAMETER = `...(() => {
   });
 $VM_PASS_SET$
   const el = new ParameterComponent_$ID$(attrs, $VM_PASS_PARAM$);
+$CSTYLE_PID$
 $VM_PASS_WATCH$
 $PUSH_ELE$
   return assertRenderResults_$ID$(el[RENDER_$ID$]());

@@ -1,7 +1,9 @@
 const fs = require('fs').promises;
 const readFileSync = require('fs').readFileSync;
 const path = require('path');
-const { calcTranslateId } = require('./util');
+const {
+  calcTranslateId
+} = require('./util');
 
 function parseCSVLine(line) {
   const results = [];
@@ -78,7 +80,9 @@ class I18NManager {
     if (info.key && !/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/.test(info.key)) {
       return 'i18n "key" must match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/';
     }
-    const { buildLocale, defaultLocale } = opts;
+    const {
+      buildLocale, defaultLocale
+    } = opts;
     const translateId = calcTranslateId(info, resourcePath, opts);
     if (buildLocale !== defaultLocale) {
       if (!this.has(translateId)) {

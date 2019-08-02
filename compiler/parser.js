@@ -1,11 +1,20 @@
-const { Parser } = require('acorn');
+const {
+  Parser
+} = require('acorn');
 const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
 const path = require('path');
-const { TemplateParser } = require('./template');
-const { CSSParser } = require('./style');
-const { prependTab, isString, isArray, arrayIsEqual } = require('./util');
+const {
+  TemplateParser
+} = require('./template');
+const {
+  CSSParser
+} = require('./style');
+const {
+  prependTab, isString, isArray, arrayIsEqual
+} = require('./util');
 const RND_ID = require('crypto').randomBytes(5).toString('hex');
+
 const jingeUtilFile = path.resolve(__dirname, '../util/index.js');
 const jingeUtilCommonFile = path.resolve(__dirname, '../util/common.js');
 
@@ -200,7 +209,9 @@ class ComponentParser {
       if (_isStyle) {
         source = source || (await this._resolve(node));
         if (!this.componentStyleStore.extractStyles.has(source)) {
-          this.componentStyleStore.extractStyles.set(source, { code: null });
+          this.componentStyleStore.extractStyles.set(source, {
+            code: null
+          });
         }
       }
       return false;
@@ -302,6 +313,10 @@ class ComponentParser {
 
     let styInfo;
     if (styNode) {
+      if (this._previousClassWithSty) {
+        throw new Error(`A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`);
+      }
+      this._previousClassWithSty = node.id.name;
       const csm = this.componentStyleStore.components;
       if (!csm.has(this.resourcePath)) {
         csm.set(this.resourcePath, {
@@ -510,7 +525,6 @@ import {
   }
 
   walkStyle(node, ci) {
-    // debugger;
     if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
     const st = node.value.body.body[0];
     if (st.type !== 'ReturnStatement') {
@@ -676,7 +690,9 @@ import {
             }
           }
 
-          const info = { text, key, params };
+          const info = {
+            text, key, params
+          };
           const validateErr = this._i18nManager.validate(
             this.resourcePath,
             info,
@@ -695,7 +711,9 @@ import {
                   type: 'Identifier',
                   name: '_t'
                 },
-                arguments: [{ type: 'Literal', value: info.text }, params]
+                arguments: [{
+                  type: 'Literal', value: info.text
+                }, params]
               });
             } else {
               code = JSON.stringify(info.text);
@@ -708,7 +726,9 @@ import {
           } else {
             if (params) {
               this.walkI18NTranslate(params, level + 1);
-              node.arguments = [{ type: 'Literal', value: info.text }, params];
+              node.arguments = [{
+                type: 'Literal', value: info.text
+              }, params];
             } else {
               node.type = 'Literal';
               node.value = info.text;

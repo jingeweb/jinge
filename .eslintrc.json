@@ -11,6 +11,10 @@
     "sourceType": "module"
   },
   "rules": {
+    "import/newline-after-import": ["error"],
+    "object-curly-newline": ["error", {
+      "minProperties": 1
+    }],
     "space-before-function-paren": ["error", "never"],
     "semi": ["error", "always"]
   }

@@ -6,10 +6,18 @@ const HTMLTags = require('html-tags');
 const SVGTags = require('svg-tags');
 const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
 const helper = require('./helper');
-const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
-const { TemplateParser } = require('./parser/TemplateParser');
-const { AttributeValueParser } = require('./AttributeValueParser');
-const { HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS } = require('./const');
+const {
+  TemplateParserVisitor
+} = require('./parser/TemplateParserVisitor');
+const {
+  TemplateParser
+} = require('./parser/TemplateParser');
+const {
+  AttributeValueParser
+} = require('./AttributeValueParser');
+const {
+  HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS
+} = require('./const');
 
 const {
   replaceTplStr,
@@ -18,6 +26,7 @@ const {
 } = require('../util');
 
 const TPL = require('./tpl');
+
 const KNOWN_ATTR_TYPES = [
   /* bellow is parameter related attribute types */
   /* s is just alias of str */
@@ -29,9 +38,7 @@ const KNOWN_ATTR_TYPES = [
   'slot-pass', 'slot-use',
   'ref',
   /* translate attribute */
-  '_t',
-  /* compiler options */
-  '_co'
+  '_t'
 ];
 
 function mergeAlias(src, dst) {
@@ -66,7 +73,9 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._imports = {};
     this._importOutputCodes = [];
     this._needHandleComment = true;
-    this._parent = { type: 'component', sub: 'root' };
+    this._parent = {
+      type: 'component', sub: 'root'
+    };
     const alias = mergeAlias(opts.alias, {
       jinge: {
         LogComponent: 'log',
@@ -84,7 +93,9 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._aliasLocalMap = {};
     for (const source in alias) {
       const m = alias[source];
-      if (!this._aliasLocalMap[source]) this._aliasLocalMap[source] = {};
+      if (!this._aliasLocalMap[source]) {
+        this._aliasLocalMap[source] = {};
+      }
       Object.keys(m).map(c => {
         const rid = crypto.randomBytes(4).toString('hex');
         if (!(c in this._aliasLocalMap[source])) {
@@ -253,7 +264,9 @@ class TemplateVisitor extends TemplateParserVisitor {
         }
       }
     });
-    let code = escodegen.generate(tree, { indent: '' });
+    let code = escodegen.generate(tree, {
+      indent: ''
+    });
     code = code.substring(14, code.length - 1);
     return {
       code,
@@ -269,7 +282,6 @@ class TemplateVisitor extends TemplateParserVisitor {
     const attrCtxs = ctx.htmlAttribute();
     if (!attrCtxs || attrCtxs.length === 0) {
       return {
-        compilerOpts: {},
         constAttrs: [],
         argAttrs: [],
         listeners: [],
@@ -286,7 +298,6 @@ class TemplateVisitor extends TemplateParserVisitor {
     const vms = [];
     const vmPass = [];
     const pVms = this._vms;
-    const compilerOpts = {};
     let argPass = null;
     let argUse = null;
     let ref = null;
@@ -323,13 +334,6 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
       a_category = a_category.toLowerCase();
 
-      if (a_category === '_co') {
-        if (!a_name) this._throwParseError(attrCtx.start, '_co attribute require name.');
-        a_name.split('|').forEach(optName => {
-          if (optName) compilerOpts[optName] = true;
-        });
-        return;
-      }
       if (a_category === 'ref') {
         if (!a_name) this._throwParseError(attrCtx.start, 'ref attribute require name.');
         if (ref) this._throwParseError(attrCtx.start, 'ref attribute can only be used once!');
@@ -353,7 +357,9 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-use type attribute reflect vairable name must match /^[\\w\\d$_]+$/, but got: ' + a_name);
         if (vms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use type attribute name dulipcated: ' + a_name);
         if (pVms.find(v => v.name === aval)) this._throwParseError(attrCtx.start, 'vm-use attribute reflect vairiable name"' + a_name + '" has been declared in parent context.');
-        vms.push({ name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1 });
+        vms.push({
+          name: aval, reflect: a_name, level: pVms.length > 0 ? pVms[pVms.length - 1].level + 1 : 1
+        });
         return;
       }
 
@@ -362,7 +368,9 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (!aval) this._throwParseError(attrCtx.start, 'vm-pass type attribute require attribute value');
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (vmPass.find(v => v.name === a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
-        vmPass.push({ name: a_name, expr: aval });
+        vmPass.push({
+          name: a_name, expr: aval
+        });
         return;
       }
 
@@ -666,7 +674,6 @@ class TemplateVisitor extends TemplateParserVisitor {
       this._vms = pVms.slice().concat(vms);
     }
     const rtn = {
-      compilerOpts,
       constAttrs: obj2arr(constAttrs),
       argAttrs: obj2arr(argAttrs).map(at => {
         const e = this._parse_expr(at[1], ctx).join('\n');
@@ -706,27 +713,39 @@ class TemplateVisitor extends TemplateParserVisitor {
 
   _parse_html_ele(etag, ctx) {
     const result = this._parse_attrs('html', etag, ctx, this._parent);
-    const elements = this._visit_child_nodes(ctx, result.vms, { type: 'html', isSVG: this._parent.isSVG || etag === 'svg' });
-    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
+    const elements = this._visit_child_nodes(ctx, result.vms, {
+      type: 'html', isSVG: this._parent.isSVG || etag === 'svg'
+    });
+    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, {
+      NAME: result.ref
+    }) : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
     const constAttrs = result.constAttrs;
     if (this._componentStyleId) {
       constAttrs.unshift([this._componentStyleId, '']);
     }
-    const needAssignParentStyleId = result.compilerOpts.csty || (this._parent.type === 'component' && this._parent.sub === 'root');
-    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAssignParentStyleId ? '' : 'WithoutAttrs'}`;
+    /**
+     * 如果 html 元素上有 slog-use: 或 slot-pass: 属性，相当于包裹在 <_slot> 组件里。
+     * 比如 <span slot-use:default>default text</span> 等价于:
+     * <_slot slot-use:default><span>default text</span></_slot>
+     *
+     * 因此，如果 html 元素上满足 result.argUse || result.argPass 则也需要赋予父组件的 styleId，
+     * 但需要理解这个时候的父组件（component），不是当前模板所属于的组件（vm_0）。
+     */
+    const needAddParentStyId = result.argUse || result.argPass || this._parent.type === 'component';
+    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAddParentStyId ? '' : 'WithoutAttrs'}`;
     const ce = `${ceFn}_${this._id}`;
     const arr = [`"${etag}"`];
     if (constAttrs.length > 0) {
       const attrsCode = '{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}';
-      if (needAssignParentStyleId) {
-        arr.push(`assignObject_${this._id}(${attrsCode}, vm_0[CSTYLE_PID_${this._id}])`);
+      if (needAddParentStyId) {
+        arr.push(`assignObject_${this._id}(${attrsCode}, component[CSTYLE_PID_${this._id}])`);
       } else {
         arr.push(attrsCode);
       }
-    } else if (needAssignParentStyleId) {
-      arr.push(`vm_0[CSTYLE_PID_${this._id}]`);
+    } else if (needAddParentStyId) {
+      arr.push(`component[CSTYLE_PID_${this._id}]`);
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -775,11 +794,14 @@ return el;`, true) + '\n})()';
     }
 
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
-    const rtnEl = { type: 'html', value: code };
+    const rtnEl = {
+      type: 'html', value: code
+    };
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
-        [rtnEl], result.argUse, result.vmPass, vmLevel
+        [rtnEl], result.argUse, result.vmPass, vmLevel,
+        this._componentStyleId, this._parent.type === 'component'
       );
     }
     if (result.argPass) {
@@ -793,7 +815,7 @@ return el;`, true) + '\n})()';
     return rtnEl;
   }
 
-  _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel) {
+  _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel, componentStyleId, addParentStyleId) {
     let vmPassInitCode = '';
     let vmPassSetCode = '';
     let vmPassWatchCode = '';
@@ -825,6 +847,9 @@ return el;`, true) + '\n})()';
         VM_PASS_PARAM: JSON.stringify(vmPassParamCode),
         PUSH_ELE: this._prependTab(this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE)),
         ARG_USE: argUse,
+        CSTYLE_PID: this._prependTab(componentStyleId || addParentStyleId ? (
+          `addParentStyleId_${this._id}(el, ${addParentStyleId ? `component[CSTYLE_PID_${this._id}]` : 'null'}${componentStyleId ? `, '${componentStyleId}'` : ''});`
+        ) : ''),
         DEFAULT: elements.length > 0 ? this._prependTab(this._gen_render(elements, vmLevel)) : 'null'
       })
     };
@@ -885,7 +910,9 @@ return el;`, true) + '\n})()';
     });
 
     let cnodes = ctx.htmlNode();
-    const { buildLocale, defaultLocale } = this._i18nOptions;
+    const {
+      buildLocale, defaultLocale
+    } = this._i18nOptions;
     if (!info.ifLocale) {
       info.text = cnodes.map(c => {
         if (c.ruleIndex !== TemplateParser.RULE_htmlNode || c.children.length !== 1) throw new Error('unimpossible!?');
@@ -965,11 +992,14 @@ return el;`, true) + '\n})()';
     if (result.vms.length > 0 && !result.argPass && hasArg) {
       this._throwParseError(ctx.start, 'if component has vm-use: attribute but do not have slot-pass: attribute, it\'s root children can\'t have slot-pass: attribute.');
     }
-    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, { NAME: result.ref }) : '';
+    const setRefCode = result.ref ? this._replace_tpl(TPL.SET_REF_ELE, {
+      NAME: result.ref
+    }) : '';
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
     if (tag === '_slot' && result.argUse) {
       return this._parse_arg_use_parameter(
-        elements, result.argUse, result.vmPass, vmLevel
+        elements, result.argUse, result.vmPass, vmLevel,
+        this._componentStyleId, this._parent.type === 'component'
       );
     }
 
@@ -1015,12 +1045,8 @@ ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
   })).join('\n')}
 `;
 
-    let styleIdCode = '';
-    if (result.compilerOpts.csty || (this._parent.type === 'component' && this._parent.sub === 'root')) {
-      styleIdCode += `addParentStyleId_${this._id}(el, vm_0[CSTYLE_PID_${this._id}]${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`;
-    } else if (this._componentStyleId) {
-      styleIdCode += `addParentStyleId_${this._id}(el, null, '${this._componentStyleId}');`;
-    }
+    const needAddParentStyId = result.argPass || result.argUse || this._parent.type === 'component';
+    const styleIdCode = this._componentStyleId || needAddParentStyId ? `addParentStyleId_${this._id}(el, ${needAddParentStyId ? `component[CSTYLE_PID_${this._id}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});` : '';
     const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
 const el = new ${Component}(attrs);
@@ -1029,11 +1055,14 @@ ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
 return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()';
 
-    const rtnEl = { type: 'component', sub: 'normal', value: code };
+    const rtnEl = {
+      type: 'component', sub: 'normal', value: code
+    };
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
-        [rtnEl], result.argUse, result.vmPass, vmLevel
+        [rtnEl], result.argUse, result.vmPass, vmLevel,
+        this._componentStyleId, this._parent.type === 'component'
       );
     }
     if (result.argPass) {
@@ -1468,7 +1497,9 @@ ${body}
           // skip import XX from '.', which means Component used is in same file.
           continue;
         }
-        spec.local = { type: 'Identifier', name: spec.local.name + `_${this._tplId}` };
+        spec.local = {
+          type: 'Identifier', name: spec.local.name + `_${this._tplId}`
+        };
         specifiers.push(spec);
       }
       if (specifiers.length > 0) {
@@ -1479,7 +1510,9 @@ ${body}
       }
     });
     if (tree.body.length === 0) return null;
-    const output = escodegen.generate(tree, { indent: '' });
+    const output = escodegen.generate(tree, {
+      indent: ''
+    });
     // console.log(output);
     this._importOutputCodes.push(output);
     return null;

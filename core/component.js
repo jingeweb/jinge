@@ -553,7 +553,9 @@ export function emptyRenderFn(component) {
 }
 
 export function errorRenderFn(component) {
-  const el = createElement('span', { style: 'color: red !important;' });
+  const el = createElement('span', {
+    style: 'color: red !important;'
+  });
   el.textContent = 'template parsing failed! please check webpack log.';
   component[ROOT_NODES].push(el);
   return [el];

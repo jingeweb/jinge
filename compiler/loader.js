@@ -1,6 +1,12 @@
-const { TemplateParser } = require('./template');
-const { ComponentParser } = require('./parser');
-const { CSSParser } = require('./style');
+const {
+  TemplateParser
+} = require('./template');
+const {
+  ComponentParser
+} = require('./parser');
+const {
+  CSSParser
+} = require('./style');
 const store = require('./_store');
 const path = require('path');
 const jingeRoot = require('path').resolve(__dirname, '../');
@@ -34,7 +40,9 @@ function jingeLoader(source, sourceMap) {
     if (!/\.(js|html)$/.test(resourcePath)) {
       return callback(new Error('jingeLoader only support .js,.html,.css,.less,.scss file'));
     }
-    const iopt = opts.i18n || { mode: 'dictionary-reflect' };
+    const iopt = opts.i18n || {
+      mode: 'dictionary-reflect'
+    };
     if (iopt.mode === 'compiler-translate') {
       I18N_OPTION_NAMES.forEach(n => {
         if (!iopt[n]) throw new Error(`jinge loader require non-empty option "i18n.${n}" when "i18n.mode" is "compiler-translate"`);
