@@ -186,8 +186,8 @@ export function addObserveEvent($element, eventName, handler, capture) {
   };
 }
 
-export function getComputedStyle(el, p) {
-  return window.getComputedStyle(el, p);
+export function getComputedStyle(el, pseudoElt) {
+  return window.getComputedStyle(el, pseudoElt);
 }
 
 export function getCSPropertyValue(cst, prop) {

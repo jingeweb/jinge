@@ -135,7 +135,7 @@ class CSSParser {
       }
     }
     return {
-      code: opts.extractStyle ? `null; // ${opts.styleId} is extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `return ${JSON.stringify({
+      code: opts.extractStyle ? `null; // ${opts.styleId} is extracted by JingeWebpackPlugin at ${new Date().toLocaleString()}` : `${JSON.stringify({
         css,
         id: opts.styleId
       })};`
