@@ -10,7 +10,8 @@ import {
   vmClearListener
 } from '../viewmodel/notify';
 import {
-  VM_PARENTS
+  VM_PARENTS,
+  VM_DESTROIED
 } from '../viewmodel/common';
 import {
   Messenger,
@@ -127,6 +128,7 @@ export class Component extends Messenger {
     }
     super(attrs[LISTENERS]);
     this[VM_PARENTS] = null;
+    this[VM_DESTROIED] = false;
     this[VM_LISTENERS] = null;
     this[UPDATE_NEXT_MAP] = null;
     this[CSTYLE_PID] = null;
@@ -316,6 +318,7 @@ export class Component extends Messenger {
   [DESTROY](removeDOM = true) {
     if (this[STATE] > STATE_WILLDESTROY) return;
     this[STATE] = STATE_WILLDESTROY;
+    this[VM_DESTROIED] = true;
     this[BEFORE_DESTROY]();
     super[CLEAR](); // dont forgot call super clear.
     // clear next tick update setImmediate

@@ -6,6 +6,7 @@ import {
 } from '../util';
 
 export const VM_PARENTS = Symbol('vm_parents');
+export const VM_DESTROIED = Symbol('vm_destroied');
 export const VM_DEBUG_ID = Symbol('vm_id');
 export const VM_DEBUG_NAME = Symbol('vm_name');
 export const VM_EMPTY_PARENTS = [];

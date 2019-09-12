@@ -16,7 +16,8 @@ import {
   isPublicProp,
   addVMParent,
   removeVMParent,
-  VM_DEBUG_ID
+  VM_DEBUG_ID,
+  VM_DESTROIED
 } from './common';
 import {
   VM_NOTIFY,
@@ -31,6 +32,9 @@ import {
 export const VM_WRAPPER_PROXY = Symbol('proxy');
 
 function notifyPropChanged(vm, prop) {
+  if (vm[VM_DESTROIED]) {
+    return;
+  }
   if (VM_NOTIFY in vm) {
     vm[VM_NOTIFY](prop);
   }
@@ -313,6 +317,7 @@ function wrapProp(vm, prop) {
   }
   if (instanceOf(v, Boolean) || instanceOf(v, RegExp)) {
     v[VM_PARENTS] = VM_EMPTY_PARENTS;
+    v[VM_DESTROIED] = false;
     return;
   }
   vm[prop] = loopWrapVM(v);
@@ -321,6 +326,7 @@ function wrapProp(vm, prop) {
 
 function wrapProxy(vm, isArr) {
   vm[VM_PARENTS] = [];
+  vm[VM_DESTROIED] = false;
   const p = new Proxy(vm, isArr ? ArrayProxyHandler : ObjectProxyHandler);
   vm[VM_WRAPPER_PROXY] = p;
   return p;
@@ -333,6 +339,7 @@ function loopWrapVM(plainObjectOrArray) {
     if (VM_PARENTS in plainObjectOrArray) return plainObjectOrArray;
     if (instanceOf(plainObjectOrArray, Boolean) || instanceOf(plainObjectOrArray, RegExp)) {
       plainObjectOrArray[VM_PARENTS] = VM_EMPTY_PARENTS;
+      plainObjectOrArray[VM_DESTROIED] = false;
       return plainObjectOrArray;
     } else if (isArray(plainObjectOrArray)) {
       for (let i = 0; i < plainObjectOrArray.length; i++) {
@@ -383,25 +390,14 @@ export function wrapComponent(component) {
     console.error('dulplicated wrap component', component);
     return;
   }
-  component[VM_PARENTS] = VM_EMPTY_PARENTS;
+  component[VM_PARENTS] = [];
+  component[VM_DESTROIED] = false;
   component[VM_LISTENERS] = new Map();
   handleVMDebug(component);
   const p = new Proxy(component, ObjectProxyHandler);
   component[VM_WRAPPER_PROXY] = p;
   return p;
 }
-
-// const AttrsProxyHandler = {
-//   set: function (target, prop, value) {
-//     if (!isPublicProp(prop)) {
-//       target[prop] = value;
-//       return true;
-//     }
-//     target[prop] = value;
-//     notifyPropChanged(target, prop);
-//     return true;
-//   }
-// };
 
 /**
  * @notice Don't use this function. It can only be used for compiler generated code.
@@ -424,9 +420,4 @@ export function wrapAttrs(attrsObj) {
     }
   }
   return wrapViewModel(attrsObj, true);
-
-  // attrsObj[VM_PARENTS] = VM_EMPTY_PARENTS;
-  // vmAddMessengerInterface(attrsObj);
-  // handleVMDebug(attrsObj);
-  // return new Proxy(attrsObj, AttrsProxyHandler);
 }

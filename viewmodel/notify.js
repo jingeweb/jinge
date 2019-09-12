@@ -13,6 +13,9 @@ import {
   config,
   CFG_VM_DEBUG
 } from '../config';
+import {
+  VM_DESTROIED
+} from './common';
 
 export const VM_NOTIFY = Symbol('vm_notify');
 export const VM_ON = Symbol('vm_on');
@@ -174,8 +177,13 @@ function loopNotify(vm, props, level = 0) {
 }
 
 export function vmNotifyChanged(vm, prop) {
+  if (vm[VM_DESTROIED]) {
+    return;
+  }
   const props = isArray(prop) ? prop : prop.split('.');
-  if (props.length === 0) return;
+  if (props.length === 0) {
+    return;
+  }
   loopNotify(vm, props);
 }
 
