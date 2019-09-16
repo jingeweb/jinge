@@ -61,6 +61,26 @@ function _n_vm(idx, stmt, an, props) {
           body: {
             type: 'BlockStatement',
             body: [
+              {
+                type: 'IfStatement',
+                test: {
+                  type: 'MemberExpression',
+                  computed: true,
+                  object: {
+                    type: 'Identifier',
+                    name: `vm_${RND_ID}`
+                  },
+                  property: {
+                    type: 'Identifier',
+                    name: `VM_DESTROIED_${RND_ID}`
+                  }
+                },
+                consequent: {
+                  type: 'ReturnStatement',
+                  argument: null
+                },
+                alternate: null
+              },
               stmt
             ]
           },
@@ -349,6 +369,9 @@ class ComponentParser {
   _addConstructorImports() {
     if (!this._constructorImports) {
       this._constructorImports = `
+import {
+  VM_DESTROIED as VM_DESTROIED_${RND_ID}
+} from '${this.jingeBase}/viewmodel/common';
 import {
   VM_ON as VM_ON_${RND_ID}
 } from '${this.jingeBase}/viewmodel/notify';
