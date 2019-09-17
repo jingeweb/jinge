@@ -24,31 +24,31 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "dependencies": {
-    "acorn": "^6.2.1",
-    "acorn-walk": "^6.2.0",
+    "acorn": "^7.0.0",
+    "acorn-walk": "^7.0.0",
     "antlr4": "^4.7.2",
     "clean-css": "^4.2.1",
-    "escodegen": "^1.11.1",
+    "escodegen": "^1.12.0",
     "html-entities": "^1.2.1",
-    "html-tags": "^3.0.0",
-    "postcss": "^7.0.17",
+    "html-tags": "^3.1.0",
+    "postcss": "^7.0.18",
     "postcss-discard-comments": "^4.0.2",
     "postcss-prettify": "^0.3.4",
     "postcss-selector-parser": "^6.0.2",
     "svg-tags": "^1.0.0"
   },
   "devDependencies": {
-    "eslint": "^6.1.0",
-    "eslint-config-standard": "^13.0.1",
+    "eslint": "^6.4.0",
+    "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.18.2",
-    "eslint-plugin-node": "^9.1.0",
+    "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-promise": "^4.2.1",
-    "eslint-plugin-standard": "^4.0.0",
+    "eslint-plugin-standard": "^4.0.1",
     "precommit-hook": "^3.0.0",
-    "rollup": "^1.18.0",
-    "rollup-plugin-banner": "^0.2.0",
+    "rollup": "^1.21.4",
+    "rollup-plugin-banner": "^0.2.1",
     "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-terser": "^5.1.1"
+    "rollup-plugin-terser": "^5.1.2"
   },
   "pre-commit": [
     "lint"
