@@ -59,14 +59,23 @@ function jingeLoader(source, sourceMap) {
     if (!('checkConflict' in iopt)) {
       iopt.checkConflict = this._compiler.options.mode === 'production';
     }
+
+    let componentAlias = opts.componentAlias;
+    if (Array.isArray(componentAlias)) {
+      componentAlias = Object.assign({}, ...componentAlias);
+    }
+    let componentBase = opts.componentBase;
+    if (Array.isArray(componentBase)) {
+      componentBase = Object.assign({}, ...componentBase);
+    }
     parseOpts = {
       resourcePath,
       componentStyleStore: store,
       jingeBase: resourcePath.startsWith(jingeRoot) ? path.relative(path.dirname(resourcePath), jingeRoot) : 'jinge',
       webpackLoaderContext: this,
       tabSize: opts.tabSize,
-      componentAlias: opts.componentAlias,
-      componentBase: opts.componentBase,
+      componentAlias,
+      componentBase,
       i18n: iopt,
       extractStyle: opts.extractStyle,
       compress: needCompress
