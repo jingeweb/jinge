@@ -25,10 +25,8 @@ export function assignObject(target, ...srcs) {
 }
 
 export function obj2class(obj, prepend) {
-  const classes = Object.keys(obj).map(k => {
-    return obj[k] ? k : '';
-  }).join(' ').trim();
-  return prepend ? `${prepend} ${classes}` : classes;
+  const classes = Object.keys(obj).filter(k => obj[k]).join(' ').trim();
+  return prepend ? `${prepend}${classes ? ' ' + classes : ''}` : classes;
 }
 
 export function obj2style(obj) {
