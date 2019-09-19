@@ -30,6 +30,53 @@ import {
 } from '../config';
 
 export const VM_WRAPPER_PROXY = Symbol('proxy');
+export const VM_SETTER_FN_MAP = Symbol('is_setter_fn_map');
+
+/**
+ * check if property named "prop" is setter of instance "obj",
+ * if it's setter, return setter function, otherwise return null.
+ * @param {Object} obj
+ * @param {String} prop
+ *
+ * 检测名称为 "prop" 的属性是否是 setter，如果是，返回该 setter 函数，
+ * 否则，返回 null。
+ * 由于 obj 可能是有继承关系的类的实例，因此需要向上检测继承的类的 prototype。
+ */
+function getSetterFnIfPropIsSetter(obj, prop) {
+  let map = obj[VM_SETTER_FN_MAP];
+  if (map === null) {
+    /**
+     * use cache to store setter functions.
+     * 缓存曾经检测过的属性名，提升性能。
+     */
+    map = obj[VM_SETTER_FN_MAP] = new Map();
+  }
+  if (!map.has(prop)) {
+    let clazz = obj.constructor;
+    let desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
+    let fn;
+    if (desc) {
+      fn = isFunction(desc.set) ? desc.set : null;
+      map.set(prop, fn);
+      return fn;
+    }
+    // lookup to check parent classes
+    clazz = Object.getPrototypeOf(clazz);
+    while (clazz && clazz.prototype) {
+      desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
+      if (desc) {
+        fn = isFunction(desc.set) ? desc.set : null;
+        map.set(prop, fn);
+        return fn;
+      }
+      clazz = Object.getPrototypeOf(clazz);
+    }
+    map.set(prop, null);
+    return null;
+  } else {
+    return map.get(prop);
+  }
+}
 
 function notifyPropChanged(vm, prop) {
   if (vm[VM_DESTROIED]) {
@@ -71,12 +118,13 @@ function objectPropSetHandler(target, prop, value) {
    *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
    * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
    */
-  const desc = Object.getOwnPropertyDescriptor(target.constructor.prototype, prop);
-  if (desc && isFunction(desc.set)) {
-    desc.set.call(target[VM_WRAPPER_PROXY], value);
+  const setterFn = getSetterFnIfPropIsSetter(target, prop);
+  if (setterFn) {
+    setterFn.call(target[VM_WRAPPER_PROXY], value);
   } else {
     target[prop] = value;
   }
+
   if (newValIsVM) {
     addVMParent(value, target, prop);
   }
@@ -318,6 +366,7 @@ function wrapProp(vm, prop) {
   if (instanceOf(v, Boolean) || instanceOf(v, RegExp)) {
     v[VM_PARENTS] = VM_EMPTY_PARENTS;
     v[VM_DESTROIED] = false;
+    v[VM_SETTER_FN_MAP] = null;
     return;
   }
   vm[prop] = loopWrapVM(v);
@@ -327,6 +376,7 @@ function wrapProp(vm, prop) {
 function wrapProxy(vm, isArr) {
   vm[VM_PARENTS] = [];
   vm[VM_DESTROIED] = false;
+  vm[VM_SETTER_FN_MAP] = null;
   const p = new Proxy(vm, isArr ? ArrayProxyHandler : ObjectProxyHandler);
   vm[VM_WRAPPER_PROXY] = p;
   return p;
@@ -340,6 +390,7 @@ function loopWrapVM(plainObjectOrArray) {
     if (instanceOf(plainObjectOrArray, Boolean) || instanceOf(plainObjectOrArray, RegExp)) {
       plainObjectOrArray[VM_PARENTS] = VM_EMPTY_PARENTS;
       plainObjectOrArray[VM_DESTROIED] = false;
+      plainObjectOrArray[VM_SETTER_FN_MAP] = null;
       return plainObjectOrArray;
     } else if (isArray(plainObjectOrArray)) {
       for (let i = 0; i < plainObjectOrArray.length; i++) {
@@ -392,6 +443,7 @@ export function wrapComponent(component) {
   }
   component[VM_PARENTS] = [];
   component[VM_DESTROIED] = false;
+  component[VM_SETTER_FN_MAP] = null;
   component[VM_LISTENERS] = new Map();
   handleVMDebug(component);
   const p = new Proxy(component, ObjectProxyHandler);
