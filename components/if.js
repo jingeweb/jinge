@@ -240,10 +240,12 @@ function updateSwitchOnTransitionEnd(component) {
 
   if (e) return;
 
-  const renderFn = component[ARG_COMPONENTS] ? component[ARG_COMPONENTS][value] : null;
-  doUpdate(component, renderFn);
+  doUpdate(component);
   component[P_VAL] = value;
   const ct = component[T_MAP][value];
+  if (!ct) {
+    return;
+  }
   const fd = component[GET_TRANSITION_DOM]();
   if (fd.nodeType !== Node.ELEMENT_NODE) {
     ct[0] = TS_STATE_ENTERED;
