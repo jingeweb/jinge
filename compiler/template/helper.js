@@ -18,7 +18,8 @@ function parse(source) {
   let meetErr = null;
   parser.removeErrorListeners();
   parser.addErrorListener({
-    syntaxError(recognizer, offendingSymbol, line, column) {
+    syntaxError(recognizer, offendingSymbol, line, column, ...args) {
+      console.error(...args);
       if (!meetErr) {
         meetErr = {
           line, column
