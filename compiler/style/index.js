@@ -9,6 +9,8 @@ const plugin = postcss.plugin('postcss-jinge-component-style', () => {
   return function(root, result) {
     // Transform each rule here
     const styleId = result.opts.styleId;
+    let keyframesMap = null;
+
     function transform(root) {
       root.each(selector => {
         selector.each(n => {
@@ -28,9 +30,45 @@ const plugin = postcss.plugin('postcss-jinge-component-style', () => {
         });
       });
     }
-    root.walkRules(rule => {
-      rule.selector = parser(transform)
-        .processSync(rule.selector, {
+
+    root.nodes.forEach(node => {
+      if (node.type === 'atrule' && node.name === 'keyframes') {
+        const name = node.params;
+        if (name.startsWith('/deep/')) {
+          node.params = name.replace(/\/deep\/\s*/, '');
+          return;
+        }
+        if (!keyframesMap) keyframesMap = new Map();
+        if (keyframesMap.has(name)) return;
+        node.params = `${name}_${styleId}`;
+        keyframesMap.set(name, node.params);
+      }
+    });
+    if (keyframesMap) {
+      root.walkDecls(/^animation(?:-name)?$/, decl => {
+        let an = decl.value;
+        const idx = an.indexOf(' ');
+        if (decl.prop === 'animation') {
+          an = an.substring(0, idx < 0 ? an.length : idx);
+        }
+        const kn = keyframesMap.get(an);
+        if (!kn) {
+          return;
+        }
+        if (decl.prop === 'animation') {
+          decl.value = kn + decl.value.substring(idx);
+        } else {
+          decl.value = kn;
+        }
+      });
+    }
+
+    root.nodes.forEach(node => {
+      if (node.type !== 'rule') {
+        return;
+      }
+      node.selector = parser(transform)
+        .processSync(node.selector, {
           updateSelector: true
         });
     });
