@@ -16,7 +16,8 @@ import {
 import {
   Messenger,
   LISTENERS,
-  CLEAR
+  CLEAR,
+  NOTIFY
 } from './messenger';
 import {
   manager as StyleManager,
@@ -40,7 +41,9 @@ import {
   STR_EMPTY,
   setImmediate,
   clearImmediate,
-  assignObject
+  assignObject,
+  BEFORE_DESTROY_EVENT_NAME,
+  AFTER_RENDER_EVENT_NAME
 } from '../util';
 import {
   getParent,
@@ -319,6 +322,7 @@ export class Component extends Messenger {
     if (this[STATE] > STATE_WILLDESTROY) return;
     this[STATE] = STATE_WILLDESTROY;
     this[VM_DESTROIED] = true;
+    this[NOTIFY](BEFORE_DESTROY_EVENT_NAME, this);
     this[BEFORE_DESTROY]();
     super[CLEAR](); // dont forgot call super clear.
     // clear next tick update setImmediate
@@ -385,6 +389,7 @@ export class Component extends Messenger {
     this[STATE] = STATE_RENDERED;
     this[CONTEXT_STATE] = -1; // has been rendered, can't modify context
     this[AFTER_RENDER]();
+    this[NOTIFY](AFTER_RENDER_EVENT_NAME, this);
   }
 
   /**

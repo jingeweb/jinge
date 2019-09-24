@@ -364,8 +364,9 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
 
       if (a_category === 'vm-pass') {
+        if (!a_name) this._throwParseError(attrCtx.start, 'vm-pass type attribute require reflect variable name.');
+        if (!aval) aval = a_name;
         if (mode === 'html') this._throwParseError(attrCtx.start, 'vm-pass attribute can\'t be used on html element');
-        if (!aval) this._throwParseError(attrCtx.start, 'vm-pass type attribute require attribute value');
         if (!/^[\w\d$_]+$/.test(a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute reflect vairable name must match /^[\\w\\d$_]+$/');
         if (vmPass.find(v => v.name === a_name)) this._throwParseError(attrCtx.start, 'vm-pass type attribute name dulipcated: ' + a_name);
         vmPass.push({
@@ -784,7 +785,7 @@ ${result.argAttrs.map((at, i) => {
     });
   }).join('\n')}
 ${result.listeners.map(lt => {
-    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
+    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   }).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -1033,7 +1034,7 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
 ${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
-${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
 },`) : ''}
 ${this._prependTab(attrs.join(',\n'), true)}
 });
