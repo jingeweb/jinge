@@ -49,3 +49,7 @@ export function getOwnPropertySymbols(obj) {
 export function createEmptyObject(o) {
   return Object.create(o || null);
 }
+
+export function isPromise(obj) {
+  return isObject(obj) && isFunction(obj.then);
+}
