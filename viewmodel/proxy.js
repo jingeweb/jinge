@@ -7,7 +7,8 @@ import {
   isObject,
   assertFail,
   STR_LENGTH,
-  isFunction
+  isFunction,
+  isPromise
 } from '../util';
 import {
   VM_PARENTS,
@@ -171,6 +172,20 @@ function arrayLengthSetHandler(target, value) {
 }
 
 export const ObjectProxyHandler = {
+  set: objectPropSetHandler
+};
+
+export const PromiseProxyHandler = {
+  get(target, prop) {
+    if (prop === 'then' || prop === 'catch') {
+      const v = target[prop];
+      return function(...args) {
+        return v.call(target, ...args);
+      };
+    } else {
+      return target[prop];
+    }
+  },
   set: objectPropSetHandler
 };
 
@@ -377,7 +392,9 @@ function wrapProxy(vm, isArr) {
   vm[VM_PARENTS] = [];
   vm[VM_DESTROIED] = false;
   vm[VM_SETTER_FN_MAP] = null;
-  const p = new Proxy(vm, isArr ? ArrayProxyHandler : ObjectProxyHandler);
+  const p = new Proxy(vm, isArr ? ArrayProxyHandler : (
+    isPromise(vm) ? PromiseProxyHandler : ObjectProxyHandler
+  ));
   vm[VM_WRAPPER_PROXY] = p;
   return p;
 }
