@@ -39,6 +39,34 @@ export function defineProperties(...args) {
   return Object.defineProperties(...args);
 }
 
+/**
+ * @param {Object} obj
+ * @param {Function} enumFn
+ */
+export function getOwnPropertyNames(obj, enumFn) {
+  const ns = Object.getOwnPropertyNames(obj);
+  if (enumFn) ns.forEach(enumFn);
+  return ns;
+}
+
+/**
+ * @param {Object} obj
+ * @param {Function} enumFn
+ */
+export function getOwnPropertySymbols(obj, enumFn) {
+  const ss = Object.getOwnPropertySymbols(obj);
+  if (enumFn) ss.forEach(enumFn);
+  return ss;
+}
+
+export function isPropertyEnumerable(obj, key) {
+  return Object.prototype.propertyIsEnumerable.call(obj, key);
+}
+
+export function createEmptyObject(o) {
+  return Object.create(o || null);
+}
+
 export function uid() {
   return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
 }
