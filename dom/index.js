@@ -10,6 +10,9 @@ export function getParent($ele) {
 }
 
 export function setText($element, text) {
+  if (isArray(text)) {
+    text = JSON.stringify(text);
+  }
   $element.textContent = text;
 }
 
