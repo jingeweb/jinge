@@ -43,7 +43,9 @@ import {
   clearImmediate,
   assignObject,
   BEFORE_DESTROY_EVENT_NAME,
-  AFTER_RENDER_EVENT_NAME
+  AFTER_RENDER_EVENT_NAME,
+  getOwnPropertyNames,
+  getOwnPropertySymbols
 } from '../util';
 import {
   getParent,
@@ -339,13 +341,15 @@ export class Component extends Messenger {
     // remove component style
     StyleManager[CSTYLE_DEL](this.constructor.style);
 
+    // clear context. may be unnecessary.
+    destroyContext(this);
+
     // clear properties
     this[STATE] = STATE_DESTROIED;
     this[RELATED_VM_LISTENERS] =
       this[NON_ROOT_COMPONENT_NODES] =
       this[REF_NODES] =
-      this[ARG_COMPONENTS] =
-      this[CONTEXT] = null;
+      this[ARG_COMPONENTS] = null;
 
     if (this[BINDED_DOM_LISTENERS]) {
       unbindDOMListeners(this);
@@ -387,7 +391,7 @@ export class Component extends Messenger {
       if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
     });
     this[STATE] = STATE_RENDERED;
-    this[CONTEXT_STATE] = -1; // has been rendered, can't modify context
+    this[CONTEXT_STATE] = this[CONTEXT_STATE] > 0 ? -2 : -1; // has been rendered, can't modify context
     this[AFTER_RENDER]();
     this[NOTIFY](AFTER_RENDER_EVENT_NAME, this);
   }
@@ -512,6 +516,21 @@ export class Component extends Messenger {
   [BEFORE_DESTROY]() {
     // lifecycle hook, default do nothing.
   }
+}
+
+function destroyContext(comp) {
+  const ctx = comp[CONTEXT];
+  if (!ctx) return;
+  if (comp[CONTEXT_STATE] === -2) {
+    // maybe unnecessary to reset properties
+    getOwnPropertyNames(ctx, propN => {
+      ctx[propN] = null;
+    });
+    getOwnPropertySymbols(ctx, propN => {
+      ctx[propN] = null;
+    });
+  }
+  comp[CONTEXT] = null;
 }
 
 export function destroyRelatedVM(comp) {
