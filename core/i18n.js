@@ -16,6 +16,10 @@ export const I18N_DATA_CHANGED = Symbol('data-changed');
 
 let dictStore = window.JINGE_I18N_DATA || null;
 
+/**
+ * @param {String} text text to translate
+ * @param {Object|String} params params or translate key
+ */
 export function _t(text, params) {
   if (!params || !isObject(params) || text.indexOf('{') < 0) {
     return text;

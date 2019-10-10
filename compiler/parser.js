@@ -703,7 +703,7 @@ import {
               throw new Error('_t require parameter "key" to be literal string.');
             }
             key = key.value;
-            if (!/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/.test(key)) {
+            if (!/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/i.test(key)) {
               throw new Error('_t require parameter "key" to match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/');
             }
           }

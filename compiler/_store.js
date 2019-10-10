@@ -77,7 +77,7 @@ class I18NManager {
   }
 
   validate(resourcePath, info, opts) {
-    if (info.key && !/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/.test(info.key)) {
+    if (info.key && !/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/i.test(info.key)) {
       return 'i18n "key" must match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/';
     }
     const {

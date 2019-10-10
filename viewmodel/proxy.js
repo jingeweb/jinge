@@ -12,7 +12,6 @@ import {
 } from '../util';
 import {
   VM_PARENTS,
-  VM_EMPTY_PARENTS,
   isViewModel,
   isPublicProp,
   addVMParent,
@@ -371,6 +370,9 @@ export const ArrayProxyHandler = {
   set: arrayPropSetHandler
 };
 
+function isInnerObj(v) {
+  return instanceOf(v, Boolean) || instanceOf(v, RegExp) || instanceOf(v, Date);
+}
 function wrapProp(vm, prop) {
   const v = vm[prop];
   if (v === null || !isObject(v)) return;
@@ -378,8 +380,8 @@ function wrapProp(vm, prop) {
     addVMParent(v, vm, prop);
     return;
   }
-  if (instanceOf(v, Boolean) || instanceOf(v, RegExp)) {
-    v[VM_PARENTS] = VM_EMPTY_PARENTS;
+  if (isInnerObj(v)) {
+    v[VM_PARENTS] = [];
     v[VM_DESTROIED] = false;
     v[VM_SETTER_FN_MAP] = null;
     return;
@@ -404,8 +406,8 @@ function loopWrapVM(plainObjectOrArray) {
   if (isObject(plainObjectOrArray)) {
     // already been ViewModel
     if (VM_PARENTS in plainObjectOrArray) return plainObjectOrArray;
-    if (instanceOf(plainObjectOrArray, Boolean) || instanceOf(plainObjectOrArray, RegExp)) {
-      plainObjectOrArray[VM_PARENTS] = VM_EMPTY_PARENTS;
+    if (isInnerObj(plainObjectOrArray)) {
+      plainObjectOrArray[VM_PARENTS] = [];
       plainObjectOrArray[VM_DESTROIED] = false;
       plainObjectOrArray[VM_SETTER_FN_MAP] = null;
       return plainObjectOrArray;
