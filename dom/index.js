@@ -24,7 +24,7 @@ export function setAttribute($ele, attrName, attrValue) {
     }
     return;
   }
-  if (isUndefined(attrValue)) {
+  if (isUndefined(attrValue) || attrValue === null) {
     removeAttribute($ele, attrName);
   } else {
     $ele.setAttribute(attrName, attrValue);
