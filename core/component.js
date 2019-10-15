@@ -7,7 +7,8 @@ import {
   VM_CLEAR,
   VM_LISTENERS,
   VM_NOTIFY,
-  vmClearListener
+  vmClearListener,
+  VM_LISTENERS_IMMS
 } from '../viewmodel/notify';
 import {
   VM_PARENTS,
@@ -45,7 +46,8 @@ import {
   BEFORE_DESTROY_EVENT_NAME,
   AFTER_RENDER_EVENT_NAME,
   getOwnPropertyNames,
-  getOwnPropertySymbols
+  getOwnPropertySymbols,
+  arrayRemove
 } from '../util';
 import {
   getParent,
@@ -55,19 +57,21 @@ import {
   createElement,
   createTextNode,
   appendChild,
-  addEvent,
-  removeEvent
+  registerEvent
 } from '../dom';
 import {
-  wrapComponent
+  wrapComponent,
+  destroyViewModel,
+  VM_SETTER_FN_MAP,
+  VM_WRAPPER_PROXY
 } from '../viewmodel/proxy';
 
-export const BINDED_DOM_LISTENERS = Symbol('binded_dom_listeners');
 export const NOTIFY_TRANSITION = Symbol('notify_transition');
 export const TEMPLATE_RENDER = Symbol('template_render');
 export const RENDER = Symbol('render');
 export const RENDER_TO_DOM = Symbol('render_to_dom');
 export const ARG_COMPONENTS = Symbol('arg_components');
+export const PASSED_ATTRS = Symbol('passed_attrs');
 export const CLONE = Symbol('clone');
 export const DESTROY = Symbol('destroy');
 export const CONTEXT = Symbol('context');
@@ -76,7 +80,8 @@ export const ROOT_NODES = Symbol('root_nodes');
 export const NON_ROOT_COMPONENT_NODES = Symbol('non_root_components');
 export const REF_NODES = Symbol('ref_nodes');
 export const SET_REF_NODE = Symbol('setChild');
-export const RELATED_VM_REFS = Symbol('related_refs');
+export const REF_BELONGS = Symbol('ref_belongs');
+export const RELATED_DOM_REFS = Symbol('related_dom_refs');
 export const RELATED_VM_LISTENERS = Symbol('related_vm_listeners');
 export const RELATED_VM_ON = Symbol('related_vm_on');
 export const RELATED_VM_OFF = Symbol('related_vm_off');
@@ -104,15 +109,29 @@ export const STATE_NAMES = [
   'initialize', 'rendered', 'willdestroy', 'destroied'
 ];
 
+export const DOM_ON = Symbol('add_dom_listener');
+export const DOM_PASS_LISTENERS = Symbol('pass_all_listeners_to_dom');
+const DOM_LISTENER_DEREGISTERS = Symbol('dom_listener_deregisters');
+
 function copyContext(context) {
   if (!context) return null;
   return assignObject(createEmptyObject(), context);
 }
 
+function _getOrCreate(comp, prop, fn) {
+  let pv = comp[prop];
+  if (!pv) {
+    pv = comp[prop] = fn();
+  }
+  return pv;
+}
+
 function getOrCreateMap(comp, prop) {
-  let m = comp[prop];
-  if (!m) m = comp[prop] = new Map();
-  return m;
+  return _getOrCreate(comp, prop, () => new Map());
+}
+
+function getOrCreateArr(comp, prop) {
+  return _getOrCreate(comp, prop, () => []);
 }
 
 export class Component extends Messenger {
@@ -132,9 +151,16 @@ export class Component extends Messenger {
       throw new Error('First argument passed to Component constructor must be ViewModel with Messenger interface. See https://[todo]');
     }
     super(attrs[LISTENERS]);
-    this[VM_PARENTS] = null;
+
+    this[PASSED_ATTRS] = attrs;
+
+    this[VM_PARENTS] = [];
     this[VM_DESTROIED] = false;
-    this[VM_LISTENERS] = null;
+    this[VM_LISTENERS] = new Map();
+    this[VM_LISTENERS_IMMS] = [];
+    this[VM_SETTER_FN_MAP] = new Map();
+    this[VM_WRAPPER_PROXY] = null;
+
     this[UPDATE_NEXT_MAP] = null;
     this[CSTYLE_PID] = null;
     this[CONTEXT] = attrs[CONTEXT];
@@ -170,8 +196,25 @@ export class Component extends Messenger {
     this[NON_ROOT_COMPONENT_NODES] = [];
     /**
      * REF_NODES contains all children with ref: attribute.
+     * REF_BELONGS contains all parent components which has this component as ref.
+     *
+     * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
+     *   之后通过 GET_REF 函数可以获取到元素实例。
+     * 当标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素可能被动态产生或销毁。
+     *   需要在元素产生或销毁时，相应地把它从它所属于的 REF_NODES 中添加或删除。
+     * 为了实现这个目的，对于 Component 元素，在将它添加到目标父组件的 REF_NODES 中的同时，
+     *   会将目标父组件反向记录到该元素的 REF_BELONGS 中，从而实现当该元素被销毁时，
+     *   可以将自己从它所属于的 REF_NODES 中删除；
+     * 对于 html node 元素，我们会将其目标父组件记录到该元素的渲染关联组件的 RELATED_DOM_REFS。
+     *   比如说，如果该 html 元素是 <if> 组件的 slot ，那它的渲染关联组件就是 <if> 内部的 Slot 组件，
+     *   当 <if> 的条件发生变化时，实际上会销毁这个 Slot 组件。由于前面提到的 html 元素
+     *   的 ref: 信息记录到了该 Slot 组件的 RELATED_DOM_REFS 里，因此就能反向地将
+     *   这个 html 元素从它所属于的 REF_NODES 中删除。
      */
     this[REF_NODES] = null;
+    this[REF_BELONGS] = null;
+    this[RELATED_DOM_REFS] = null;
+
     /**
      * If some child of this component is passed as argument(ie.
      * use arg:pass attribute) like ng-tranclude in angular 1.x,
@@ -205,15 +248,64 @@ export class Component extends Messenger {
      */
     this[RELATED_VM_LISTENERS] = null;
     /**
-     * Simalary as RELATED_VM_LISTENERS, RELATED_VM_REFS stores
-     *   ref elements of parent component.
+     * Store all dom listener deregisters.
      */
-    this[RELATED_VM_REFS] = null;
-    /**
-     * Only be used by bindDOMListeners and unbindDOMListeners
-     */
-    this[BINDED_DOM_LISTENERS] = null;
+    this[DOM_LISTENER_DEREGISTERS] = null;
     return wrapComponent(this);
+  }
+
+  /**
+   * Helper function to add dom event listener.
+   * Return deregister function which will remove event listener.
+   * If you do dot call deregister function, it will be auto called when component is destroied.
+   * @param {HtmlElement} $el
+   * @param {String} eventName
+   * @param {Function} listener
+   * @param {Boolean|Object} capture
+   * @returns {Function} deregister function to remove listener
+   */
+  [DOM_ON]($el, eventName, listener, capture) {
+    const lisDeregister = registerEvent($el, eventName, $event => {
+      listener.call(this, $event);
+    }, capture);
+
+    const deregs = getOrCreateArr(this, DOM_LISTENER_DEREGISTERS);
+    const deregister = () => {
+      lisDeregister();
+      arrayRemove(deregs, deregister);
+    };
+    deregs.push(deregister);
+    return deregister;
+  }
+
+  /**
+   * Helper function to pass all listener to first dom element.
+   * @param {Array} ignoredEventNames event names not passed
+   */
+  [DOM_PASS_LISTENERS](ignoredEventNames) {
+    if (this[STATE] !== STATE_RENDERED) {
+      throw new Error('bindDOMListeners must be applied to component which is rendered.');
+    }
+    const lis = this[LISTENERS];
+    if (!lis || lis.length === 0) {
+      return;
+    }
+    const $el = this[GET_FIRST_DOM]();
+    if ($el.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+    lis.forEach((handlers, eventName) => {
+      if (ignoredEventNames && ignoredEventNames.indexOf(eventName) >= 0) {
+        return;
+      }
+      handlers.forEach(fn => {
+        this[DOM_ON]($el, eventName, fn.tag ? $evt => {
+          fn.tag.stop && $evt.stopPropagation();
+          fn.tag.prevent && $evt.preventDefault();
+          fn($evt);
+        } : fn);
+      });
+    });
   }
 
   [GET_TRANSITION_DOM]() {
@@ -324,9 +416,29 @@ export class Component extends Messenger {
     if (this[STATE] > STATE_WILLDESTROY) return;
     this[STATE] = STATE_WILLDESTROY;
     this[VM_DESTROIED] = true;
+
+    this[HANDLE_BEFORE_DESTROY](); // destroy children first
     this[NOTIFY](BEFORE_DESTROY_EVENT_NAME, this);
     this[BEFORE_DESTROY]();
-    super[CLEAR](); // dont forgot call super clear.
+
+    // clear messenger listeners.
+    super[CLEAR]();
+    // remove component style
+    StyleManager[CSTYLE_DEL](this.constructor.style);
+
+    // destroy attrs passed to constructor
+    const attrs = this[PASSED_ATTRS];
+    destroyViewModel(attrs);
+    (ARG_COMPONENTS in attrs) && (attrs[ARG_COMPONENTS] = null);
+    (LISTENERS in attrs) && (attrs[LISTENERS] = null);
+    attrs[CONTEXT] = null;
+    this[PASSED_ATTRS] = null;
+
+    // destroy view model
+    destroyViewModel(this, false);
+    this[VM_SETTER_FN_MAP].clear();
+    this[VM_SETTER_FN_MAP] = null;
+
     // clear next tick update setImmediate
     if (this[UPDATE_NEXT_MAP]) {
       this[UPDATE_NEXT_MAP].forEach(imm => {
@@ -334,26 +446,22 @@ export class Component extends Messenger {
       });
       this[UPDATE_NEXT_MAP].clear();
     }
-    this[VM_CLEAR](); // dont forgot clear vm listeners
+
+    // destroy related listener and ref:
     destroyRelatedVM(this);
-    this[HANDLE_BEFORE_DESTROY]();
-
-    // remove component style
-    StyleManager[CSTYLE_DEL](this.constructor.style);
-
-    // clear context. may be unnecessary.
+    // clear context.
     destroyContext(this);
+    // clear all dom event listener
+    destroyDOMListeners(this);
 
     // clear properties
     this[STATE] = STATE_DESTROIED;
     this[RELATED_VM_LISTENERS] =
       this[NON_ROOT_COMPONENT_NODES] =
       this[REF_NODES] =
+      this[REF_BELONGS] =
       this[ARG_COMPONENTS] = null;
 
-    if (this[BINDED_DOM_LISTENERS]) {
-      unbindDOMListeners(this);
-    }
     // remove dom
     if (removeDOM) {
       this[HANDLE_REMOVE_ROOT_DOMS]();
@@ -481,14 +589,18 @@ export class Component extends Messenger {
       elOrArr = [elOrArr, el];
       rns.set(ref, elOrArr);
     }
-    if (relatedComponent === this) return;
-    const rvrs = getOrCreateMap(relatedComponent, RELATED_VM_REFS);
-    let rs = rvrs.get(this);
-    if (!rs) {
-      rs = [];
-      rvrs.set(this, rs);
+    if (isComponent(el)) {
+      getOrCreateArr(el, REF_BELONGS).push([
+        this, ref
+      ]);
+      return;
     }
-    rs.push(ref);
+    if (this === relatedComponent) {
+      return;
+    }
+    getOrCreateArr(
+      relatedComponent, RELATED_DOM_REFS
+    ).push([this, ref, el]);
   }
 
   /**
@@ -533,6 +645,13 @@ function destroyContext(comp) {
   comp[CONTEXT] = null;
 }
 
+function destroyDOMListeners(component) {
+  const deregisters = component[DOM_LISTENER_DEREGISTERS];
+  if (!deregisters) return;
+  deregisters.forEach(deregister => deregister());
+  component[DOM_LISTENER_DEREGISTERS] = null;
+}
+
 export function destroyRelatedVM(comp) {
   function _destroy(prop, cb) {
     const m = comp[prop];
@@ -543,16 +662,25 @@ export function destroyRelatedVM(comp) {
     });
     m.clear();
   }
+  function _unref(refBelongs, el) {
+    if (!refBelongs) return;
+    refBelongs.forEach(info => {
+      const map = info[0][REF_NODES];
+      if (!map) return;
+      const rns = map.get(info[1]);
+      if (isArray(rns)) {
+        arrayRemove(rns, el || info[2]);
+      } else {
+        map.delete(info[1]);
+      }
+    });
+  }
   _destroy(RELATED_VM_LISTENERS, (ctx, hook) => {
     ctx[VM_OFF](hook[0], hook[1]);
   });
-  _destroy(RELATED_VM_REFS, (ctx, ref) => {
-    // const rn = ctx[REF_NODES];
-    // if (rn) debugger;
-    // rn.delete(ref);
-    // debugger;
-    ctx[REF_NODES].delete(ref);
-  });
+
+  _unref(comp[REF_BELONGS], comp);
+  _unref(comp[RELATED_DOM_REFS]);
 }
 
 export function isComponent(c) {
@@ -592,63 +720,4 @@ export function textRenderFn(component, txtContent) {
   const el = createTextNode(txtContent);
   component[ROOT_NODES].push(el);
   return el;
-}
-
-/**
- * bind(attach) listeners to rendered DOM element.
- * @param {Component} component
- * @param {Array<String>} ignoredEventNames
- */
-export function bindDOMListeners(component, ignoredEventNames) {
-  if (component[STATE] !== STATE_RENDERED) {
-    throw new Error('bindDOMListeners must be applied to component which is rendered.');
-  }
-  const lis = component[LISTENERS];
-  if (!lis || lis.length === 0) {
-    return;
-  }
-  const $el = component[GET_FIRST_DOM]();
-  if ($el.nodeType !== Node.ELEMENT_NODE) {
-    return;
-  }
-  let bindedListeners = component[BINDED_DOM_LISTENERS];
-  if (bindedListeners) {
-    throw new Error('bindedDOMListeners can only be applied once.');
-  } else {
-    bindedListeners = component[BINDED_DOM_LISTENERS] = {
-      el: $el,
-      ar: []
-    };
-  }
-  lis.forEach((handlers, eventName) => {
-    if (ignoredEventNames && ignoredEventNames.indexOf(eventName) >= 0) return;
-    handlers.forEach(fn => {
-      const tag = fn.tag || false;
-      let handler = fn;
-      if (tag && (tag.stop || tag.prevent)) {
-        handler = function($evt) {
-          fn($evt);
-          tag.stop && $evt.stopPropagation();
-          tag.prevent && $evt.preventDefault();
-        };
-      }
-      addEvent($el, eventName, handler, tag);
-      bindedListeners.ar.push([eventName, handler]);
-    });
-  });
-}
-
-/**
- * unbind(detach) listeners from rendered DOM element.
- * @param {Component} component
- */
-export function unbindDOMListeners(component) {
-  const bindedListeners = component[BINDED_DOM_LISTENERS];
-  if (!bindedListeners) {
-    return;
-  }
-  bindedListeners.ar.forEach(saved => {
-    removeEvent(bindedListeners.el, saved[0], saved[1]);
-  });
-  component[BINDED_DOM_LISTENERS] = null;
 }

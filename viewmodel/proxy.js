@@ -1,6 +1,4 @@
 import {
-  typeOf,
-  instanceOf,
   Symbol,
   isNumber,
   isArray,
@@ -8,11 +6,13 @@ import {
   assertFail,
   STR_LENGTH,
   isFunction,
-  isPromise
+  isPromise,
+  getOwnPropertyNames
 } from '../util';
 import {
   VM_PARENTS,
   isViewModel,
+  isInnerObj,
   isPublicProp,
   addVMParent,
   removeVMParent,
@@ -22,14 +22,16 @@ import {
 import {
   VM_NOTIFY,
   vmAddMessengerInterface,
-  VM_LISTENERS
+  VM_CLEAR,
+  VM_ON,
+  VM_OFF
 } from './notify';
 import {
   CFG_VM_DEBUG,
   config
 } from '../config';
 
-export const VM_WRAPPER_PROXY = Symbol('proxy');
+export const VM_WRAPPER_PROXY = Symbol('wrapper_proxy');
 export const VM_SETTER_FN_MAP = Symbol('is_setter_fn_map');
 
 /**
@@ -43,14 +45,7 @@ export const VM_SETTER_FN_MAP = Symbol('is_setter_fn_map');
  * 由于 obj 可能是有继承关系的类的实例，因此需要向上检测继承的类的 prototype。
  */
 function getSetterFnIfPropIsSetter(obj, prop) {
-  let map = obj[VM_SETTER_FN_MAP];
-  if (map === null) {
-    /**
-     * use cache to store setter functions.
-     * 缓存曾经检测过的属性名，提升性能。
-     */
-    map = obj[VM_SETTER_FN_MAP] = new Map();
-  }
+  const map = obj[VM_SETTER_FN_MAP];
   if (!map.has(prop)) {
     let clazz = obj.constructor;
     let desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
@@ -94,21 +89,33 @@ function notifyPropChanged(vm, prop) {
   });
 }
 
-function objectPropSetHandler(target, prop, value) {
+function __propSetHandler(target, prop, value, setFn) {
   if (!isPublicProp(prop)) {
     target[prop] = value;
     return true;
   }
-  const newValType = typeOf(value);
   const newValIsVM = isViewModel(value);
-  if (value !== null && newValType === 'object' && !newValIsVM) {
-    throw new Error('public property of ViewModel target must also be ViewModel');
+  if (isObject(value) && !isInnerObj(value) && !newValIsVM) {
+    throw new Error('public property of ViewModel must also be ViewModel');
   }
   // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
   const oldVal = target[prop];
   if (isViewModel(oldVal)) {
     removeVMParent(oldVal, target, prop);
   }
+  setFn(target, prop, value);
+  if (newValIsVM) {
+    addVMParent(value, target, prop);
+  }
+  notifyPropChanged(target, prop);
+  return true;
+}
+
+function __objectPropSetFn(target, prop, value) {
+  target[prop] = value;
+}
+
+function __componentPropSetFn(target, prop, value) {
   /**
    * we must ensure `this` in setter function to be `Proxy`
    *
@@ -118,25 +125,30 @@ function objectPropSetHandler(target, prop, value) {
    *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
    * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
    */
+  if (!target[VM_SETTER_FN_MAP]) {
+    console.warn(`call setter "${prop}" after destroied, resources such as setInterval maybe not released before destroy. component:`, target);
+    return;
+  }
   const setterFn = getSetterFnIfPropIsSetter(target, prop);
   if (setterFn) {
     setterFn.call(target[VM_WRAPPER_PROXY], value);
   } else {
     target[prop] = value;
   }
+}
 
-  if (newValIsVM) {
-    addVMParent(value, target, prop);
-  }
-  notifyPropChanged(target, prop);
-  return true;
+function objectPropSetHandler(target, prop, value) {
+  return __propSetHandler(target, prop, value, __objectPropSetFn);
+}
+
+function componentPropSetHandler(target, prop, value) {
+  return __propSetHandler(target, prop, value, __componentPropSetFn);
 }
 
 function arrayPropSetHandler(target, prop, value) {
   if (prop === STR_LENGTH) {
     return arrayLengthSetHandler(target, value);
   }
-  console.log('set', prop);
   return objectPropSetHandler(target, prop, value);
 }
 
@@ -172,6 +184,10 @@ function arrayLengthSetHandler(target, value) {
 
 export const ObjectProxyHandler = {
   set: objectPropSetHandler
+};
+
+export const ComponentProxyHandler = {
+  set: componentPropSetHandler
 };
 
 export const PromiseProxyHandler = {
@@ -370,20 +386,13 @@ export const ArrayProxyHandler = {
   set: arrayPropSetHandler
 };
 
-function isInnerObj(v) {
-  return instanceOf(v, Boolean) || instanceOf(v, RegExp) || instanceOf(v, Date);
-}
 function wrapProp(vm, prop) {
   const v = vm[prop];
-  if (v === null || !isObject(v)) return;
-  if (VM_PARENTS in v) {
-    addVMParent(v, vm, prop);
+  if (!isObject(v) || isInnerObj(v)) {
     return;
   }
-  if (isInnerObj(v)) {
-    v[VM_PARENTS] = [];
-    v[VM_DESTROIED] = false;
-    v[VM_SETTER_FN_MAP] = null;
+  if (VM_PARENTS in v) {
+    addVMParent(v, vm, prop);
     return;
   }
   vm[prop] = loopWrapVM(v);
@@ -393,7 +402,6 @@ function wrapProp(vm, prop) {
 function wrapProxy(vm, isArr) {
   vm[VM_PARENTS] = [];
   vm[VM_DESTROIED] = false;
-  vm[VM_SETTER_FN_MAP] = null;
   const p = new Proxy(vm, isArr ? ArrayProxyHandler : (
     isPromise(vm) ? PromiseProxyHandler : ObjectProxyHandler
   ));
@@ -404,14 +412,12 @@ function wrapProxy(vm, isArr) {
 function loopWrapVM(plainObjectOrArray) {
   if (plainObjectOrArray === null) return plainObjectOrArray;
   if (isObject(plainObjectOrArray)) {
-    // already been ViewModel
-    if (VM_PARENTS in plainObjectOrArray) return plainObjectOrArray;
-    if (isInnerObj(plainObjectOrArray)) {
-      plainObjectOrArray[VM_PARENTS] = [];
-      plainObjectOrArray[VM_DESTROIED] = false;
-      plainObjectOrArray[VM_SETTER_FN_MAP] = null;
+    // directly return if alreay is ViewModel or inner object(Date/RegExp/Boolean).
+    if (isInnerObj(plainObjectOrArray) || (VM_PARENTS in plainObjectOrArray)) {
       return plainObjectOrArray;
-    } else if (isArray(plainObjectOrArray)) {
+    }
+
+    if (isArray(plainObjectOrArray)) {
       for (let i = 0; i < plainObjectOrArray.length; i++) {
         wrapProp(plainObjectOrArray, i);
       }
@@ -441,7 +447,9 @@ export function wrapViewModel(plainObjectOrArray, addMessengerInterface = false)
 }
 
 function handleVMDebug(vm) {
-  if (!config[CFG_VM_DEBUG]) return;
+  if (!config[CFG_VM_DEBUG]) {
+    return;
+  }
   let _di = window._VM_DEBUG;
   if (!_di) {
     _di = window._VM_DEBUG = {
@@ -456,16 +464,11 @@ function handleVMDebug(vm) {
 }
 
 export function wrapComponent(component) {
-  if (component[VM_PARENTS]) {
-    console.error('dulplicated wrap component', component);
-    return;
+  if (component[VM_WRAPPER_PROXY]) {
+    throw new Error('alreay wraped.');
   }
-  component[VM_PARENTS] = [];
-  component[VM_DESTROIED] = false;
-  component[VM_SETTER_FN_MAP] = null;
-  component[VM_LISTENERS] = new Map();
   handleVMDebug(component);
-  const p = new Proxy(component, ObjectProxyHandler);
+  const p = new Proxy(component, ComponentProxyHandler);
   component[VM_WRAPPER_PROXY] = p;
   return p;
 }
@@ -476,19 +479,34 @@ export function wrapComponent(component) {
  */
 export function wrapAttrs(attrsObj) {
   if (attrsObj === null || !isObject(attrsObj) || (VM_PARENTS in attrsObj)) {
-    /*
-     * this should never happen,
-     * as `wrapAttrs` should only be used in compiler generated code.
-     */
     assertFail();
   }
   for (const k in attrsObj) {
     if (isPublicProp(k)) {
       const v = attrsObj[k];
-      if (v !== null && isObject(v) && !(VM_PARENTS in v)) {
+      if (isObject(v) && !isInnerObj(v) && !(VM_PARENTS in v)) {
         throw new Error(`value passed to attribute "${k}" must be ViewModel.`);
       }
     }
   }
   return wrapViewModel(attrsObj, true);
+}
+
+export function destroyViewModel(vm, removeFns = true) {
+  vm[VM_DESTROIED] = true;
+  vm[VM_PARENTS].length = 0;
+  vm[VM_CLEAR]();
+  getOwnPropertyNames(vm, prop => {
+    if (!isPublicProp(prop)) return;
+    if (isViewModel(vm[prop])) {
+      vm[prop] = null; // unlink all view model property
+    }
+  });
+  vm[VM_WRAPPER_PROXY] = null;
+  if (removeFns) {
+    vm[VM_ON] =
+    vm[VM_OFF] =
+    vm[VM_NOTIFY] =
+    vm[VM_CLEAR] = null;
+  }
 }

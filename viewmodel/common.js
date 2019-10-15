@@ -2,15 +2,20 @@ import {
   isObject,
   isString,
   Symbol,
-  startsWith
+  startsWith,
+  instanceOf
 } from '../util';
 
 export const VM_PARENTS = Symbol('vm_parents');
 export const VM_DESTROIED = Symbol('vm_destroied');
 export const VM_DEBUG_ID = Symbol('vm_id');
 export const VM_DEBUG_NAME = Symbol('vm_name');
+
+export function isInnerObj(v) {
+  return instanceOf(v, Boolean) || instanceOf(v, RegExp) || instanceOf(v, Date);
+}
 export function isViewModel(obj) {
-  return obj !== null && isObject(obj) && (VM_PARENTS in obj);
+  return isObject(obj) && !isInnerObj(obj) && (VM_PARENTS in obj);
 }
 
 export function isPublicProp(v) {

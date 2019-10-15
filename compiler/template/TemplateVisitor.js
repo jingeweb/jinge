@@ -289,7 +289,10 @@ class TemplateVisitor extends TemplateParserVisitor {
         vmPass: [],
         argPass: null,
         ref: null,
-        argUse: mode !== 'html' && tag === '_slot' ? 'default' : null
+        argUse: mode !== 'html' && tag === '_slot' ? {
+          component: null,
+          fn: 'default'
+        } : null
       };
     }
     const constAttrs = {};
@@ -311,6 +314,10 @@ class TemplateVisitor extends TemplateParserVisitor {
       if (attr_data.length === 1) {
         a_name = a_category;
         a_category = 'str';
+      }
+      if (a_category.startsWith('slot-use|')) {
+        a_tag = a_category.substring(9);
+        a_category = 'slot-use';
       }
       if (a_category.startsWith('on|')) {
         a_tag = {};
@@ -391,7 +398,17 @@ class TemplateVisitor extends TemplateParserVisitor {
         if (argUse) {
           this._throwParseError(attrCtx.start, 'slot-use: attribute can only be used once!');
         }
-        argUse = a_name;
+        if (a_tag) {
+          const ns = a_tag.split('.');
+          const vmVar = this._vms.find(v => v.name === ns[0]);
+          const level = vmVar ? vmVar.level : 0;
+          ns[0] = `vm_${level}.${vmVar ? vmVar.reflect : ns[0]}`;
+          a_tag = ns.join('.');
+        }
+        argUse = {
+          component: a_tag,
+          fn: a_name
+        };
         return;
       }
 
@@ -841,13 +858,14 @@ return el;`, true) + '\n})()';
       type: 'component',
       sub: 'parameter',
       value: this._replace_tpl(TPL.PARAMETER, {
+        VM_RENDERER: argUse.component ? argUse.component : 'vm_0',
         VM_DEBUG_NAME: this._isProdMode ? '' : `[VM_DEBUG_NAME_${this._id}]: "attrs_of_<parameter>",`,
         VM_PASS_INIT: vmPassInitCode,
         VM_PASS_SET: this._prependTab(vmPassSetCode),
         VM_PASS_WATCH: this._prependTab(vmPassWatchCode),
         VM_PASS_PARAM: JSON.stringify(vmPassParamCode),
         PUSH_ELE: this._prependTab(this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE)),
-        ARG_USE: argUse,
+        ARG_USE: argUse.fn,
         CSTYLE_PID: this._prependTab(componentStyleId || addParentStyleId ? (
           `addParentStyleId_${this._id}(el, ${addParentStyleId ? `component[CSTYLE_PID_${this._id}]` : 'null'}${componentStyleId ? `, '${componentStyleId}'` : ''});`
         ) : ''),

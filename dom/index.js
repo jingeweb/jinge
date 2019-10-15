@@ -177,15 +177,20 @@ export function removeEvent($element, eventName, handler) {
   $element.removeEventListener(eventName, handler);
 }
 
-export function addObserveEvent($element, eventName, handler, capture) {
-  function killObserver() {
+/**
+ * Add event to DOM element, similar as addEventListener,
+ * but return deregister function which will call removeEventListener.
+ *
+ * @param {HtmlElement} $element
+ * @param {String} eventName
+ * @param {Function} handler
+ * @param {Boolean|Object} capture
+ * @returns {Function} deregister function which will removeEventListener
+ */
+export function registerEvent($element, eventName, handler, capture) {
+  addEvent($element, eventName, handler, capture);
+  return function deregister() {
     removeEvent($element, eventName, handler);
-  }
-
-  addEvent(eventName, $element, handler, capture);
-
-  return {
-    destroy: killObserver
   };
 }
 

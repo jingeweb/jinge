@@ -3,7 +3,7 @@ export function typeOf(v) {
 }
 
 export function isObject(v) {
-  return typeOf(v) === 'object' && v !== null;
+  return v !== null && typeOf(v) === 'object';
 }
 
 export function isString(v) {

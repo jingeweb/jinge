@@ -7,7 +7,8 @@ import {
   isString,
   createEmptyObject,
   setImmediate,
-  assignObject
+  assignObject,
+  clearImmediate
 } from '../util';
 import {
   config,
@@ -27,6 +28,7 @@ export const VM_LISTENERS = Symbol('vm_listeners');
 export const VM_LISTENERS_ID = Symbol('vm_listenrs_id');
 export const VM_LISTENERS_PARENT = Symbol('vm_listeners_parent');
 export const VM_LISTENERS_HANDLERS = Symbol('vm_listeners_handlers');
+export const VM_LISTENERS_IMMS = Symbol('vm_listeners_imms');
 
 function loopCreateNode(vm, props, level = 0) {
   let propN = props[level];
@@ -99,24 +101,30 @@ export function vmRemoveListener(vm, prop, handler) {
   loopDelNode(node);
 }
 
-function loopClearNode(node) {
+function loopClearNode(node, vm) {
   node[VM_LISTENERS].forEach(sn => loopClearNode(sn));
   node[VM_LISTENERS].clear();
 
   node[VM_LISTENERS_HANDLERS].length = 0;
-
   node[VM_LISTENERS_ID] =
     node[VM_LISTENERS_PARENT] =
     node[VM_LISTENERS_HANDLERS] = null;
 }
 export function vmClearListener(vm) {
-  vm[VM_LISTENERS].forEach(node => loopClearNode(node));
+  vm[VM_LISTENERS].forEach(node => {
+    loopClearNode(node, vm);
+  });
+  vm[VM_LISTENERS_IMMS].forEach(imm => {
+    clearImmediate(imm);
+  });
+  vm[VM_LISTENERS_IMMS].length = 0;
   vm[VM_LISTENERS].clear();
 }
 
 export function vmAddMessengerInterface(vm) {
   if (VM_LISTENERS in vm) return;
   vm[VM_LISTENERS] = new Map();
+  vm[VM_LISTENERS_IMMS] = [];
   vm[VM_ON] = (prop, handler) => vmAddListener(vm, prop, handler);
   vm[VM_OFF] = (prop, handler) => vmRemoveListener(vm, prop, handler);
   vm[VM_NOTIFY] = prop => vmNotifyChanged(vm, prop);
@@ -124,55 +132,57 @@ export function vmAddMessengerInterface(vm) {
 }
 
 const _handleTasks = new Map();
-function _handleOnce(handler, propPath) {
+function _handleOnce(node, handler, propPath, imms) {
   const _has = _handleTasks.has(handler);
   _handleTasks.set(handler, propPath);
   if (_has) {
     return;
   }
-  setImmediate(() => {
+  const imm = setImmediate(() => {
+    arrayRemove(imms, imm);
     try {
       handler(_handleTasks.get(handler));
     } finally {
       _handleTasks.delete(handler);
     }
   });
+  imms.push(imm);
 }
 
-function loopHandle(propPath, node, once) {
+function loopHandle(propPath, node, imms) {
   if (node[VM_LISTENERS_HANDLERS].length > 0) {
     node[VM_LISTENERS_HANDLERS].forEach(handler => {
-      once ? _handleOnce(handler, propPath) : handler(propPath);
+      imms ? _handleOnce(node, handler, propPath, imms) : handler(propPath);
     });
   }
   const children = node[VM_LISTENERS];
   children.size > 0 && children.forEach(c => {
-    loopHandle(propPath, c);
+    loopHandle(propPath, c, imms);
   });
 }
 
-function loopNotify(vm, props, level = 0) {
+function loopNotify(vm, props, imms, level = 0) {
   const propN = '' + props[level]; // force to string
   const lis = vm[VM_LISTENERS];
   let node = lis.get(propN);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(props, node, !config[CFG_VM_DEBUG]);
+      loopHandle(props, node, config[CFG_VM_DEBUG] ? null : imms);
     } else {
-      loopNotify(node, props, level + 1);
+      loopNotify(node, props, imms, level + 1);
     }
   }
   node = lis.get(VM_LISTENERS_STAR);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(props, node, false);
+      loopHandle(props, node, null);
     } else {
-      loopNotify(node, props, level + 1);
+      loopNotify(node, props, imms, level + 1);
     }
   }
   node = lis.get(VM_LISTENERS_DBSTAR);
   if (node) {
-    loopHandle(props, node, false);
+    loopHandle(props, node, null);
   }
 }
 
@@ -184,7 +194,7 @@ export function vmNotifyChanged(vm, prop) {
   if (props.length === 0) {
     return;
   }
-  loopNotify(vm, props);
+  loopNotify(vm, props, vm[VM_LISTENERS_IMMS]);
 }
 
 export function vmWatch(vm, prop, handler) {
