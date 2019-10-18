@@ -21,6 +21,10 @@ let dictStore = window.JINGE_I18N_DATA || null;
  * @param {Object|String} params params or translate key
  */
 export function _t(text, params) {
+  return format(text, params);
+}
+
+export function format(text, params) {
   if (!params || !isObject(params) || text.indexOf('{') < 0) {
     return text;
   }
