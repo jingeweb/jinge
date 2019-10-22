@@ -802,7 +802,7 @@ ${result.argAttrs.map((at, i) => {
     });
   }).join('\n')}
 ${result.listeners.map(lt => {
-    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
+    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   }).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -1050,9 +1050,10 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
     }
     const vmAttrs = `const attrs = wrapAttrs_${this._id}({
 ${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
+${this._prependTab(`[VM_ATTRS_${this._id}]: null,`)}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
-${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
 },`) : ''}
 ${this._prependTab(attrs.join(',\n'), true)}
 });
@@ -1210,7 +1211,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
-        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
+        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
         return [`let _${levelId};`, `function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1218,7 +1219,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
   _calc_${levelId}();
   _notify_${parentLevelId}();
   _update_${parentLevelId}();
-}`, `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
+}`, `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
       }
     } else {
       const assignCodes = [];
@@ -1271,7 +1272,7 @@ function _notify_${lv_id}() {
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-    vm_${level}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ATTRS_${this._id}][VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
 }`);
         initCodes.push(`_calc_${lv_id}();`);
@@ -1286,7 +1287,7 @@ function _notify_${lv_id}() {
 }`);
         initCodes.push(`_calc_${levelId}();`);
         updateCodes.unshift(`function _update_${levelId}() { _calc_${levelId}(); }`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
         calcCodes.push(`function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1296,7 +1297,7 @@ function _notify_${lv_id}() {
   _notify_${parentLevelId}();
 }`);
         initCodes.push(`_calc_${levelId}();`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
 
       return [

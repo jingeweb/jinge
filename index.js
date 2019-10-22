@@ -58,8 +58,12 @@ export {
 } from './viewmodel/proxy';
 export {
   vmWatch,
-  vmUnwatch
-} from './viewmodel/notify';
+  vmUnwatch,
+  VM_ON,
+  VM_OFF,
+  VM_NOTIFY,
+  VM_ATTRS
+} from './viewmodel/core';
 export {
   Messenger,
   NOTIFY,

@@ -3,9 +3,7 @@ import {
   isComponent
 } from './component';
 import {
-  assertFail,
-  createEmptyObject,
-  assignObject
+  assertFail
 } from '../util';
 import {
   config,
@@ -16,7 +14,7 @@ import {
 } from '../viewmodel/proxy';
 import {
   VM_DEBUG_NAME
-} from '../viewmodel/common';
+} from '../viewmodel/core';
 
 export function bootstrap(Component, dom, attrs) {
   if (dom === document.body) {
@@ -26,9 +24,7 @@ export function bootstrap(Component, dom, attrs) {
    * as we must pass ViewModel-Object as first argument to Component constructor,
    * we simple pass an empty attrs.
    */
-  const bootAttrs = createEmptyObject();
-  attrs && assignObject(bootAttrs, attrs);
-
+  const bootAttrs = attrs || {};
   if (config[CFG_VM_DEBUG]) {
     bootAttrs[VM_DEBUG_NAME] = 'attrs_of_<root>';
   }

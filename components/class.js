@@ -2,10 +2,10 @@ import {
   Component,
   RENDER,
   UPDATE,
-  STATE_RENDERED,
-  STATE,
   GET_TRANSITION_DOM,
-  operateRootHtmlDOM
+  operateRootHtmlDOM,
+  UPDATE_IF_NEED,
+  BEFORE_DESTROY
 } from '../core/component';
 import {
   addClass,
@@ -15,14 +15,11 @@ import {
 } from '../dom';
 import {
   isObject,
-  setImmediate,
-  clearImmediate,
-  raf
+  setImmediate
 } from '../util';
 import {
-  vmWatch,
-  vmUnwatch
-} from '../viewmodel/notify';
+  vmWatch
+} from '../viewmodel/core';
 import {
   NOTIFY
 } from '../core/messenger';
@@ -60,23 +57,18 @@ export class ToggleClassComponent extends Component {
     this._t = null;
     this._i = null; // update immediate
     vmWatch(this, 'class.**', () => {
-      if (this[STATE] !== STATE_RENDERED) return;
-      if (this._i) clearImmediate(this._i);
-      this._i = setImmediate(() => {
-        this._i = null;
-        this[UPDATE]();
-      });
+      this[UPDATE_IF_NEED]();
     });
-  }
-
-  beforeDestroy() {
-    vmUnwatch(this, 'class.**');
   }
 
   [RENDER]() {
     const rr = super[RENDER]();
     this[UPDATE](true);
     return rr;
+  }
+
+  [BEFORE_DESTROY]() {
+    this._t && this._t.clear();
   }
 
   [UPDATE](init) {
@@ -155,7 +147,7 @@ export class ToggleClassComponent extends Component {
       t[1] = onEnd;
       addEvent(el, tsEndName, onEnd);
       this[NOTIFY](TS_TRANSITION, v ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, k, el);
-      raf(() => {
+      setImmediate(() => {
         this[NOTIFY](TS_TRANSITION, v ? TS_ENTER : TS_LEAVE, k, el);
       });
     });

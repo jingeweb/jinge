@@ -1,9 +1,7 @@
-import * as common from './common';
-import * as notify from './notify';
+import * as core from './core';
 import * as proxy from './proxy';
 
 export {
-  common,
-  notify,
+  core,
   proxy
 };

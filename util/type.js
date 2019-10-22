@@ -19,7 +19,14 @@ export function isUndefined(v) {
 }
 
 export function isArray(v) {
+  // const ov = isObject(v) && v.constructor === Array;
+  // const nv = Array.isArray(v);
+  // if (ov !== nv) debugger
   return Array.isArray(v);
+  // return isObject(v) && (
+  //   v.constructor === Array ||
+  //   Object.prototype.toString.call(v) === '[object Array]'
+  // );
 }
 
 export function isBoolean(v) {

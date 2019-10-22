@@ -1,5 +1,7 @@
 import {
-  Symbol
+  Symbol,
+  getOrCreateArrayValueOfMap,
+  getOrCreateMapProperty
 } from '../util';
 
 export const LISTENERS = Symbol('listeners');
@@ -12,11 +14,7 @@ export function notifyHelper(listenersMap, notifyKey, ...notifyArgs) {
 }
 
 export function onHelper(listenersMap, notifyKey, listener) {
-  let listeners = listenersMap.get(notifyKey);
-  if (!listeners) {
-    listeners = [];
-    listenersMap.set(notifyKey, listeners);
-  }
+  const listeners = getOrCreateArrayValueOfMap(listenersMap, notifyKey);
   if (listeners.indexOf(listener) < 0) {
     listeners.push(listener);
   }
@@ -83,17 +81,14 @@ export class Messenger {
   }
 
   [ON](eventName, eventListener, opts) {
-    const me = this;
-    if (!me[LISTENERS]) {
-      me[LISTENERS] = new Map();
-    }
+    const listeners = getOrCreateMapProperty(this, LISTENERS);
     if (opts) {
       eventListener.tag = opts;
     }
     if (opts && opts.once) {
-      onceHelper(me[LISTENERS], eventName, eventListener);
+      onceHelper(listeners, eventName, eventListener);
     } else {
-      onHelper(me[LISTENERS], eventName, eventListener);
+      onHelper(listeners, eventName, eventListener);
     }
   }
 
@@ -119,10 +114,7 @@ export function passListeners(srcMessenger, dstMessenger) {
   const srcLis = srcMessenger[LISTENERS];
   if (!srcLis) return;
   srcLis.forEach((lis, key) => {
-    let dstLis = dstMessenger[LISTENERS];
-    if (!dstLis) {
-      dstLis = dstMessenger[LISTENERS] = new Map();
-    }
+    const dstLis = getOrCreateMapProperty(dstMessenger, LISTENERS);
     lis.forEach(listener => {
       const tag = listener.tag;
       if (tag && tag.once) {

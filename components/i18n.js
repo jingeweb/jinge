@@ -2,7 +2,7 @@
 import {
   vmWatch,
   vmUnwatch
-} from '../viewmodel/notify';
+} from '../viewmodel/core';
 import {
   Component,
   RENDER,
