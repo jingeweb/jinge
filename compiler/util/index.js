@@ -52,6 +52,10 @@ function isBoolean(v) {
   return typeof v === 'boolean' || v instanceof Boolean;
 }
 
+function isSimpleProp(p) {
+  return isString(p) && /^[\w\d$_]+$/.test(p);
+}
+
 function isSimpleType(v) {
   return isUndefined(v) || isNull(v) || isString(v) || isNumber(v) || isBoolean(v) || isRegExp(v);
 }
@@ -99,6 +103,7 @@ module.exports = {
   isString,
   isObject,
   isFunction,
+  isSimpleProp,
   isUndefined,
   isNull,
   isNumber,

@@ -7,7 +7,9 @@ import {
   arrayRemove,
   getOwnPropertyNames,
   arrayPushIfNotExist,
-  getOrCreateArrayProperty
+  getOrCreateArrayProperty,
+  isArray,
+  arrayEqual
 } from '../util';
 import {
   config,
@@ -22,6 +24,7 @@ export const VM_OFF = Symbol('fn_remove_listener');
 export const VM_NOTIFY = Symbol('fn_notify_listener');
 export const VM_NOTIFIABLE = Symbol('notifiable');
 export const VM_HOST = Symbol('host');
+export const VM_RELATED_LISTENERS = Symbol('vm_related_listeners');
 
 const PARENTS = Symbol('parents');
 const LISTENERS_STAR = Symbol('*');
@@ -62,8 +65,11 @@ function getPropN(v) {
   if (v === LISTENERS_DBSTAR || v === LISTENERS_STAR || isString(v)) {
     return v;
   }
-  if (v === null || isUndefined(v)) {
-    return v;
+  if (v === null) {
+    return 'null';
+  }
+  if (isUndefined(v)) {
+    return 'undefined';
   }
   return v.toString();
 }
@@ -103,11 +109,9 @@ function loopGetNode(vm, props, level = 0) {
   }
 }
 
-function loopDelNode(node) {
-  if (!node[LISTENERS_HANDLERS] ||
-    !node[LISTENERS] ||
-    node[LISTENERS_HANDLERS].length > 0 ||
-    node[LISTENERS].size > 0
+function delNode(node) {
+  if ((node[LISTENERS_HANDLERS] && node[LISTENERS_HANDLERS].length > 0) ||
+    (node[LISTENERS] && node[LISTENERS].size > 0)
   ) {
     return;
   }
@@ -118,21 +122,28 @@ function loopDelNode(node) {
   const id = node[LISTENERS_ID];
   node[LISTENERS_PARENT] = null; // unlink parent.
   parent[LISTENERS].delete(id);
-  loopDelNode(parent);
+  return parent;
 }
 
-function loopClearNode(node) {
+function loopClearNode(node, isRoot = true) {
   const listeners = node[LISTENERS];
   if (listeners) {
-    listeners.forEach(sn => loopClearNode(sn));
+    // loop clear all child nodes
+    listeners.forEach(sn => loopClearNode(sn, false));
     listeners.clear();
+    node[LISTENERS] = null;
   }
+  if (isRoot) {
+    return;
+  }
+  // destroy all handlers
   const handlers = node[LISTENERS_HANDLERS];
   if (handlers) {
     handlers.length = 0;
-  }
-  node[LISTENERS] =
     node[LISTENERS_HANDLERS] = null;
+  }
+  // unlink parent
+  node[LISTENERS_PARENT] = null;
 }
 
 const _handleTasks = new Map();
@@ -232,7 +243,7 @@ export class ViewModelAttrs {
     }
   }
 
-  [VM_ON](prop, handler) {
+  [VM_ON](prop, handler, relatedComponent) {
     const node = loopCreateNode(this, getProps(prop));
     if (!node) {
       return;
@@ -241,9 +252,19 @@ export class ViewModelAttrs {
       getOrCreateArrayProperty(node, LISTENERS_HANDLERS),
       handler
     );
+    const host = this[VM_HOST];
+    if (!relatedComponent || !(VM_RELATED_LISTENERS in relatedComponent)) {
+      return;
+    }
+    // unwrap component out of wrapper proxy
+    relatedComponent = relatedComponent[VM_ATTRS][VM_HOST];
+    if (host === relatedComponent) {
+      return;
+    }
+    vmRelatedOn(relatedComponent, host, prop, handler);
   }
 
-  [VM_OFF](prop, handler) {
+  [VM_OFF](prop, handler, relatedComponent) {
     const node = loopGetNode(this, getProps(prop));
     if (!node) {
       return;
@@ -252,7 +273,18 @@ export class ViewModelAttrs {
     if (!handler) hs.length = 0; // remove all
     else arrayRemove(hs, handler);
 
-    loopDelNode(node);
+    delNode(node);
+
+    const host = this[VM_HOST];
+    if (!relatedComponent || !(VM_RELATED_LISTENERS in relatedComponent)) {
+      return;
+    }
+    // unwrap component out of wrapper proxy
+    relatedComponent = relatedComponent[VM_ATTRS][VM_HOST];
+    if (host === relatedComponent) {
+      return;
+    }
+    vmRelatedOff(relatedComponent, host, prop, handler);
   }
 
   [VM_NOTIFY](prop) {
@@ -295,10 +327,24 @@ export class ViewModelAttrs {
     // unlink host object wrapper proxy
     this[VM_PROXY] = null;
 
-    if (!unlinkHostProperties) {
-      this[VM_HOST] = null;
-      return;
+    const host = this[VM_HOST];
+
+    // destroy related listeners
+    if (VM_RELATED_LISTENERS in host) {
+      const lmap = host[VM_RELATED_LISTENERS];
+      if (lmap) {
+        lmap.forEach((arr, component) => {
+          arr.forEach(hook => {
+            component[VM_ATTRS][VM_OFF](hook[0], hook[1]);
+          });
+          arr.length = 0;
+        });
+        lmap.clear();
+        host[VM_RELATED_LISTENERS] = null;
+      }
     }
+    // unlink vm host
+    this[VM_HOST] = null;
     /*
      * by default, we will reset VM_HOST object's all public properties to null
      *   to remove VM_HOST object from old property value's VM_PARENTS
@@ -310,21 +356,46 @@ export class ViewModelAttrs {
      *   通过 getOwnPropertyNames 来遍历。因此这种情况，需要主动传递 unlinkHostProperties = false
      *   来禁用默认的重置属性逻辑，然后自己处理相关的重置逻辑。比如 Component 组件。
      */
-    const obj = this[VM_HOST];
-    this[VM_HOST] = null;
-    getOwnPropertyNames(obj, prop => {
+    unlinkHostProperties && getOwnPropertyNames(host, prop => {
       if (prop.charCodeAt(0) === 95) {
         return;
       }
-      const v = obj[prop];
+      const v = host[prop];
       if (!isObject(v)) {
         return;
       }
-      if (VM_ATTRS in v) {
-        v[VM_ATTRS][REMOVE_PARENT](obj, prop);
-      }
-      obj[prop] = null;
+      const a = v[VM_ATTRS];
+      a && a[REMOVE_PARENT](host, prop);
+      host[prop] = null;
     });
+  }
+}
+
+function vmRelatedOn(relatedComponent, hostViewModel, prop, handler) {
+  const rvl = getOrCreateMapProperty(relatedComponent, VM_RELATED_LISTENERS);
+  let hook = rvl.get(hostViewModel);
+  if (!hook) {
+    hook = [];
+    rvl.set(hostViewModel, hook);
+  }
+  hook.push([prop, handler]);
+}
+
+function vmRelatedOff(relatedComponent, hostViewModel, prop, handler) {
+  const rvl = relatedComponent[VM_RELATED_LISTENERS];
+  if (!rvl) return;
+  const hook = rvl.get(hostViewModel);
+  if (!hook) return;
+  const isPropArray = isArray(prop);
+  const i = hook.findIndex(it => {
+    return handler === it[1] &&
+      (isPropArray
+        ? arrayEqual(prop, it[0])
+        : prop === it[0]
+      );
+  });
+  if (i >= 0) {
+    hook.splice(i, 1);
   }
 }
 
@@ -332,9 +403,6 @@ export function vmWatch(vm, prop, handler) {
   const vmAttrs = vm[VM_ATTRS];
   if (!vmAttrs) {
     throw new Error('vmWatch require ViewModel object');
-  }
-  if (!vmAttrs[VM_NOTIFIABLE]) {
-    throw new Error('can\'t watch ViewModel has been destroied.');
   }
   let dbStarIdx = -1;
   const props = getProps(prop).map((p, i) => {

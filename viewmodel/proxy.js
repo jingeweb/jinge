@@ -78,13 +78,14 @@ function __propSetHandler(target, prop, value, setFn) {
   if (oldVal === value && !isUndefined(value)) {
     return true;
   }
-  const newValIsVM = isViewModel(value);
-  if (isObject(value) && !isInnerObj(value) && !newValIsVM) {
-    throw new Error('public property of ViewModel must also be ViewModel');
+  const newValIsVM = isObject(value) && !isInnerObj(value);
+  if (newValIsVM && !(VM_ATTRS in value)) {
+    throw new Error(`public property "${prop}" of ViewModel must also be ViewModel`);
   }
   // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
-  if (isViewModel(oldVal)) {
-    oldVal[VM_ATTRS][REMOVE_PARENT](target, prop);
+  if (isObject(oldVal)) {
+    const a = oldVal[VM_ATTRS];
+    a && a[REMOVE_PARENT](target, prop);
   }
   setFn(target, prop, value);
   if (newValIsVM) {
@@ -126,7 +127,7 @@ function objectPropSetHandler(target, prop, value) {
 
 function componentPropSetHandler(target, prop, value) {
   if (!target[VM_ATTRS]) {
-    console.warn(`call setter "${prop}" after destroied, resources such as setInterval maybe not released before destroy. component:`, target);
+    console.warn(`call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`, target);
     return true;
   }
   return __propSetHandler(target, prop, value, __componentPropSetFn);
@@ -461,6 +462,9 @@ export function wrapComponent(component) {
   }
   // handleVMDebug(component);
   const vmAttrs = new ViewModelAttrs(component);
+  // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
+  // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
+  vmAttrs[VM_NOTIFIABLE] = false;
   component[VM_ATTRS] = vmAttrs;
   const p = new Proxy(component, ComponentProxyHandler);
   vmAttrs[VM_PROXY] = p;

@@ -1,12 +1,10 @@
 import {
   VM_ATTRS,
-  VM_OFF,
-  VM_ON,
-  VM_NOTIFY,
   DESTROY as VM_DESTROY,
   VM_NOTIFIABLE,
   REMOVE_PARENT,
-  VM_HOST
+  VM_HOST,
+  VM_RELATED_LISTENERS
 } from '../viewmodel/core';
 import {
   Messenger,
@@ -30,8 +28,6 @@ import {
   isObject,
   isArray,
   createEmptyObject,
-  arrayFindIndex,
-  arrayEqual,
   STR_EMPTY,
   setImmediate,
   clearImmediate,
@@ -75,9 +71,6 @@ export const REF_NODES = Symbol('ref_nodes');
 export const SET_REF_NODE = Symbol('setChild');
 export const REF_BELONGS = Symbol('ref_belongs');
 export const RELATED_DOM_REFS = Symbol('related_dom_refs');
-export const RELATED_VM_LISTENERS = Symbol('related_vm_listeners');
-export const RELATED_VM_ON = Symbol('related_vm_on');
-export const RELATED_VM_OFF = Symbol('related_vm_off');
 export const GET_STATE_NAME = Symbol('get_state_name');
 export const AFTER_RENDER = Symbol('afterRender');
 export const HANDLE_AFTER_RENDER = Symbol('handleAfterRender');
@@ -198,9 +191,9 @@ export class Component extends Messenger {
      *
      * When destroy this component, we should also remove messenger listeners
      *   belong to outer parent to prevent memory leak.
-     * To implement this goal, we maitain RELATED_VM_LISTENERS.
+     * To implement this goal, we maitain VM_RELATED_LISTENERS.
      * When render view-tree, any messenger listeners belong to outer
-     * parent, will be also linked under RELATED_VM_LISTENERS, then
+     * parent, will be also linked under VM_RELATED_LISTENERS, then
      * when we destroy this component, the listeners can also be clear.
      *
      * For examle:
@@ -221,7 +214,7 @@ export class Component extends Messenger {
      * to the outer parent RootApp which watch `name` variable should
      * also be removed.
      */
-    this[RELATED_VM_LISTENERS] = null;
+    this[VM_RELATED_LISTENERS] = null;
     /**
      * Store all dom listener deregisters.
      */
@@ -302,54 +295,6 @@ export class Component extends Messenger {
     if (rns.length === 0) assertFail();
     const el = rns[rns.length - 1];
     return isComponent(el) ? el[GET_LAST_DOM]() : el;
-  }
-
-  [VM_ON](prop, handler, componentCtx) {
-    this[VM_ATTRS][VM_ON](prop, handler);
-    if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
-    componentCtx[RELATED_VM_ON](this, prop, handler);
-  }
-
-  [RELATED_VM_ON](vm, prop, handler) {
-    const rvl = getOrCreateMapProperty(this, RELATED_VM_LISTENERS);
-    let hook = rvl.get(vm);
-    if (!hook) {
-      hook = [];
-      rvl.set(vm, hook);
-    }
-    hook.push([prop, handler]);
-  }
-
-  [RELATED_VM_OFF](vm, prop, handler) {
-    const rvl = this[RELATED_VM_LISTENERS];
-    if (!rvl) return;
-    const hook = rvl.get(vm);
-    if (!hook) return;
-    const isPropArray = isArray(prop);
-    const i = arrayFindIndex(hook, it => {
-      if (handler === it[1] && (isPropArray ? arrayEqual(prop, it[0]) : prop === it[0])) {
-        return true;
-      } else {
-        return false;
-      }
-    });
-    if (i >= 0) hook.splice(i, 1);
-  }
-
-  [VM_OFF](prop, handler, componentCtx) {
-    this[VM_ATTRS][VM_OFF](prop, handler);
-    if (!componentCtx || !isComponent(componentCtx) || componentCtx === this) return;
-    componentCtx[RELATED_VM_OFF](this, prop, handler);
-  }
-
-  [VM_NOTIFY](prop) {
-    if (this[STATE] !== STATE_RENDERED) {
-      /**
-       * 如果状态还未渲染，或即将被销毁，都不需要传递消息。
-       */
-      return;
-    }
-    return this[VM_ATTRS][VM_NOTIFY](prop);
   }
 
   [CLONE]() {
@@ -460,8 +405,8 @@ export class Component extends Messenger {
       this[UPDATE_NEXT_MAP] = null;
     }
 
-    // destroy related listener and ref:
-    destroyRelatedVM(this);
+    // destroy related refs:
+    destroyRelatedRefs(this);
     // clear context.
     destroyContext(this);
     // clear all dom event listener
@@ -470,8 +415,7 @@ export class Component extends Messenger {
     // clear properties
     this[STATE] = STATE_DESTROIED;
     // unlink all symbol properties. maybe unnecessary.
-    this[RELATED_VM_LISTENERS] =
-      this[VM_SETTER_FN_MAP] =
+    this[VM_SETTER_FN_MAP] =
       this[PASSED_ATTRS] =
       this[NON_ROOT_COMPONENT_NODES] =
       this[ROOT_NODES] =
@@ -510,6 +454,7 @@ export class Component extends Messenger {
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
     this[PASSED_ATTRS][VM_ATTRS][VM_NOTIFIABLE] = true;
+    this[VM_ATTRS][VM_NOTIFIABLE] = true;
 
     this[ROOT_NODES].forEach(n => {
       if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
@@ -668,16 +613,7 @@ function destroyDOMListeners(component) {
   component[DOM_LISTENER_DEREGISTERS] = null;
 }
 
-export function destroyRelatedVM(comp) {
-  function _destroy(prop, cb) {
-    const m = comp[prop];
-    if (!m) return;
-    m.forEach((arr, ctx) => {
-      arr.forEach(k => cb(ctx, k));
-      arr.length = 0;
-    });
-    m.clear();
-  }
+export function destroyRelatedRefs(comp) {
   function _unref(refBelongs, el) {
     if (!refBelongs) return;
     refBelongs.forEach(info => {
@@ -691,10 +627,6 @@ export function destroyRelatedVM(comp) {
       }
     });
   }
-  _destroy(RELATED_VM_LISTENERS, (ctx, hook) => {
-    ctx[VM_OFF](hook[0], hook[1]);
-  });
-
   _unref(comp[REF_BELONGS], comp);
   _unref(comp[RELATED_DOM_REFS]);
 }

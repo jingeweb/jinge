@@ -71,9 +71,6 @@ export function uid() {
   return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
 }
 
-export const raf = window.requestAnimationFrame;
-export const caf = window.cancelAnimationFrame;
-
 export function mapObject(obj, fn) {
   const newObj = {};
   for (const k in obj) {
