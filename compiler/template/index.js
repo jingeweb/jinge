@@ -13,8 +13,7 @@ const IMPORTS = (function() {
   const map = {
     'jinge/dom': 'createTextNode,createComment,createElement,createElementWithoutAttrs,createSVGElement,createSVGElementWithoutAttrs,createFragment,' +
       'appendText,appendChild,setText,setAttribute,removeAttribute,setInputValue,addEvent',
-    'jinge/viewmodel/notify': 'VM_ON,VM_NOTIFY,VM_OFF',
-    'jinge/viewmodel/common': 'VM_DESTROIED,VM_DEBUG_NAME',
+    'jinge/viewmodel/core': 'VM_ATTRS,VM_ON,VM_OFF,VM_NOTIFY,VM_DEBUG_NAME',
     'jinge/core/messenger': 'ON,LISTENERS',
     'jinge/core/style': 'CSTYLE_PID,addParentStyleId',
     'jinge/core/component': 'assertRenderResults,emptyRenderFn,errorRenderFn,textRenderFn,SET_REF_NODE,CONTEXT,NON_ROOT_COMPONENT_NODES,ROOT_NODES,ARG_COMPONENTS,RENDER',

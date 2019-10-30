@@ -1,16 +1,17 @@
 import {
   Component
-} from '../core/component.js';
+} from '../core/component';
 import {
-  VM_ON
-} from '../viewmodel/notify.js';
+  VM_ON,
+  VM_ATTRS
+} from '../viewmodel/core';
 
 export class ParameterComponent extends Component {
   constructor(attrs, params) {
     super(attrs);
     params.forEach(p => {
       this[p] = attrs[p];
-      attrs[VM_ON](p, () => {
+      attrs[VM_ATTRS][VM_ON](p, () => {
         this[p] = attrs[p];
       });
     });

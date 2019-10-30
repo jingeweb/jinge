@@ -6,7 +6,7 @@ import {
 } from './class';
 import {
   vmWatch
-} from '../viewmodel/notify';
+} from '../viewmodel/core';
 
 export const STR_JG_HIDE = 'jg-hide';
 

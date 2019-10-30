@@ -19,6 +19,7 @@ const PARAMETER = `...(() => {
   const attrs = wrapAttrs_$ID$({
     $VM_DEBUG_NAME$
     $VM_PASS_INIT$
+    [VM_ATTRS_$ID$]: null,
     [CONTEXT_$ID$]: component[CONTEXT_$ID$],
     [ARG_COMPONENTS_$ID$]: {
       [STR_DEFAULT_$ID$]: renderFn || emptyRenderFn_$ID$

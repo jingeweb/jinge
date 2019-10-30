@@ -10,7 +10,8 @@ import {
   GET_FIRST_DOM,
   CONTEXT,
   isComponent,
-  GET_TRANSITION_DOM
+  GET_TRANSITION_DOM,
+  BEFORE_DESTROY
 } from '../core/component';
 import {
   NOTIFY
@@ -31,13 +32,11 @@ import {
 import {
   STR_DEFAULT,
   STR_EMPTY,
-  raf,
-  createEmptyObject,
   Symbol
 } from '../util';
 import {
-  VM_DEBUG_NAME
-} from '../viewmodel/common';
+  VM_DEBUG_NAME, VM_ATTRS
+} from '../viewmodel/core';
 
 import {
   TS_STATE_ENTERED,
@@ -78,6 +77,7 @@ const ON_TS_END = Symbol('on_ts_end');
 function createEl(renderFn, context, parentStyleIds) {
   const el = new Component(wrapAttrs({
     [VM_DEBUG_NAME]: 'attrs_of_<if>',
+    [VM_ATTRS]: null,
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: renderFn
@@ -91,12 +91,12 @@ function renderSwitch(component) {
   const value = component[C_VAL];
   const acs = component[ARG_COMPONENTS];
   if (component.ts && acs) {
-    const t = createEmptyObject();
+    const t = new Map();
     for (const k in acs) {
-      t[k] = [
+      t.set(k, [
         k === value ? TS_STATE_ENTERED : TS_STATE_LEAVED,
         null // element
-      ];
+      ]);
     }
     component[T_MAP] = t;
     component[P_VAL] = value;
@@ -167,7 +167,7 @@ function startTs(t, tn, e, component) {
   const el = t[1];
   const onEnd = component[OE_H];
   if (el.nodeType !== Node.ELEMENT_NODE) {
-    raf(onEnd);
+    onEnd();
     return;
   }
   const classOfStart = tn + (e ? TS_C_ENTER : TS_C_LEAVE);
@@ -179,13 +179,13 @@ function startTs(t, tn, e, component) {
   addClass(el, classOfActive);
   const tsEndName = getDurationType(el);
   if (!tsEndName) {
-    raf(onEnd);
+    onEnd();
     return;
   }
   t[0] = e ? TS_STATE_ENTERING : TS_STATE_LEAVING;
   addEvent(el, tsEndName, onEnd);
   component[NOTIFY](TS_TRANSITION, e ? TS_BEFORE_ENTER : TS_BEFORE_LEAVE, el);
-  raf(() => {
+  setImmediate(() => {
     component[NOTIFY](TS_TRANSITION, e ? TS_ENTER : TS_LEAVE, el);
   });
 }
@@ -193,13 +193,13 @@ function updateSwitchWithTransition(component) {
   const value = component[C_VAL];
   const pv = component[P_VAL];
   const tn = component.ts;
-  let pt = component[T_MAP][pv];
+  let pt = component[T_MAP].get(pv);
   if (!pt) {
     pt = [
       pv === IF_STR_ELSE ? TS_STATE_LEAVED : TS_STATE_ENTERED,
-      null, null
+      null // element
     ];
-    component[T_MAP][pv] = pt;
+    component[T_MAP].set(pv, pt);
   }
   // debugger;
   if (pt[0] === TS_STATE_ENTERING) {
@@ -224,7 +224,7 @@ function updateSwitchOnTransitionEnd(component) {
   const value = component[C_VAL];
   const pv = component[P_VAL];
   const tn = component.ts;
-  const pt = component[T_MAP][pv];
+  const pt = component[T_MAP].get(pv);
   const e = pt[0] === TS_STATE_ENTERING;
   const el = pt[1];
 
@@ -242,7 +242,7 @@ function updateSwitchOnTransitionEnd(component) {
 
   doUpdate(component);
   component[P_VAL] = value;
-  const ct = component[T_MAP][value];
+  const ct = component[T_MAP].get(value);
   if (!ct) {
     return;
   }
@@ -256,9 +256,29 @@ function updateSwitchOnTransitionEnd(component) {
   startTs(ct, tn, true, component);
 }
 
+function destroySwitch(component) {
+  const tMap = component[T_MAP];
+  if (tMap) {
+    tMap.forEach((ts, v) => {
+      if (ts[1]) {
+        removeEvent(ts[1], TS_TRANSITION_END, component[OE_H]);
+        removeEvent(ts[1], TS_ANIMATION_END, component[OE_H]);
+      }
+      ts.length = 0;
+    });
+    tMap.clear();
+  }
+}
+
 export class IfComponent extends Component {
   constructor(attrs) {
     super(attrs);
+
+    this[C_VAL] = STR_DEFAULT;
+    this[OE_H] = null;
+    this[T_MAP] = null;
+    this[P_VAL] = null;
+
     this.expect = attrs.expect;
     this.ts = attrs.transition;
   }
@@ -289,11 +309,20 @@ export class IfComponent extends Component {
   [UPDATE]() {
     updateSwitch(this);
   }
+
+  [BEFORE_DESTROY]() {
+    destroySwitch(this);
+  }
 }
 
 export class SwitchComponent extends Component {
   constructor(attrs) {
     super(attrs);
+
+    this[OE_H] = null;
+    this[T_MAP] = null;
+    this[P_VAL] = null;
+
     this.test = attrs.test;
     this.ts = attrs.transition;
   }
@@ -326,5 +355,9 @@ export class SwitchComponent extends Component {
 
   [UPDATE]() {
     updateSwitch(this);
+  }
+
+  [BEFORE_DESTROY]() {
+    destroySwitch(this);
   }
 }

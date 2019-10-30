@@ -22,7 +22,8 @@ const {
 const {
   replaceTplStr,
   prependTab,
-  attrN
+  attrN,
+  isSimpleProp
 } = require('../util');
 
 const TPL = require('./tpl');
@@ -802,7 +803,7 @@ ${result.argAttrs.map((at, i) => {
     });
   }).join('\n')}
 ${result.listeners.map(lt => {
-    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
+    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   }).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -1050,9 +1051,10 @@ ${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAUL
     }
     const vmAttrs = `const attrs = wrapAttrs_${this._id}({
 ${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
+${this._prependTab(`[VM_ATTRS_${this._id}]: null,`)}
 ${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
 ${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
-${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {if(component[VM_DESTROIED_${this._id}])return;${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
 },`) : ''}
 ${this._prependTab(attrs.join(',\n'), true)}
 });
@@ -1097,7 +1099,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 
   _parse_expr_memeber_node(memExpr, startLine) {
     const paths = [];
-    let computed = -1;
+    let computed = -1; // -1: no computed, 0: only have Literal computed, 1: member expression computed
     let root = null;
     const walk = node => {
       const objectExpr = node.object;
@@ -1163,23 +1165,140 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
     const addPath = p => {
       if (!watchPaths.find(ep => ep.vm === p.vm && ep.n === p.n)) watchPaths.push(p);
     };
-    const convert = (root, props, computed = -1) => {
+    const replaceExpr = (nodeExpr, root, props) => {
+      if (props.length <= 1) return;
+
+      /*
+       * convert member expression to optional chain expression:
+       *   a.b.c["d"]e ===>  a?.b?.c?["d"]?.e
+       * TODO: use browser optional chain when supported.
+       *   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Optional_chaining
+       */
+      const _decl = {
+        type: 'VariableDeclaration',
+        declarations: new Array(props.length - 1).fill(0).map((n, i) => ({
+          type: 'VariableDeclarator',
+          id: { type: 'Identifier', name: `_${i}` },
+          init: null
+        })),
+        kind: 'let'
+      };
+      let tmp;
+      props.forEach((p, i) => {
+        if (i === 0) {
+          tmp = {
+            type: 'Identifier',
+            name: root.name
+          };
+          return;
+        }
+        const isSp = p.type === 'const' && isSimpleProp(p.value);
+        tmp = {
+          type: 'ConditionalExpression',
+          alternate: {
+            type: 'MemberExpression',
+            computed: !isSp,
+            object: {
+              type: 'Identifier',
+              name: `_${i - 1}`
+            },
+            property: isSp || p.type === 'id' ? {
+              type: 'Identifier',
+              name: p.value
+            } : {
+              type: 'Literal',
+              value: p.value
+            }
+          },
+          consequent: {
+            type: 'UnaryExpression',
+            operator: 'void',
+            argument: {
+              type: 'Literal',
+              value: 0,
+              raw: '0'
+            },
+            prefix: true
+          },
+          test: {
+            type: 'LogicalExpression',
+            operator: '||',
+            left: {
+              type: 'BinaryExpression',
+              operator: '===',
+              left: {
+                type: 'AssignmentExpression',
+                operator: '=',
+                left: {
+                  type: 'Identifier',
+                  name: `_${i - 1}`
+                },
+                right: tmp
+              },
+              right: {
+                type: 'Literal',
+                value: null,
+                raw: 'null'
+              }
+            },
+            right: {
+              type: 'BinaryExpression',
+              operator: '===',
+              left: {
+                type: 'Identifier',
+                name: `_${i - 1}`
+              },
+              right: {
+                type: 'UnaryExpression',
+                operator: 'void',
+                argument: {
+                  type: 'Literal',
+                  value: 0,
+                  raw: '0'
+                },
+                prefix: true
+              }
+            }
+          }
+        };
+      });
+      const _rtn = {
+        type: 'ReturnStatement',
+        argument: tmp
+      };
+      nodeExpr.type = 'CallExpression';
+      nodeExpr.callee = {
+        type: 'FunctionExpression',
+        id: null,
+        params: [],
+        body: {
+          type: 'BlockStatement',
+          body: [_decl, _rtn]
+        },
+        generator: false,
+        expression: false,
+        async: false
+      };
+      nodeExpr.arguments = [];
+    };
+    const convert = (nodeExpr, root, props) => {
       const varName = root.name;
       const vmVar = this._vms.find(v => v.name === varName);
       const level = vmVar ? vmVar.level : 0;
       root.name = `vm_${level}.${vmVar ? vmVar.reflect : varName}`;
+
+      replaceExpr(nodeExpr, root, props);
+
       if (varName.startsWith('_')) {
         // do not need watch private property.
         return;
       }
       if (vmVar) {
-        props[0] = vmVar.reflect;
+        props[0].value = vmVar.reflect;
       }
       addPath({
         vm: `vm_${level}`,
-        n: JSON.stringify(
-          computed >= 0 ? props : props.join('.')
-        )
+        n: JSON.stringify(props.map(p => p.value))
       });
     };
 
@@ -1191,13 +1310,16 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
         }, 'Function call is not allowed in expression');
       },
       Identifier: node => {
-        convert(node, [node.name]);
+        convert(node, node, [{
+          type: 'const',
+          value: node.name
+        }]);
         return false;
       },
       MemberExpression: node => {
         const mn = this._parse_expr_memeber_node(node, info.startLine);
         if (mn.computed < 1) {
-          convert(mn.root, mn.paths.map(mp => mp.value), mn.computed);
+          convert(mn.memExpr, mn.root, mn.paths);
         } else {
           computedMemberExprs.push(mn);
         }
@@ -1210,7 +1332,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
-        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
+        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
         return [`let _${levelId};`, `function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1218,7 +1340,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
   _calc_${levelId}();
   _notify_${parentLevelId}();
   _update_${parentLevelId}();
-}`, `${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
+}`, `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
       }
     } else {
       const assignCodes = [];
@@ -1232,7 +1354,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
         const __p = [];
         let __si = 0;
         assignCodes.push(`let _${lv_id};\nlet _${lv_id}_p;`);
-        cm.paths.forEach((cmp) => {
+        cm.paths.forEach((cmp, pidx) => {
           if (cmp.type === 'const') {
             __p.push(JSON.stringify(cmp.value));
             return;
@@ -1248,7 +1370,11 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
             type: 'Identifier',
             name: `_${llv.join('_')}`
           };
-          __p.push('_' + llv.join('_'));
+          __p.push(cmp.value.property.name);
+          cm.paths[pidx] = {
+            type: 'id',
+            value: cmp.value.property.name
+          };
         });
         const vmVar = this._vms.find(v => v.name === cm.root.name);
         const level = vmVar ? vmVar.level : 0;
@@ -1256,6 +1382,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
         if (vmVar) {
           __p[0] = `'${vmVar.reflect}'`;
         }
+        replaceExpr(cm.memExpr, cm.root, cm.paths);
         calcCodes.push(`function _calc_${lv_id}() {
   _${lv_id} = ${escodegen.generate(cm.memExpr)};
 }`);
@@ -1267,11 +1394,11 @@ function _notify_${lv_id}() {
   const _np = [${__p.join(', ')}];
   const _eq = _${lv_id}_p && arrayEqual_${this._id}(_${lv_id}_p, _np);
   if (_${lv_id}_p && !_eq) {
-    vm_${level}[VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ATTRS_${this._id}][VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-    vm_${level}[VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ATTRS_${this._id}][VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
 }`);
         initCodes.push(`_calc_${lv_id}();`);
@@ -1286,7 +1413,7 @@ function _notify_${lv_id}() {
 }`);
         initCodes.push(`_calc_${levelId}();`);
         updateCodes.unshift(`function _update_${levelId}() { _calc_${levelId}(); }`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
         calcCodes.push(`function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1296,7 +1423,7 @@ function _notify_${lv_id}() {
   _notify_${parentLevelId}();
 }`);
         initCodes.push(`_calc_${levelId}();`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
 
       return [

@@ -10,7 +10,9 @@ import {
   GET_FIRST_DOM,
   CONTEXT,
   HANDLE_AFTER_RENDER,
-  GET_LAST_DOM
+  GET_LAST_DOM,
+  STATE,
+  STATE_RENDERED
 } from '../core/component';
 import {
   isArray,
@@ -33,15 +35,14 @@ import {
   insertAfter
 } from '../dom';
 import {
-  VM_PARENTS,
-  VM_DEBUG_NAME
-} from '../viewmodel/common';
-import {
   wrapAttrs
 } from '../viewmodel/proxy';
 import {
-  vmWatch
-} from '../viewmodel/notify';
+  VM_DEBUG_NAME,
+  vmWatch,
+  VM_ATTRS,
+  isInnerObj
+} from '../viewmodel/core';
 import {
   CSTYLE_PID,
   addParentStyleId
@@ -76,6 +77,7 @@ export class ForEachComponent extends Component {
 function createEl(item, i, isLast, itemRenderFn, context, cstyPid) {
   const el = new ForEachComponent(wrapAttrs({
     [VM_DEBUG_NAME]: 'attrs_of_<for-each>',
+    [VM_ATTRS]: null,
     [CONTEXT]: context,
     [ARG_COMPONENTS]: {
       [STR_DEFAULT]: itemRenderFn
@@ -92,7 +94,7 @@ function appendRenderEach(item, i, isLast, itemRenderFn, roots, context, cstyPid
 }
 
 function _assertVm(item, i) {
-  if (item !== null && isObject(item) && !(VM_PARENTS in item)) {
+  if (isObject(item) && !isInnerObj(item) && !(VM_ATTRS in item)) {
     throw new Error(`loop item [${i}] of <for> component must be ViewModel.`);
   }
 }
@@ -148,6 +150,9 @@ function _parseIndexPath(p) {
   return (isString(p) && p !== STR_LENGTH && /^\d+$/.test(p)) ? Number(p) : p;
 }
 
+let INC = 0;
+const ID = Symbol('id');
+
 export class ForComponent extends Component {
   constructor(attrs) {
     if (attrs.key && !/^(index|each(.[\w\d$_]+)*)$/.test(attrs.key)) {
@@ -155,6 +160,7 @@ export class ForComponent extends Component {
     }
     super(attrs);
     this.loop = attrs.loop;
+    this[ID] = INC++;
     const kn = attrs.key || KEY_INDEX;
     this[FOR_KEY_NAME] = kn;
     this[FOR_LENGTH] = 0;
@@ -186,7 +192,7 @@ export class ForComponent extends Component {
       });
     }
     vmWatch(this, 'loop.*', propPath => {
-      if (propPath.length !== 2 || this[FOR_WAIT_UPDATE]) {
+      if (this[STATE] !== STATE_RENDERED || propPath.length !== 2 || this[FOR_WAIT_UPDATE]) {
         // if propPath.length === 1 means loop variable changed, loop setter will handle it.
         // ignore if is alreay waiting for update
         // console.log('skip', propPath);
@@ -197,7 +203,6 @@ export class ForComponent extends Component {
       if (p === STR_LENGTH) {
         this[FOR_WAIT_UPDATE] = true;
         this[UPDATE_IF_NEED]();
-        // this[FOR_UPDATE_TM] = setImmediate(this[FOR_UPDATE_HD]);
       } else if (isNumber(p)) {
         this[FOR_UPDATE_ITEM](p);
       }

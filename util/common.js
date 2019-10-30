@@ -71,13 +71,39 @@ export function uid() {
   return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
 }
 
-export const raf = window.requestAnimationFrame;
-export const caf = window.cancelAnimationFrame;
-
 export function mapObject(obj, fn) {
   const newObj = {};
   for (const k in obj) {
     newObj[k] = fn(obj[k], k);
   }
   return newObj;
+}
+
+export function getOrCreateProperty(obj, property, fn) {
+  let v = obj[property];
+  if (!v) {
+    v = obj[property] = fn();
+  }
+  return v;
+}
+
+export function getOrCreateValueOfMap(map, key, fn) {
+  let v = map.get(key);
+  if (!v) {
+    v = fn();
+    map.set(key, v);
+  }
+  return v;
+}
+
+export function getOrCreateMapProperty(obj, property) {
+  return getOrCreateProperty(obj, property, () => new Map());
+}
+
+export function getOrCreateArrayValueOfMap(map, key) {
+  return getOrCreateValueOfMap(map, key, () => []);
+}
+
+export function getOrCreateArrayProperty(obj, property) {
+  return getOrCreateProperty(obj, property, () => []);
 }

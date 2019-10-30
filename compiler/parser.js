@@ -61,26 +61,26 @@ function _n_vm(idx, stmt, an, props) {
           body: {
             type: 'BlockStatement',
             body: [
-              {
-                type: 'IfStatement',
-                test: {
-                  type: 'MemberExpression',
-                  computed: true,
-                  object: {
-                    type: 'Identifier',
-                    name: `vm_${RND_ID}`
-                  },
-                  property: {
-                    type: 'Identifier',
-                    name: `VM_DESTROIED_${RND_ID}`
-                  }
-                },
-                consequent: {
-                  type: 'ReturnStatement',
-                  argument: null
-                },
-                alternate: null
-              },
+              // {
+              //   type: 'IfStatement',
+              //   test: {
+              //     type: 'MemberExpression',
+              //     computed: true,
+              //     object: {
+              //       type: 'Identifier',
+              //       name: `vm_${RND_ID}`
+              //     },
+              //     property: {
+              //       type: 'Identifier',
+              //       name: `VM_DESTROIED_${RND_ID}`
+              //     }
+              //   },
+              //   consequent: {
+              //     type: 'ReturnStatement',
+              //     argument: null
+              //   },
+              //   alternate: null
+              // },
               stmt
             ]
           },
@@ -111,8 +111,16 @@ function _n_vm(idx, stmt, an, props) {
           type: 'MemberExpression',
           computed: true,
           object: {
-            type: 'Identifier',
-            name: an
+            type: 'MemberExpression',
+            computed: true,
+            object: {
+              type: 'Identifier',
+              name: an
+            },
+            property: {
+              type: 'Identifier',
+              name: `VM_ATTRS_${RND_ID}`
+            }
           },
           property: {
             type: 'Identifier',
@@ -370,11 +378,9 @@ class ComponentParser {
     if (!this._constructorImports) {
       this._constructorImports = `
 import {
-  VM_DESTROIED as VM_DESTROIED_${RND_ID}
-} from '${this.jingeBase}/viewmodel/common';
-import {
+  VM_ATTRS as VM_ATTRS_${RND_ID},
   VM_ON as VM_ON_${RND_ID}
-} from '${this.jingeBase}/viewmodel/notify';
+} from '${this.jingeBase}/viewmodel/core';
 import {
   wrapComponent as wrapComponent_${RND_ID}
 } from '${this.jingeBase}/viewmodel/proxy';
