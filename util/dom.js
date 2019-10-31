@@ -3,7 +3,7 @@ import {
   isArray,
   isUndefined,
   isObject
-} from '../util';
+} from './type';
 
 export function getParent($ele) {
   return $ele.parentNode;
@@ -57,6 +57,7 @@ function _createEl($el, attrs, children) {
   children.forEach(child => appendChild($el, child));
   return $el;
 }
+
 export function createElement(tag, attrs, ...children) {
   return _createEl(
     document.createElement(tag),
@@ -85,7 +86,7 @@ export function createFragment(children) {
   return $f;
 }
 
-export function createTextNode(text) {
+export function createTextNode(text = '') {
   return document.createTextNode(text);
 }
 
@@ -169,7 +170,11 @@ export function replaceClass($ele, oldClass, newClass) {
   return $ele.classList.replace(oldClass, newClass);
 }
 
-export function addEvent($element, eventName, handler, capture = false) {
+export function addEvent($element, eventName, handler, capture) {
+  isUndefined(capture) && (capture = eventName.startsWith('touch') ? {
+    capture: false,
+    passive: true
+  } : false);
   $element.addEventListener(eventName, handler, capture);
 }
 

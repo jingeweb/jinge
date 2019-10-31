@@ -1,12 +1,6 @@
 # jinge
 
-## 示例
-
-|  demo |  link  |
-| ---  | ----|
-| basic demos | https://github.com/YuhangGe/jinge-demos |
-| todo-mvc    | https://github.com/YuhangGe/jinge-demos/tree/dev/08-todo-mvc|
-
+> 一款基于 `Messenger`, `Proxy` 和 `Compiler` 的前端 mvvm 框架
 
 ## 引言
 
@@ -14,7 +8,7 @@
 
 * `Messenger` 代表消息驱动（等价于 EventEmmiter）。
 * `Proxy` 是实现数据绑定的原理（依赖 es6 的 Proxy）。
-* `Compiler` 负责编译模板，以及处理组件对象（现阶段会处理构造函数）。
+* `Compiler` 负责编译模板，以及处理组件对象（现阶段会处理构造函数和模板文件）。
 
 通过以上三个核心概念，`jinge` 框架实现了数据绑定的能力。简单来讲，`jinge` 框架的数据绑定原理是，`当存在赋值行为时，对该赋值行为影响的变量（属性）通过消息广播到 View 层；View 层收到变量（属性）有赋值行为的消息后更新该变量影响到的视图节点`。
 
@@ -33,11 +27,39 @@
 
 jinge 框架诞生于长期的使用其它框架进行的业务项目的研发过程，因此在设计之初，其目标就包括但不限于：
 
-* 简洁的视图（view）模板。目前将一切都抽象成了 html 里面的`元素（Element)`和`属性（Attribute)`概念，额外加上 es6 的 template string 语法，即构成了 jinge 的 view 层，没有 directive, filter 等更多概念，包括 if/for 等控制逻辑，也统一属于`组件元素（Component Element)`。
+* 简洁的视图（view）模板。目前将一切都抽象成了 html 里面的`元素（Element)`和`属性（Attribute)`概念，额外加上 es6 的 template string 语法，即构成了 jinge 的 view 层，没有 directive, filter 等更多概念，包括 if/for 等控制逻辑，也统一用`元素（Component Element)`来实现，而不是特别的控制指令。
 * 更小的构建包文件大小。目前实现的版本，最简单的 hello world 示例，production 模式下的构建包小于 10k（gzip 后小于 3k），同主流的框架比，小接近一个数量级。
 * 组件模板的根节点支持多个节点。目前的主流框架都基本已经实现了这一目标（比如 react >= 16 版本）。
 * 渲染后，组件本身不引入到 DOM 里。这个目标是为了，css 样式的编写，只与纯 html tag 有关，能够更好地进行跨框架迁移，或服务端渲染的切换。这个目标主要是对比于 angular 而言。
-* 更简单的组件生命周期概念。目前只有两个生命周期，渲染结束和即将销毁。同时，渲染结束（DOM元素可用）的生命周期函数，应该保证其子组件的 DOM 元素也全部可用。比如，循环组件的渲染结束生命周期，会保证所有循环节点的 DOM 元素已经可用。其它框架的其它生命周期，在 jinge 里都是不需要的或被其它概念替换的。
+* 更简单的组件生命周期概念。目前只有三个生命周期，初始化（即构造函数），渲染结束和即将销毁。同时，渲染结束（DOM元素可用）的生命周期函数，应该保证其子组件的 DOM 元素也全部可用。比如，循环组件的渲染结束生命周期，会保证所有循环节点的 DOM 元素已经可用。
+
+## 示例和文档
+
+#### 示例
+
+目前已经完成的示例主要包括两个：
+
+* 一个展示 jinge 框架各方面能力的基本示例的集合，即 jinge-demos 仓库。其中包括一个检验 mvvm 框架基础能力的 TodoMVC 示例。
+* 一个完整的 material design ui 组件库（jinge-material），包括丰富的组件和完善的使用文档。这个组件库本身同时也是 jinge 框架的极佳编码示例。
+
+|   |    |
+| ---  | ----|
+| jinge-demos | https://github.com/YuhangGe/jinge-demos |
+| jinge-todo-mvc    | https://github.com/YuhangGe/jinge-demos/tree/dev/08-todo-mvc |
+| jinge-material | https://material.jinge.design |
+
+#### 文档
+
+目前 jinge 框架还没有正式开始编写文档，只是在 jinge-demos 仓库里，不同的示例下的 README 会有零散的概念介绍和使用说明。
+
+|   |    |
+| ---  | ----|
+| 组件和组件别名（Component） | https://github.com/YuhangGe/jinge-demos/blob/dev/09-component-alias/README_zh-cn.md |
+| 属性（Attribute） |  https://github.com/YuhangGe/jinge-demos/blob/dev/11-slot/README_zh-cn.md  |
+| 数据监听（ViewModel） | https://github.com/YuhangGe/jinge-demos/blob/dev/15-vm-watch/README_zh-cn.md    |
+| 国际化多语言（i18n）|  https://github.com/YuhangGe/jinge-demos/blob/dev/16-i18n/README_zh-cn.md |
+| 组件作用域样式（Component Style） | https://github.com/YuhangGe/jinge-demos/blob/dev/17-component-scope-style/README_zh-cn.md |
+| 路由（Router）| https://github.com/YuhangGe/jinge-demos/blob/dev/06-ui-router/README_zh-cn.md |
 
 ## 已知问题
 

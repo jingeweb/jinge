@@ -1,11 +1,9 @@
 const path = require('path');
+const fs = require('fs').promises;
 const crypto = require('crypto');
 
-/**
- * simple uuid
- */
-function uuid() {
-  return Date.now().toString(32) + Math.floor(Math.random() * 0xffff).toString(32);
+function getUniquePostfix() {
+  return '_' + crypto.randomBytes(6).toString('hex');
 }
 
 function isString(v) {
@@ -77,28 +75,58 @@ function prependTab(str, replaceStartEndEmpty = false, spaceCount = 2) {
   return str;
 }
 
-function calcTranslateId(info, file, opts) {
-  // if key startsWith '^', it means global id;
-  if (info.key && info.key.startsWith('^')) {
-    return info.key.slice(1);
-  }
-  let baseDir = opts.idBaseDir;
-  if (isFunction(baseDir)) baseDir = baseDir(file);
-  file = path.relative(baseDir, file);
-  if (!info.key) {
-    const hash = crypto.createHash('md5');
-    hash.update(info.text);
-    info.key = hash.digest('hex').substring(0, 8);
-  }
-  return file + '/' + info.key;
-}
-
 function convertAttributeName(an) {
   return (an.startsWith('[') && an.endsWith(']')) || /^[\w\d$_]+$/.test(an) ? an : JSON.stringify(an);
 }
 
+async function mkdirp(dirname) {
+  try {
+    await fs.access(dirname);
+    return;
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      throw err;
+    }
+  }
+  await mkdirp(path.dirname(dirname));
+  await fs.mkdir(dirname);
+}
+
+function deepClone(obj) {
+  if (isArray(obj)) {
+    return obj.map(v => deepClone(v));
+  } else if (obj instanceof Map) {
+    const nm = new Map();
+    obj.forEach((v, k) => {
+      nm.set(k, deepClone(v));
+    });
+    return nm;
+  } else if (isObject(obj)) {
+    const no = {};
+    for (const k in obj) {
+      no[k] = deepClone(obj[k]);
+    }
+    return no;
+  } else {
+    return obj;
+  }
+}
+
+const jingeRoot = path.resolve(__dirname, '../');
+
+function getJingeBase(resourcePath) {
+  return resourcePath.startsWith(jingeRoot) ? path.relative(
+    path.dirname(resourcePath),
+    jingeRoot
+  ) : 'jinge';
+}
+
 module.exports = {
-  uuid,
+  getUniquePostfix,
+  jingeRoot,
+  getJingeBase,
+  mkdirp,
+  deepClone,
   isSimpleType,
   isString,
   isObject,
@@ -113,6 +141,5 @@ module.exports = {
   isBoolean,
   replaceTplStr,
   prependTab,
-  attrN: convertAttributeName,
-  calcTranslateId
+  attrN: convertAttributeName
 };

@@ -2,27 +2,37 @@ const {
   TemplateParser
 } = require('./template');
 const {
-  ComponentParser
-} = require('./parser');
+  ComponentParser,
+  componentBaseManager
+} = require('./component');
 const {
   CSSParser
 } = require('./style');
-const store = require('./_store');
-const path = require('path');
-const jingeRoot = require('path').resolve(__dirname, '../');
+const {
+  checkCompressOption
+} = require('./plugin');
 
-const I18N_OPTION_NAMES = [
-  'translateDir', 'defaultLocale', 'buildLocale'
-];
+const store = require('./store');
+const {
+  aliasManager
+} = require('./template/alias');
+
+let componentBaseAndAliasInited = false;
 
 function jingeLoader(source, sourceMap) {
   const callback = this.async();
-  this.cacheable && this.cacheable();
-
   const resourcePath = this.resourcePath;
   const opts = this.query || {};
-  const needCompress = ('compress' in opts) ? !!opts.compress : this._compiler.options.mode === 'production';
-  // console.log(resourcePath);
+
+  if (!store.options) {
+    store.options = {
+      compress: checkCompressOption(this._compiler.options),
+      i18n: null,
+      style: {
+        extract: false
+      }
+    };
+  }
 
   let parseOpts;
   let Parser;
@@ -30,61 +40,26 @@ function jingeLoader(source, sourceMap) {
   if (/\.(css|less|scss)$/.test(resourcePath)) {
     Parser = CSSParser;
     parseOpts = {
-      resourcePath,
-      componentStyleStore: store,
-      compress: needCompress,
-      keepStyleComments: opts.keepStyleComments,
-      extractStyle: opts.extractStyle
+      resourcePath
     };
   } else {
     if (!/\.(js|html)$/.test(resourcePath)) {
       return callback(new Error('jingeLoader only support .js,.html,.css,.less,.scss file'));
     }
-    const iopt = opts.i18n || {
-      mode: 'dictionary-reflect'
-    };
-    if (iopt.mode === 'compiler-translate') {
-      I18N_OPTION_NAMES.forEach(n => {
-        if (!iopt[n]) throw new Error(`jinge loader require non-empty option "i18n.${n}" when "i18n.mode" is "compiler-translate"`);
-      });
-      if (!iopt.idBaseDir) {
-        iopt.idBaseDir = process.cwd();
-      }
-    } else if (iopt.mode !== 'dictionary-reflect') {
-      return callback(new Error('jingeLoader option "i18n.mode" must be "dictionary-reflect" or "compiler-translate". see https://todo'));
-    }
-    if (iopt.buildLocale !== iopt.defaultLocale) {
-      store.i18n.loadTranslateCSV(iopt);
-    }
-    if (!('checkConflict' in iopt)) {
-      iopt.checkConflict = this._compiler.options.mode === 'production';
+
+    if (!componentBaseAndAliasInited) {
+      componentBaseManager.initialize(opts.componentBase);
+      aliasManager.initialize(opts.componentAlias);
+      componentBaseAndAliasInited = true;
     }
 
-    let componentAlias = opts.componentAlias;
-    if (Array.isArray(componentAlias)) {
-      componentAlias = Object.assign({}, ...componentAlias);
-    }
-    let componentBase = opts.componentBase;
-    if (Array.isArray(componentBase)) {
-      componentBase = Object.assign({}, ...componentBase);
-    }
     parseOpts = {
       resourcePath,
-      componentStyleStore: store,
-      jingeBase: resourcePath.startsWith(jingeRoot) ? path.relative(path.dirname(resourcePath), jingeRoot) : 'jinge',
-      webpackLoaderContext: this,
-      tabSize: opts.tabSize,
-      componentAlias,
-      componentBase,
-      i18n: iopt,
-      extractStyle: opts.extractStyle,
-      compress: needCompress
+      webpackLoaderContext: this
     };
     Parser = /\.htm(l?)$/.test(resourcePath) ? TemplateParser : ComponentParser;
   }
   Parser.parse(source, sourceMap, parseOpts).then(result => {
-    // console.log(result.code);
-    // if (resourcePath.endsWith('content.js')) console.log(result.code);
     callback(null, result.code, result.map || null, result.ast ? {
       webpackAST: result.ast
     } : null);

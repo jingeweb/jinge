@@ -1,20 +1,13 @@
 import {
-  RENDER_TO_DOM,
-  isComponent
-} from './component';
-import {
   assertFail
 } from '../util';
 import {
-  config,
-  CFG_VM_DEBUG
-} from '../config';
-import {
   wrapAttrs
-} from '../viewmodel/proxy';
+} from '../vm';
 import {
-  VM_DEBUG_NAME
-} from '../viewmodel/core';
+  RENDER_TO_DOM,
+  isComponent
+} from './component';
 
 export function bootstrap(Component, dom, attrs) {
   if (dom === document.body) {
@@ -25,9 +18,6 @@ export function bootstrap(Component, dom, attrs) {
    * we simple pass an empty attrs.
    */
   const bootAttrs = attrs || {};
-  if (config[CFG_VM_DEBUG]) {
-    bootAttrs[VM_DEBUG_NAME] = 'attrs_of_<root>';
-  }
   const bootComponent = new Component(wrapAttrs(bootAttrs));
   if (!isComponent(bootComponent)) assertFail();
   bootComponent[RENDER_TO_DOM](dom);

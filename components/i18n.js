@@ -1,146 +1,70 @@
 
 import {
-  vmWatch,
-  vmUnwatch
-} from '../viewmodel/core';
-import {
   Component,
   RENDER,
-  ROOT_NODES,
   UPDATE,
   BEFORE_DESTROY,
-  UPDATE_IF_NEED
-} from '../core/component';
+  UPDATE_IF_NEED,
+  HANDLE_BEFORE_DESTROY,
+  GET_LAST_DOM,
+  i18n as i18nService,
+  I18N_GET_COMPONENT_RENDER,
+  I18N_WATCH
+} from '../core';
 import {
-  createTextNode,
-  setText,
-  createElementWithoutAttrs,
   getParent,
-  removeChild,
+  insertBefore,
   appendChild
-} from '../dom';
+} from '../util';
 import {
-  i18n,
-  messenger as i18nMessenger,
-  I18N_DATA_CHANGED,
-  _t as i18nRender
-} from '../core/i18n';
-import {
-  ON,
-  OFF
-} from '../core/messenger';
+  vmRelatedClear,
+  VM_RELATED_LISTENERS
+} from '../vm';
 
-function render() {
-  if (this._h) {
-    const $c = createElementWithoutAttrs('div');
-    $c.innerHTML = this._r();
-    this[ROOT_NODES].push(...$c.childNodes);
-  } else {
-    const el = createTextNode(this._r());
-    this[ROOT_NODES].push(el);
-  }
-  return this[ROOT_NODES];
-}
+const RENDER_KEY = Symbol('render_key');
+const RENDER_VMS = Symbol('render_vms');
+const ON_LOCALE_CHANGE = Symbol('fn_on_locale_change');
 
-function update() {
-  const roots = this[ROOT_NODES];
-  if (this._h) {
-    const p = getParent(roots[0]);
-    if (roots.length > 0) {
-      roots.forEach(n => removeChild(p, n));
-      roots.length = 0;
-    }
-    appendChild(p, this[RENDER]());
-  } else {
-    setText(roots[0], this._r());
-  }
-}
-
-const I18nComponentsCache = new Map();
 export class I18nComponent extends Component {
-  static prefix(prefix, cache = true) {
-    let C = I18nComponentsCache.get(prefix);
-    if (C) return C;
-    /* eslint no-new-func:"off" */
-    C = new Function('BaseI18n', `
-    return class I18n_${prefix.replace(/\./g, '_')} extends BaseI18n {
-      constructor(attrs) {
-        const vm = super(attrs);
-        this._f = '${prefix}';
-        return vm;
-      }
-    }`)(I18nComponent);
-    if (cache) {
-      I18nComponentsCache.set(prefix, C);
-    }
-    return C;
-  }
-
-  constructor(attrs) {
-    if (!attrs.key) throw new Error('I18n component require attribute "key". see https://todo');
+  constructor(attrs, renderKey, renderVms) {
     super(attrs);
-    this.k = attrs.key;
-    this.p = attrs.params;
-    this._h = !!attrs.html; // render html mode
-    this._f = ''; // prefix
-    this._o = this[UPDATE_IF_NEED].bind(this);
-    vmWatch(this, 'p.**', this._o);
-    i18nMessenger[ON](I18N_DATA_CHANGED, this._o);
+    this[RENDER_KEY] = renderKey;
+    this[RENDER_VMS] = renderVms;
+    this[I18N_WATCH](this[ON_LOCALE_CHANGE]);
   }
 
-  [BEFORE_DESTROY]() {
-    vmUnwatch(this, 'p.**', this._o);
-    i18nMessenger[OFF](I18N_DATA_CHANGED, this._o);
+  [RENDER]() {
+    const renderFn = i18nService[I18N_GET_COMPONENT_RENDER](this[RENDER_KEY]);
+    return renderFn(this, ...this[RENDER_VMS]);
   }
 
-  get k() {
-    return this._k;
-  }
-
-  set k(v) {
-    if (this._k === v) return;
-    this._k = v;
+  [ON_LOCALE_CHANGE]() {
     this[UPDATE_IF_NEED]();
   }
 
-  /**
-   * render text
-   */
-  _r() {
-    return i18n((this._f ? `${this._f}.` : '') + this._k, this.p);
-  }
-
-  [RENDER]() {
-    return render.call(this);
-  }
-
   [UPDATE]() {
-    update.call(this);
-  }
-}
+    vmRelatedClear(this[VM_RELATED_LISTENERS]);
 
-export class _TComponent extends Component {
-  constructor(attrs) {
-    super(attrs);
-    this.p = attrs.params;
-    this._t = attrs.text;
-    this._h = !!attrs.html; // render html mode
-    vmWatch(this, 'p.**', () => this[UPDATE_IF_NEED]());
-  }
+    let $el = this[GET_LAST_DOM]();
+    const $parentEl = getParent($el);
+    $el = $el.nextSibling;
 
-  beforeDestroy() {
-    vmUnwatch(this, 'p.**');
-  }
-
-  _r() {
-    return i18nRender(this._t, this.p);
-  }
-
-  [RENDER]() {
-    return render.call(this);
+    /*
+     * 当前实现下，HANDLE_BEFORE_DESTROY 正好可以销毁子组件/子元素。
+     */
+    this[HANDLE_BEFORE_DESTROY](true);
+    /*
+     * 将新的元素替换到原来的旧的元素的位置。
+     */
+    const els = this[RENDER]();
+    if ($el) {
+      insertBefore($parentEl, els, $el);
+    } else {
+      appendChild($parentEl, els);
+    }
   }
 
-  [UPDATE]() {
-    update.call(this);
+  [BEFORE_DESTROY]() {
+    this[RENDER_VMS] = null; // unlink vms, maybe not necessary
   }
 }

@@ -2,6 +2,8 @@ import {
   isObject,
   isString,
   isUndefined,
+  setImmediate,
+  clearImmediate,
   Symbol,
   getOrCreateMapProperty,
   arrayRemove,
@@ -11,10 +13,6 @@ import {
   isArray,
   arrayEqual
 } from '../util';
-import {
-  config,
-  CFG_VM_DEBUG
-} from '../config';
 
 export const VM_ATTRS = Symbol('vm_injected_attrs');
 export const VM_DEBUG_NAME = Symbol('name');
@@ -33,12 +31,11 @@ const LISTENERS = Symbol('listeners');
 const LISTENERS_ID = Symbol('listenrs_id');
 const LISTENERS_PARENT = Symbol('vm_listeners_parent');
 const LISTENERS_HANDLERS = Symbol('vm_listeners_handlers');
-const LISTENERS_IMMS = Symbol('vm_listeners_imms');
 
-export const ADD_PARENT = Symbol('fn_add_parent');
-export const REMOVE_PARENT = Symbol('fn_remove_parent');
-export const SHIFT_PARENT = Symbol('fn_shift_parent');
-export const DESTROY = Symbol('fn_destroy');
+export const VM_ADD_PARENT = Symbol('fn_add_parent');
+export const VM_REMOVE_PARENT = Symbol('fn_remove_parent');
+export const VM_SHIFT_PARENT = Symbol('fn_shift_parent');
+export const VM_DESTROY = Symbol('fn_destroy');
 
 export function isInnerObj(v) {
   const clazz = v.constructor;
@@ -139,6 +136,8 @@ function loopClearNode(node, isRoot = true) {
   // destroy all handlers
   const handlers = node[LISTENERS_HANDLERS];
   if (handlers) {
+    // clear handler waiting to execute
+    handlers.forEach(_handleCancel);
     handlers.length = 0;
     node[LISTENERS_HANDLERS] = null;
   }
@@ -147,35 +146,47 @@ function loopClearNode(node, isRoot = true) {
 }
 
 const _handleTasks = new Map();
-function _handleOnce(node, handler, propPath, imms) {
-  const _has = _handleTasks.has(handler);
-  _handleTasks.set(handler, propPath);
-  if (_has) {
+function _handleCancel(handler) {
+  const t = _handleTasks.get(handler);
+  if (t) {
+    clearImmediate(t.i);
+    _handleTasks.delete(handler);
+  }
+}
+function _handleOnce(handler, propPath) {
+  if (_handleTasks.has(handler)) {
     return;
   }
   const imm = setImmediate(() => {
-    arrayRemove(imms, imm);
+    const arg = _handleTasks.get(handler);
     try {
-      handler(_handleTasks.get(handler));
+      handler(arg.p);
     } finally {
       _handleTasks.delete(handler);
     }
   });
-  imms.push(imm);
+  _handleTasks.set(handler, {
+    i: imm,
+    p: propPath
+  });
 }
 
-function loopHandle(propPath, node, imms) {
+function loopHandle(propPath, node, immediate) {
   const handlers = node[LISTENERS_HANDLERS];
   handlers && handlers.forEach(handler => {
-    imms ? _handleOnce(node, handler, propPath, imms) : handler(propPath);
+    if (immediate) {
+      handler(propPath);
+    } else {
+      _handleOnce(handler, propPath);
+    }
   });
   const listeners = node[LISTENERS];
   listeners && listeners.forEach(c => {
-    loopHandle(propPath, c, imms);
+    loopHandle(propPath, c, immediate);
   });
 }
 
-function loopNotify(vm, props, imms, level = 0) {
+function loopNotify(vm, props, immediate, level = 0) {
   const listeners = vm[LISTENERS];
   if (!listeners) {
     return;
@@ -187,22 +198,23 @@ function loopNotify(vm, props, imms, level = 0) {
   let node = listeners.get(propertyName);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(props, node, config[CFG_VM_DEBUG] ? null : imms);
+      // loopHandle(props, node, config[CFG_VM_DEBUG] ? null : imms);
+      loopHandle(props, node, immediate);
     } else {
-      loopNotify(node, props, imms, level + 1);
+      loopNotify(node, props, immediate, level + 1);
     }
   }
   node = listeners.get(LISTENERS_STAR);
   if (node) {
     if (props.length - 1 === level) {
-      loopHandle(props, node, null);
+      loopHandle(props, node, true);
     } else {
-      loopNotify(node, props, imms, level + 1);
+      loopNotify(node, props, immediate, level + 1);
     }
   }
   node = listeners.get(LISTENERS_DBSTAR);
   if (node) {
-    loopHandle(props, node, null);
+    loopHandle(props, node, true);
   }
 }
 
@@ -219,22 +231,21 @@ export class ViewModelAttrs {
     this[VM_PROXY] = null;
     this[PARENTS] = null;
     this[LISTENERS] = null;
-    this[LISTENERS_IMMS] = null;
   }
 
-  [ADD_PARENT](parent, prop) {
+  [VM_ADD_PARENT](parent, prop) {
     const pArr = getOrCreateArrayProperty(this, PARENTS);
     pArr.push([parent, prop]);
   }
 
-  [REMOVE_PARENT](parent, prop) {
+  [VM_REMOVE_PARENT](parent, prop) {
     const pArr = this[PARENTS];
     if (!pArr) return;
     const idx = pArr.findIndex(ps => ps[0] === parent && ps[1] === prop);
     if (idx >= 0) pArr.splice(idx, 1);
   }
 
-  [SHIFT_PARENT](parent, prop, delta) {
+  [VM_SHIFT_PARENT](parent, prop, delta) {
     const pArr = this[PARENTS];
     if (!pArr) return;
     const ps = pArr.find(ps => ps[0] === parent && ps[1] === prop);
@@ -269,9 +280,15 @@ export class ViewModelAttrs {
     if (!node) {
       return;
     }
+
     const hs = node[LISTENERS_HANDLERS];
-    if (!handler) hs.length = 0; // remove all
-    else arrayRemove(hs, handler);
+    if (!handler) { // remove all if second parameter is not provided
+      hs.forEach(_handleCancel);
+      hs.length = 0;
+    } else {
+      _handleCancel(handler);
+      arrayRemove(hs, handler);
+    }
 
     delNode(node);
 
@@ -287,14 +304,13 @@ export class ViewModelAttrs {
     vmRelatedOff(relatedComponent, host, prop, handler);
   }
 
-  [VM_NOTIFY](prop) {
+  [VM_NOTIFY](prop, immediate = false) {
     if (!this[VM_NOTIFIABLE]) {
       return;
     }
     const props = getProps(prop);
     if (this[LISTENERS]) {
-      const imms = getOrCreateArrayProperty(this, LISTENERS_IMMS);
-      loopNotify(this, props, imms);
+      loopNotify(this, props, immediate);
     }
     const pArr = this[PARENTS];
     pArr && pArr.forEach(ps => {
@@ -304,24 +320,19 @@ export class ViewModelAttrs {
         return;
       }
       vmAttrs[VM_NOTIFY](
-        [ps[1]].concat(props)
+        [ps[1]].concat(props),
+        immediate
       );
     });
   }
 
-  [DESTROY](unlinkHostProperties = true) {
+  [VM_DESTROY](unlinkHostProperties = true) {
     // mark as non-notifiable
     this[VM_NOTIFIABLE] = false;
     // clear assignment parents
     const pArr = this[PARENTS];
     pArr && (pArr.length = 0);
     this[PARENTS] = null;
-    // clear all listener handlers waiting to call.
-    const imms = this[LISTENERS_IMMS];
-    imms && imms.forEach(imm => {
-      clearImmediate(imm);
-    });
-    this[LISTENERS_IMMS] = null;
     // clear listeners
     loopClearNode(this);
     // unlink host object wrapper proxy
@@ -331,17 +342,8 @@ export class ViewModelAttrs {
 
     // destroy related listeners
     if (VM_RELATED_LISTENERS in host) {
-      const lmap = host[VM_RELATED_LISTENERS];
-      if (lmap) {
-        lmap.forEach((arr, component) => {
-          arr.forEach(hook => {
-            component[VM_ATTRS][VM_OFF](hook[0], hook[1]);
-          });
-          arr.length = 0;
-        });
-        lmap.clear();
-        host[VM_RELATED_LISTENERS] = null;
-      }
+      vmRelatedClear(host[VM_RELATED_LISTENERS]);
+      host[VM_RELATED_LISTENERS] = null;
     }
     // unlink vm host
     this[VM_HOST] = null;
@@ -365,7 +367,7 @@ export class ViewModelAttrs {
         return;
       }
       const a = v[VM_ATTRS];
-      a && a[REMOVE_PARENT](host, prop);
+      a && a[VM_REMOVE_PARENT](host, prop);
       host[prop] = null;
     });
   }
@@ -396,6 +398,44 @@ function vmRelatedOff(relatedComponent, hostViewModel, prop, handler) {
   });
   if (i >= 0) {
     hook.splice(i, 1);
+  }
+}
+
+export function vmRelatedClear(relatedListeners) {
+  if (!relatedListeners) return;
+  relatedListeners.forEach((arr, component) => {
+    arr.forEach(hook => {
+      component[VM_ATTRS][VM_OFF](hook[0], hook[1]);
+    });
+    arr.length = 0;
+  });
+  relatedListeners.clear();
+}
+
+export class RelatedListenersStore {
+  constructor() {
+    /**
+     * VM_ON/VM_OFF 绑定属性监听接受三个参数，其中第三个参数为关联组件。
+     *   当关联组件被销毁时，可以同时销毁保存在其 VM_RELATED_LISTENERS 中的父亲 ViewModel 的
+     *   属性监听函数（参看 ../core/component.js 里 VM_RELATED_LISTENERS 的注释）。
+     *
+     * 在多语言国际化方案中，当 attrs 渲染函数代码被提取到独立的多语言资源文件后，除了关联组件被销毁时需要销毁父 ViewModel 的属性监听，
+     *   当 locale 发生变化时，这些监听函数也要销毁。为了实现这个目标，采用了一个取巧的思路，传递一个模拟的关联组件，
+     *   即 RelatedListenersStore 来存储 VM_RELATED_LISTENERS。
+     *
+     * 以下的 VM_RELATED_LISTENERS 和 VM_ATTRS 的定义就是为了实现该模拟，使得
+     *   VM_ON/VM_OFF 函数可以正常执行关联组件的逻辑。
+     */
+    this[VM_RELATED_LISTENERS] = null;
+    this[VM_ATTRS] = {
+      [VM_HOST]: this
+    };
+  }
+
+  // destroy
+  d() {
+    vmRelatedClear(this[VM_RELATED_LISTENERS]);
+    this[VM_RELATED_LISTENERS] = null;
   }
 }
 

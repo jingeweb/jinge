@@ -1,7 +1,7 @@
 import {
   getComputedStyle,
   getCSPropertyValue
-} from '../dom';
+} from '../util';
 
 export const TS_TRANSITION_END = 'transitionend';
 export const TS_ANIMATION_END = 'animationend';

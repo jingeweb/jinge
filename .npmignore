@@ -4,6 +4,10 @@ node_modules
 /.vscode
 .antlr
 **/.DS_Store
+/build
+.gitignore
+.eslintignore
+.eslintrc.json
 .jshintignore
 .jshintrc
 .jshint

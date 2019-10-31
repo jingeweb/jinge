@@ -2,13 +2,11 @@ import {
   Symbol,
   uid,
   createEmptyObject,
-  assignObject
-} from '../util';
-import {
+  assignObject,
   createElement,
   appendChild,
   getCSPropertyValue
-} from '../dom';
+} from '../util';
 
 export const CSTYLE_PID = Symbol('cstyle_pids');
 export const CSTYLE_ADD = Symbol('add');
