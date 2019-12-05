@@ -6,146 +6,29 @@ const escodegen = require('escodegen');
 const path = require('path');
 const {
   TemplateParser
-} = require('./template');
+} = require('../template');
 const {
   CSSParser
-} = require('./style');
+} = require('../style');
 const {
-  prependTab, isString, isArray, arrayIsEqual
-} = require('./util');
-const RND_ID = require('crypto').randomBytes(5).toString('hex');
+  prependTab,
+  isString,
+  isArray,
+  arrayIsEqual,
+  getJingeBase
+} = require('../util');
 
-const jingeUtilFile = path.resolve(__dirname, '../util/index.js');
-const jingeUtilCommonFile = path.resolve(__dirname, '../util/common.js');
-
-function _n_wrap(attrArgName) {
-  return {
-    type: 'VariableDeclaration',
-    declarations: [
-      {
-        type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: `vm_${RND_ID}`
-        },
-        init: {
-          type: 'CallExpression',
-          callee: {
-            type: 'Super'
-          },
-          arguments: [{
-            type: 'Identifier',
-            name: attrArgName
-          }]
-        }
-      }
-    ],
-    kind: 'const'
-  };
-}
-
-function _n_vm(idx, stmt, an, props) {
-  return [{
-    type: 'VariableDeclaration',
-    declarations: [
-      {
-        type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: `fn_${RND_ID}_${idx}`
-        },
-        init: {
-          type: 'ArrowFunctionExpression',
-          id: null,
-          params: [],
-          body: {
-            type: 'BlockStatement',
-            body: [
-              // {
-              //   type: 'IfStatement',
-              //   test: {
-              //     type: 'MemberExpression',
-              //     computed: true,
-              //     object: {
-              //       type: 'Identifier',
-              //       name: `vm_${RND_ID}`
-              //     },
-              //     property: {
-              //       type: 'Identifier',
-              //       name: `VM_DESTROIED_${RND_ID}`
-              //     }
-              //   },
-              //   consequent: {
-              //     type: 'ReturnStatement',
-              //     argument: null
-              //   },
-              //   alternate: null
-              // },
-              stmt
-            ]
-          },
-          generator: false,
-          expression: false,
-          async: false
-        }
-      }
-    ],
-    kind: 'const'
-  },
-  {
-    type: 'ExpressionStatement',
-    expression: {
-      type: 'CallExpression',
-      callee: {
-        type: 'Identifier',
-        name: `fn_${RND_ID}_${idx}`
-      },
-      arguments: []
-    }
-  }].concat(props.map(prop => {
-    return {
-      type: 'ExpressionStatement',
-      expression: {
-        type: 'CallExpression',
-        callee: {
-          type: 'MemberExpression',
-          computed: true,
-          object: {
-            type: 'MemberExpression',
-            computed: true,
-            object: {
-              type: 'Identifier',
-              name: an
-            },
-            property: {
-              type: 'Identifier',
-              name: `VM_ATTRS_${RND_ID}`
-            }
-          },
-          property: {
-            type: 'Identifier',
-            name: `VM_ON_${RND_ID}`
-          }
-        },
-        arguments: [isArray(prop) ? {
-          type: 'ArrayExpression',
-          elements: prop.map(p => ({
-            type: 'Literal',
-            value: p,
-            raw: JSON.stringify(p)
-          }))
-        } : {
-          type: 'Literal',
-          value: prop,
-          raw: JSON.stringify(prop)
-        }, {
-          type: 'Identifier',
-          name: `fn_${RND_ID}_${idx}`
-        }]
-      }
-    };
-  }));
-}
+const store = require('../store');
+const i18nManager = require('../i18n');
+const baseManager = require('./base');
+const {
+  BASE_UNIQUE_POSTFIX,
+  jingeEntryFile,
+  jingeUtilFile,
+  jingeUtilCommonFile,
+  _n_vm,
+  _n_wrap
+} = require('./helper');
 
 class ComponentParser {
   static parse(content, sourceMap, options = {}) {
@@ -153,51 +36,23 @@ class ComponentParser {
   }
 
   constructor(options) {
-    this.jingeBase = options.jingeBase;
     this.resourcePath = options.resourcePath;
+    this.jingeBase = getJingeBase(this.resourcePath);
     this.webpackLoaderContext = options.webpackLoaderContext;
-    this.componentStyleStore = options.componentStyleStore;
-    this._i18nManager = this.componentStyleStore.i18n;
-    this._i18nOptions = options.i18n;
     this._store = {
       templates: new Map(),
       styles: new Map()
     };
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
-    const defaultBase = {
-      Component: [
-        path.resolve(__dirname, '../index.js'),
-        path.resolve(__dirname, '../core/component.js')
-      ]
-    };
-    const cbase = options.componentBase || {};
-    for (const n in cbase) {
-      const v = Array.isArray(cbase[n]) ? cbase[n] : [cbase[n]];
-      if (n in defaultBase) {
-        defaultBase[n] = defaultBase[n].concat(v);
-      } else {
-        defaultBase[n] = v;
-      }
-    }
-    this.componentBase = defaultBase;
-    this.componentAlias = options.componentAlias;
-    this.componentBaseLocals = new Map();
-    this.needComporess = !!options.compress;
-    this.needExtractStyle = !!options.extractStyle;
+
     this.styleRequireScoped = !!options.styleRequireScoped;
-    this.tabSize = options.tabSize;
-    if (typeof this.tabSize !== 'number' || this.tabSize <= 0) {
-      this.tabSize = 0; // zero means will guess it.
-    }
     this._constructorRanges = [];
     this._replaces = null;
     this._needRemoveSymbolDesc = false;
     this._needHandleI18NTranslate = false;
-    this._constructorImports = null;
 
-    this._templateGlobalImports = null;
-    this._templateLocalImports = [];
-    this._templateAliasImports = [];
+    this._tplGlobalImports = new Set();
+    this._tplCodeOfImports = new Set();
   }
 
   _walkAcorn(node, visitors) {
@@ -236,8 +91,8 @@ class ComponentParser {
     if (node.specifiers.length === 0) {
       if (_isStyle) {
         source = source || (await this._resolve(node));
-        if (!this.componentStyleStore.extractStyles.has(source)) {
-          this.componentStyleStore.extractStyles.set(source, {
+        if (!store.extractStyles.has(source)) {
+          store.extractStyles.set(source, {
             code: null
           });
         }
@@ -277,7 +132,16 @@ class ComponentParser {
         return false;
       }
 
-      if (imported === '_t') {
+      /**
+       * 如果使用了 _t 这个多语言编译辅助函数，则自动将函数的参数注册到多语言字典里并将
+       * 该函数调用 `_t(text, params)` 转换成 `i18n[I18N_GET_TEXT](key, params)`
+       *
+       * 但如果多语言脚本资源已经处理过了（i18nManager.written === true），说明是在
+       * 启用了 watch 的研发模式下，文件发生变化后重新编译，这种情况下，由于多方面的复杂
+       * 问题不好解决，暂时先简化为不做多语言的处理（事实上，研发模式下也不需要频繁切换多语言，
+       * 往往是在默认语言下将模块开发完成，然后更新其它语言包，再重新运行和测试其它语言）。
+       */
+      if (!i18nManager.written && imported === '_t') {
         if (node.source.value === 'jinge' && local !== '_t') {
           /**
            * 为了简化逻辑，要求从 jinge 中引入 _t 这个 i18n 翻译用途的函数时，
@@ -285,28 +149,28 @@ class ComponentParser {
            * import {_t} from 'jinge'  // correct!
            * import {_t as someAlias} from 'jinge'  // wrong!
            */
-          throw new Error('_t is preserve i18n symbole, can\'t have local alias name. see https://todo.');
+          throw new Error('_t is preserve i18n symbol, can\'t have local alias name. see https://todo.');
         }
         if (local === '_t' && node.source.value === 'jinge') {
           // console.log('found _t', this.resourcePath);
           this._needHandleI18NTranslate = true;
         }
       }
-      if (this.needComporess && imported === 'Symbol') {
+      if (store.options.compress && imported === 'Symbol') {
         if (!source) {
           source = await this._resolve(node);
         }
-        if (source === jingeUtilFile || source === jingeUtilCommonFile) {
+        if (source === jingeUtilFile || source === jingeUtilCommonFile || source === jingeEntryFile) {
           this._needRemoveSymbolDesc = true;
         }
       }
-      if (!needHandleComponent && (imported in this.componentBase)) {
+      if (!needHandleComponent && (imported in baseManager.componentBase)) {
         if (!source) {
           // console.log(this.webpackLoaderContext.context, node.source.value);
           source = await this._resolve(node);
         }
-        if (this.componentBase[imported].indexOf(source) >= 0) {
-          this.componentBaseLocals.set(spec.local.name, true);
+        if (baseManager.componentBase[imported].indexOf(source) >= 0) {
+          baseManager.componentBaseLocals.set(spec.local.name, true);
           needHandleComponent = true;
         }
       }
@@ -316,7 +180,7 @@ class ComponentParser {
 
   walkClass(node) {
     const sc = node.superClass;
-    if (sc.type !== 'Identifier' || !this.componentBaseLocals.has(sc.name)) {
+    if (sc.type !== 'Identifier' || !baseManager.componentBaseLocals.has(sc.name)) {
       /* TODO: need to support more cases? */
       return;
     }
@@ -345,15 +209,15 @@ class ComponentParser {
         throw new Error(`A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`);
       }
       this._previousClassWithSty = node.id.name;
-      const csm = this.componentStyleStore.components;
+      const csm = store.components;
       if (!csm.has(this.resourcePath)) {
         csm.set(this.resourcePath, {
-          id: this.componentStyleStore.genId()
+          id: store.genId()
         });
       }
       const sty = this.walkStyle(styNode, csm.get(this.resourcePath));
       if (sty) {
-        const sts = this.componentStyleStore.styles;
+        const sts = store.styles;
         styInfo = sts.get(sty.file);
         if (styInfo && styInfo.component !== this.resourcePath) {
           throw new Error(`style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
@@ -374,18 +238,19 @@ class ComponentParser {
     }
   }
 
+  _addI18nImports() {
+    this._tplCodeOfImports.add(`import {
+  i18n as i18n${BASE_UNIQUE_POSTFIX},
+  I18N_GET_TEXT as I18N_GET_TEXT${BASE_UNIQUE_POSTFIX}
+} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'core')}';`);
+  }
+
   _addConstructorImports() {
-    if (!this._constructorImports) {
-      this._constructorImports = `
-import {
-  VM_ATTRS as VM_ATTRS_${RND_ID},
-  VM_ON as VM_ON_${RND_ID}
-} from '${this.jingeBase}/viewmodel/core';
-import {
-  wrapComponent as wrapComponent_${RND_ID}
-} from '${this.jingeBase}/viewmodel/proxy';
-`;
-    }
+    this._tplCodeOfImports.add(`import {
+  VM_ATTRS as VM_ATTRS${BASE_UNIQUE_POSTFIX},
+  VM_ON as VM_ON${BASE_UNIQUE_POSTFIX},
+  wrapComponent as wrapComponent${BASE_UNIQUE_POSTFIX}
+} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'vm')}';`);
   }
 
   _parse_mem_path(memExpr, attrsName) {
@@ -445,7 +310,8 @@ import {
 
   walkConstructor(node, ClassName) {
     if (this._needHandleI18NTranslate) {
-      this.walkI18NTranslate(node, 1);
+      // 处理出现在组件的构造函数里的 _t 函数。
+      this.walkI18NTranslate(node, true);
       this._constructorRanges.push({
         start: node.start,
         end: node.end
@@ -456,7 +322,7 @@ import {
     const an = fn.params.length === 0 ? null : fn.params[0].name;
     if (!an) throw new Error(`constructor of ${ClassName} must accept at least one argument.`);
     let foundSupper = false;
-    const vm = `vm_${RND_ID}`;
+    const vm = `vm${BASE_UNIQUE_POSTFIX}`;
     const replaceThis = stmt => {
       this._walkAcorn(stmt, {
         MemberExpression: mem => {
@@ -472,12 +338,7 @@ import {
       return stmt;
     };
     const newBody = [];
-    let guessTabSize = this.tabSize > 0 ? this.tabSize : 2; // default guess is 2
     fn.body.body.forEach((stmt, i) => {
-      if (i === 0 && this.tabSize <= 0) {
-        guessTabSize = stmt.loc.start.column - node.loc.start.column;
-        if (guessTabSize <= 0) guessTabSize = 2;
-      }
       if (stmt.type === 'ReturnStatement') {
         throw new Error(`constructor of '${ClassName}' can't have return statement.`);
       }
@@ -532,12 +393,12 @@ import {
       type: 'ReturnStatement',
       argument: {
         type: 'Identifier',
-        name: `vm_${RND_ID}`
+        name: `vm${BASE_UNIQUE_POSTFIX}`
       }
     });
     fn.body.body = newBody;
     let newCode = escodegen.generate(fn.body, {
-      indent: ''.padStart(guessTabSize, ' ')
+      indent: ''.padStart(2, ' ')
     });
     if (node.loc.start.column > 0) {
       const i = newCode.indexOf('\n');
@@ -580,9 +441,6 @@ import {
     }
     css = CSSParser.parseInline(css, {
       resourcePath: this.resourcePath,
-      extractStyle: this.needExtractStyle,
-      componentStyleStore: this.componentStyleStore,
-      compress: this.needComporess,
       styleId: ci.id
     });
     this._replaces.push({
@@ -602,11 +460,6 @@ import {
     if (st.type !== 'ReturnStatement') {
       throw new Error('static getter `template` must return directly.');
     }
-    let guessTabSize = this.tabSize > 0 ? this.tabSize : 2; // default guess is 2
-    if (this.tabSize <= 0) {
-      guessTabSize = st.loc.start.column - node.loc.start.column;
-      if (guessTabSize <= 0) guessTabSize = 2;
-    }
     const arg = st.argument;
     let tpl = '';
     if (arg.type === 'Identifier') {
@@ -614,7 +467,7 @@ import {
         throw new Error('static getter `template` must return variable imported on file topest level.');
       }
       const source = this._store.templates.get(arg.name);
-      const tps = this.componentStyleStore.templates;
+      const tps = store.templates;
       const tplInfo = tps.get(source);
       if (!tplInfo) {
         tps.set(source, {
@@ -641,27 +494,17 @@ import {
     }
 
     const result = TemplateParser._parse(tpl, {
-      componentStyleStore: this.componentStyleStore,
       componentStyleId: styInfo ? styInfo.styleId : null,
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
-      tabSize: guessTabSize,
-      i18n: this._i18nOptions,
-      wrapCode: false,
-      componentAlias: this.componentAlias
+      wrapCode: false
     });
-    if (!this._templateGlobalImports) {
-      this._templateGlobalImports = result.globalImports;
-    } else if (this._templateGlobalImports !== result.globalImports) {
-      throw new Error('impossible?!');
-    }
-    if (result.aliasImports.trim()) {
-      this._templateAliasImports.push(result.aliasImports);
-    }
 
-    if (result.localImports.trim()) {
-      this._templateLocalImports.push(result.localImports);
-    }
+    result.globalImports.forEach(imp => this._tplGlobalImports.add(imp));
+    result.aliasImports && this._tplCodeOfImports.add(result.aliasImports);
+    result.localImports && this._tplCodeOfImports.add(result.localImports);
+    result.i18nDeps && this._tplCodeOfImports.add(result.i18nDeps);
+
     let code = result.renderFn;
     if (st.loc.start.column > 0 && code.indexOf('\n') > 0) {
       code = 'function(component) {\n' + prependTab(code.substring(code.indexOf('\n') + 1), false, st.loc.start.column);
@@ -674,96 +517,55 @@ import {
     });
   }
 
-  walkI18NTranslate(rootNode, level) {
+  walkI18NTranslate(rootNode, inConstructor) {
     this._walkAcorn(rootNode, {
-      VariableDeclarator: node => {
-        if (node.init.type === 'Identifier' && node.init.name === '_t') {
-          throw new Error('_t is preserve i18n translate symbol. you can not assign it to another variable at line' + node.loc.start.line);
-        }
-      },
       CallExpression: node => {
         if (node.callee.type === 'Identifier' && node.callee.name === '_t') {
-          for (let i = 0; i < this._constructorRanges.length; i++) {
-            const r = this._constructorRanges[i];
-            if (node.start >= r.start && node.end <= r.end) {
-              // console.log('skip constructor');
-              return false;
-            }
+          /**
+           * inConstructor 为 false 说明不是从 this.walkConstructor 中进入到此处的逻辑，
+           * 这种情况下，不需要再处理出现在组件的构造函数里的 _t 函数，
+           * 因为之前在 this.walkConstructor 中已经处理过了。
+           */
+          if (!inConstructor && this._constructorRanges.some(r => {
+            return node.start <= r.end && node.end >= r.start;
+          })) {
+            return;
           }
           const args = node.arguments;
           if (args.length === 0 || args.length > 3) {
             throw new Error('_t require count of arguments to be 1 to 3.');
           }
-          let [text, params, key] = args;
+          const text = args[0];
           if (!text || text.type !== 'Literal' || typeof text.value !== 'string') {
             throw new Error('_t require first argument to be literal string.');
-          } else {
-            text = text.value;
           }
-          if (params && params.type === 'Literal' && typeof params.value === 'string') {
-            key = params;
-            params = null;
-          }
-          if (key) {
-            if (key.type !== 'Literal' || typeof key.value !== 'string') {
-              throw new Error('_t require parameter "key" to be literal string.');
+          this._addI18nImports();
+          node.callee = {
+            type: 'MemberExpression',
+            computed: true,
+            object: {
+              type: 'Identifier',
+              name: `i18n${BASE_UNIQUE_POSTFIX}`
+            },
+            property: {
+              type: 'Identifier',
+              name: `I18N_GET_TEXT${BASE_UNIQUE_POSTFIX}`
             }
-            key = key.value;
-            if (!/^(\^)?[a-z0-9]+(\.[a-z0-9]+)*$/i.test(key)) {
-              throw new Error('_t require parameter "key" to match /^(\\^)?[a-z0-9]+(\\.[a-z0-9]+)*$/');
-            }
-          }
-          if (params) {
-            if (params.type !== 'ObjectExpression') {
-              throw new Error('_t require parameter "params" to be Object.');
-            }
-          }
-
-          const info = {
-            text, key, params
           };
-          const validateErr = this._i18nManager.validate(
-            this.resourcePath,
-            info,
-            this._i18nOptions
-          );
-          if (validateErr) {
-            throw new Error(validateErr);
-          }
-          if (level === 0) {
-            let code;
-            if (params) {
-              this.walkI18NTranslate(params, level + 1);
-              code = escodegen.generate({
-                type: 'CallExpression',
-                callee: {
-                  type: 'Identifier',
-                  name: '_t'
-                },
-                arguments: [{
-                  type: 'Literal', value: info.text
-                }, params]
-              });
-            } else {
-              code = JSON.stringify(info.text);
-            }
+          const key = i18nManager.registerToDict(text.value, this.resourcePath);
+          text.value = key;
+          /*
+           * 如果 _t 函数调用不是在组件的构造函数里，则需要将 _t 函数代码转换；
+           * 否则，只需要将 ast tree node 的数据修改就行，在 walkConstructor 里会整体替换。
+           */
+          if (!inConstructor) {
+            const code = escodegen.generate(node);
             this._replaces.push({
               start: node.start,
               end: node.end,
               code
             });
-          } else {
-            if (params) {
-              this.walkI18NTranslate(params, level + 1);
-              node.arguments = [{
-                type: 'Literal', value: info.text
-              }, params];
-            } else {
-              node.type = 'Literal';
-              node.value = info.text;
-            }
           }
-          return false;
         }
       }
     });
@@ -826,7 +628,8 @@ import {
     }
 
     if (this._needHandleI18NTranslate) {
-      this.walkI18NTranslate(tree, 0);
+      // 处理出现在除了组件的构造函数外其它地方的 _t 函数
+      this.walkI18NTranslate(tree, false);
     }
     if (this._replaces.length === 0) {
       return {
@@ -837,18 +640,21 @@ import {
 
     this._replaces = this._replaces.sort((a, b) => a.start > b.start ? 1 : -1);
     let start = 0;
-    let output = '';
-    if (this._constructorImports) output += this._constructorImports + '\n';
-    if (this._templateGlobalImports) output += this._templateGlobalImports + '\n';
-    if (this._templateAliasImports.length > 0) output += this._templateAliasImports.join('\n') + '\n';
-    if (this._templateLocalImports.length > 0) output += this._templateLocalImports.join('\n') + '\n';
+    let output = this._tplGlobalImports.size > 0 ? `import { ${
+      [...this._tplGlobalImports].join(', ')
+    } } from 'jinge';\n` : '';
+    output += [...this._tplCodeOfImports].join('\n');
     for (let i = 0; i < this._replaces.length; i++) {
       const r = this._replaces[i];
-      if (r.start > start) output += code.substring(start, r.start);
+      if (r.start > start) {
+        output += code.substring(start, r.start);
+      }
       output += r.code;
       start = r.end;
     }
-    if (start < code.length) output += code.substring(start);
+    if (start < code.length) {
+      output += code.substring(start);
+    }
     // console.log(output);
     // if (this._needHandleI18NTranslate) {
     //   console.log(this.resourcePath);
@@ -860,5 +666,7 @@ import {
 }
 
 module.exports = {
-  ComponentParser
+  BASE_UNIQUE_POSTFIX,
+  ComponentParser,
+  componentBaseManager: baseManager
 };

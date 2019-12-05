@@ -5,25 +5,8 @@ import {
   GET_TRANSITION_DOM,
   operateRootHtmlDOM,
   UPDATE_IF_NEED,
-  BEFORE_DESTROY
-} from '../core/component';
-import {
-  addClass,
-  removeClass,
-  addEvent,
-  removeEvent
-} from '../dom';
-import {
-  isObject,
-  setImmediate
-} from '../util';
-import {
-  vmWatch
-} from '../viewmodel/core';
-import {
-  NOTIFY
-} from '../core/messenger';
-import {
+  BEFORE_DESTROY,
+  NOTIFY,
   TS_STATE_ENTERED,
   TS_STATE_LEAVED,
   TS_STATE_LEAVING,
@@ -44,7 +27,18 @@ import {
   TS_C_ENTER_ACTIVE,
   TS_C_LEAVE_ACTIVE,
   getDurationType
-} from '../core/transition';
+} from '../core';
+import {
+  addClass,
+  removeClass,
+  addEvent,
+  removeEvent,
+  isObject,
+  setImmediate
+} from '../util';
+import {
+  vmWatch
+} from '../vm';
 
 export class ToggleClassComponent extends Component {
   constructor(attrs) {

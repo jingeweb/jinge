@@ -1,11 +1,28 @@
 const escodegen = require('escodegen');
+const path = require('path');
 const crypto = require('crypto');
 const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
 const SVGTags = require('svg-tags');
 const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
-const helper = require('./helper');
+const store = require('../store');
+const i18nManager = require('../i18n');
+const {
+  replaceTplStr,
+  prependTab,
+  attrN,
+  isSimpleProp,
+  getUniquePostfix
+} = require('../util');
+const {
+  aliasManager,
+  ALIAS_UNIQUE_POSTFIX
+} = require('./alias');
+const {
+  CORE_UNIQUE_POSTFIX,
+  parse
+} = require('./helper');
 const {
   TemplateParserVisitor
 } = require('./parser/TemplateParserVisitor');
@@ -16,17 +33,16 @@ const {
   AttributeValueParser
 } = require('./AttributeValueParser');
 const {
-  HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS
+  HTML_BOOL_IDL_ATTRS,
+  HTML_COMMON_IDL_ATTRS
 } = require('./const');
-
-const {
-  replaceTplStr,
-  prependTab,
-  attrN,
-  isSimpleProp
-} = require('../util');
-
 const TPL = require('./tpl');
+
+const IMPORT_UNIQUE_POSTFIX = getUniquePostfix();
+
+const CORE_DEP_REG = new RegExp(`([\\w\\d$_]+)${CORE_UNIQUE_POSTFIX}`, 'g');
+const ALIAS_DEP_REG = new RegExp(`([\\w\\d$_]+)${ALIAS_UNIQUE_POSTFIX}`, 'g');
+const IMPORT_DEP_REG = new RegExp(`([\\w\\d$_]+)${IMPORT_UNIQUE_POSTFIX}`, 'g');
 
 const KNOWN_ATTR_TYPES = [
   /* bellow is parameter related attribute types */
@@ -42,72 +58,25 @@ const KNOWN_ATTR_TYPES = [
   '_t'
 ];
 
-function mergeAlias(src, dst) {
-  if (src) {
-    for (const k in src) {
-      if (!src[k] || typeof src[k] !== 'object') throw new Error('bad alias format');
-      if (k in dst) {
-        Object.assign(dst[k], src[k]);
-      } else {
-        dst[k] = src[k];
-      }
-    }
-  }
-  return dst;
-}
-
 class TemplateVisitor extends TemplateParserVisitor {
   constructor(opts) {
     super();
     this._stack = [];
     this._vms = [];
     this._id = opts.rndId;
-    this._tplId = crypto.randomBytes(4).toString('hex');
-    this._tabSize = opts.tabSize || 2;
     this._source = opts.source;
     this._resourcePath = opts.resourcePath;
     this._componentStyleId = opts.componentStyleId;
     this._baseLinePosition = opts.baseLinePosition || 1;
-    this._isProdMode = opts.needCompress;
-    this._i18nOptions = opts.i18n;
-    this._i18nManager = opts.i18nManager;
+    this._isProdMode = store.options.compress;
     this._imports = {};
     this._importOutputCodes = [];
+    this._i18nRenderDepsCodes = [];
+    this._aliasImports = {};
     this._needHandleComment = true;
     this._parent = {
       type: 'component', sub: 'root'
     };
-    const alias = mergeAlias(opts.alias, {
-      jinge: {
-        LogComponent: 'log',
-        I18nComponent: 'i18n',
-        IfComponent: 'if',
-        ForComponent: 'for',
-        SwitchComponent: 'switch',
-        HideComponent: 'hide',
-        BindHtmlComponent: 'bind-html',
-        ToggleClassComponent: 'toggle-class'
-      }
-    });
-    this._alias = {};
-    this._aliasImports = {};
-    this._aliasLocalMap = {};
-    for (const source in alias) {
-      const m = alias[source];
-      if (!this._aliasLocalMap[source]) {
-        this._aliasLocalMap[source] = {};
-      }
-      Object.keys(m).map(c => {
-        const rid = crypto.randomBytes(4).toString('hex');
-        if (!(c in this._aliasLocalMap[source])) {
-          this._aliasLocalMap[source][c] = c === 'default' ? `Component_${rid}` : `${c}_${rid}`;
-        }
-        const as = Array.isArray(m[c]) ? m[c] : [m[c]];
-        as.forEach(a => {
-          this._alias[a] = [c, source];
-        });
-      });
-    }
   }
 
   _logParseError(tokenPosition, msg, type = 'Error') {
@@ -130,7 +99,7 @@ class TemplateVisitor extends TemplateParserVisitor {
 
   _replace_tpl(str, ctx) {
     ctx = ctx || {};
-    ctx.ID = this._id;
+    ctx.POSTFIX = CORE_UNIQUE_POSTFIX;
     return replaceTplStr(str, ctx);
   }
 
@@ -149,8 +118,7 @@ class TemplateVisitor extends TemplateParserVisitor {
   }
 
   _prependTab(str, replaceStartEndEmpty = false) {
-    // console.log(this._tabSize);
-    return prependTab(str, replaceStartEndEmpty, this._tabSize);
+    return prependTab(str, replaceStartEndEmpty, 2);
   }
 
   _enter(vms, info) {
@@ -275,6 +243,20 @@ class TemplateVisitor extends TemplateParserVisitor {
     };
   }
 
+  _parse_attr_value(aval) {
+    const es = [];
+    let moreThanOne = false;
+    AttributeValueParser.parse(aval).forEach(it => {
+      if (it.type === 'TEXT') {
+        es.push(JSON.stringify(it.value));
+      } else if (it.value) {
+        es.push(moreThanOne ? `(${it.value})` : it.value);
+      }
+      moreThanOne = true;
+    });
+    return es.length > 0 ? es.join(' + ') : es[0];
+  }
+
   _parse_attrs(mode, tag, ctx, parentInfo) {
     // console.log(this._resourcePath);
     // if (this._resourcePath.endsWith('button.html')) {
@@ -285,6 +267,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       return {
         constAttrs: [],
         argAttrs: [],
+        translateAttrs: [],
         listeners: [],
         vms: [],
         vmPass: [],
@@ -297,6 +280,7 @@ class TemplateVisitor extends TemplateParserVisitor {
       };
     }
     const constAttrs = {};
+    const translateAttrs = {};
     const argAttrs = {};
     const listeners = {};
     const vms = [];
@@ -326,12 +310,6 @@ class TemplateVisitor extends TemplateParserVisitor {
           a_tag[t.trim()] = true;
         });
         a_category = 'on';
-      }
-      if (a_category.startsWith('_t|')) {
-        a_tag = {
-          key: a_category.substring(3)
-        };
-        a_category = '_t';
       }
 
       if (a_category && KNOWN_ATTR_TYPES.indexOf(a_category.toLowerCase()) < 0) {
@@ -424,7 +402,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (a_name in constAttrs || a_name in argAttrs) {
+      if (a_name in translateAttrs || a_name in constAttrs || a_name in argAttrs) {
         this._throwParseError(attrCtx.start, 'dulplicated attribute: ' + a_name);
       }
       if (!aval) {
@@ -439,16 +417,24 @@ class TemplateVisitor extends TemplateParserVisitor {
       }
 
       if (a_category === '_t') {
-        const info = {
-          key: a_tag ? a_tag.key : null,
-          text: aval
-        };
-        const validateErr = this._i18nManager.validate(this._resourcePath, info, this._i18nOptions);
-        if (validateErr) {
-          this._throwParseError(attrCtx.start, validateErr);
+        if (!a_name || !aval) this._throwParseError(attrCtx.start, '_t: type attribute require name and value.');
+        if (i18nManager.written) {
+          /**
+           * 如果多语言脚本资源已经处理过了（i18nManager.written === true），说明是在
+           *   启用了 watch 的研发模式下，文件发生变化后重新编译，这种情况下，由于多方面的复杂
+           *   问题不好解决，暂时先简化为不做多语言的处理。
+           */
+          a_category = 'str';
+        } else {
+          translateAttrs[a_name] = {
+            type: aval.indexOf('${') >= 0 ? 'expr' : 'const',
+            value: aval,
+            ctx: {
+              start: ctx.start
+            }
+          };
+          return;
         }
-        aval = info.text;
-        a_category = 'str';
       }
 
       if (a_category === 'expr') {
@@ -456,22 +442,12 @@ class TemplateVisitor extends TemplateParserVisitor {
         return;
       }
 
-      if (aval.indexOf('$') < 0) {
+      if (aval.indexOf('${') < 0) {
         constAttrs[a_name] = aval;
         return;
       }
 
-      const es = [];
-      let moreThanOne = false;
-      AttributeValueParser.parse(aval).forEach(it => {
-        if (it.type === 'TEXT') {
-          es.push(JSON.stringify(it.value));
-        } else if (it.value) {
-          es.push(moreThanOne ? `(${it.value})` : it.value);
-        }
-        moreThanOne = true;
-      });
-      argAttrs[a_name] = es.length === 1 ? es[0] : es.join(' + ');
+      argAttrs[a_name] = this._parse_attr_value(aval);
     });
 
     function obj2arr(obj) {
@@ -692,6 +668,7 @@ class TemplateVisitor extends TemplateParserVisitor {
     if (tag !== '_slot' && vms.length > 0) {
       this._vms = pVms.slice().concat(vms);
     }
+
     const rtn = {
       constAttrs: obj2arr(constAttrs),
       argAttrs: obj2arr(argAttrs).map(at => {
@@ -699,6 +676,7 @@ class TemplateVisitor extends TemplateParserVisitor {
         at[1] = e;
         return at;
       }),
+      translateAttrs: obj2arr(translateAttrs),
       listeners: obj2arr(listeners).map(lis => {
         const l = this._parse_listener(...lis[1]);
         l.code = l.code.replace(/(^[\s;]+)|([\s;]+$)/g, '')
@@ -754,21 +732,21 @@ class TemplateVisitor extends TemplateParserVisitor {
      */
     const needAddParentStyId = result.argUse || result.argPass || this._parent.type === 'component';
     const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAddParentStyId ? '' : 'WithoutAttrs'}`;
-    const ce = `${ceFn}_${this._id}`;
+    const ce = `${ceFn}${CORE_UNIQUE_POSTFIX}`;
     const arr = [`"${etag}"`];
     if (constAttrs.length > 0) {
       const attrsCode = '{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}';
       if (needAddParentStyId) {
-        arr.push(`assignObject_${this._id}(${attrsCode}, component[CSTYLE_PID_${this._id}])`);
+        arr.push(`assignObject${CORE_UNIQUE_POSTFIX}(${attrsCode}, component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}])`);
       } else {
         arr.push(attrsCode);
       }
     } else if (needAddParentStyId) {
-      arr.push(`component[CSTYLE_PID_${this._id}]`);
+      arr.push(`component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]`);
     }
     arr.push(this._join_elements(elements));
     let code;
-    if (result.argAttrs.length > 0 || result.listeners.length > 0 || setRefCode || pushEleCode) {
+    if (result.translateAttrs.length > 0 || result.argAttrs.length > 0 || result.listeners.length > 0 || setRefCode || pushEleCode) {
       code = '(() => {\n' + this._prependTab(` 
 const el = ${ce}(
 ${this._prependTab(arr.join(',\n'))}
@@ -780,7 +758,7 @@ ${result.argAttrs.map((at, i) => {
         return this._replace_tpl(at[1], {
           REL_COM: 'component',
           ROOT_INDEX: i.toString(),
-          RENDER_START: `el[JINGE_CONSTS_$ID$.HTML_ATTR_${at[0]}] = !!(`,
+          RENDER_START: `el[HTML_ATTR_${at[0]}${CORE_UNIQUE_POSTFIX}] = !!(`,
           RENDER_END: ');'
         });
       }
@@ -790,7 +768,7 @@ ${result.argAttrs.map((at, i) => {
         return this._replace_tpl(at[1], {
           REL_COM: 'component',
           ROOT_INDEX: i.toString(),
-          RENDER_START: `el[JINGE_CONSTS_$ID$.HTML_ATTR_${at[0]}] = `,
+          RENDER_START: `el[HTML_ATTR_${at[0]}${CORE_UNIQUE_POSTFIX}] = `,
           RENDER_END: ';'
         });
       }
@@ -798,12 +776,15 @@ ${result.argAttrs.map((at, i) => {
     return this._replace_tpl(at[1], {
       REL_COM: 'component',
       ROOT_INDEX: i.toString(),
-      RENDER_START: `setAttribute_$ID$(el, "${at[0]}", `,
+      RENDER_START: `setAttribute$POSTFIX$(el, "${at[0]}", `,
       RENDER_END: ');'
     });
   }).join('\n')}
+${result.translateAttrs.map((at, i) => {
+    return this._parse_i18n_attr(at, result.argAttrs.length + i, true);
+  }).join('\n')}
 ${result.listeners.map(lt => {
-    return `addEvent_${this._id}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
+    return `addEvent${CORE_UNIQUE_POSTFIX}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   }).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -834,6 +815,54 @@ return el;`, true) + '\n})()';
     return rtnEl;
   }
 
+  _parse_i18n_attr(at, idx, isDOM) {
+    const aname = at[0];
+    at = at[1];
+    if (at.type === 'const') {
+      const key = i18nManager.registerToDict(at.value, this._resourcePath);
+      return this._replace_tpl(isDOM ? TPL.ATTR_I18N_DOM_CONST : TPL.ATTR_I18N_COMP_CONST_ON, {
+        ROOT_INDEX: idx.toString(),
+        NAME: aname,
+        I18N_KEY: JSON.stringify(key)
+      });
+    }
+
+    const vmsArgs = ['vm_0', ...this._vms.map((n, i) => `vm_${i + 1}`)].join(', ');
+    const i18nKey = i18nManager.registerToAttr(at.value, this._resourcePath, (locale, text) => {
+      const expr = this._parse_attr_value(text || at.value);
+      let code;
+      try {
+        code = this._parse_expr(expr, at.ctx).join('\n');
+      } catch (ex) {
+        if (locale !== i18nManager.defaultLocale.name) {
+          console.error(`Parse i18n expression failed, locale: ${locale}, expression: ${text}`);
+        }
+        throw ex;
+      }
+      code = this._replace_tpl(code, {
+        ROOT_INDEX: '',
+        RENDER_START: 'const __attrV = ',
+        RENDER_END: `;\n      isDOM ? setAttribute${CORE_UNIQUE_POSTFIX}(target, attrName, __attrV) : target[attrName] = __attrV;`,
+        REL_COM: 'component'
+      });
+      code = code.replace(CORE_DEP_REG, (m0, m1) => {
+        const idx = i18nManager.registerRenderDep(m1);
+        if (idx >= 0) {
+          this._i18nRenderDepsCodes.push(`i18n${CORE_UNIQUE_POSTFIX}[I18N_REG_DEP${CORE_UNIQUE_POSTFIX}](${idx}, ${m0});`);
+        }
+        return m1;
+      });
+      return `function(target, attrName, isDOM, component, ${vmsArgs}) {\n${prependTab(code, true, 4)}\n  }`;
+    });
+
+    return this._replace_tpl(isDOM ? TPL.ATTR_I18N_DOM_EXPR : TPL.ATTR_I18N_COMP_EXPR_ON, {
+      ROOT_INDEX: idx.toString(),
+      NAME: aname,
+      I18N_KEY: JSON.stringify(i18nKey),
+      VMS: vmsArgs
+    });
+  }
+
   _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel, componentStyleId, addParentStyleId) {
     let vmPassInitCode = '';
     let vmPassSetCode = '';
@@ -860,7 +889,7 @@ return el;`, true) + '\n})()';
       sub: 'parameter',
       value: this._replace_tpl(TPL.PARAMETER, {
         VM_RENDERER: argUse.component ? argUse.component : 'vm_0',
-        VM_DEBUG_NAME: this._isProdMode ? '' : `[VM_DEBUG_NAME_${this._id}]: "attrs_of_<parameter>",`,
+        VM_DEBUG_NAME: this._isProdMode ? '' : `[VM_DEBUG_NAME${CORE_UNIQUE_POSTFIX}]: "attrs_of_<parameter>",`,
         VM_PASS_INIT: vmPassInitCode,
         VM_PASS_SET: this._prependTab(vmPassSetCode),
         VM_PASS_WATCH: this._prependTab(vmPassWatchCode),
@@ -868,7 +897,7 @@ return el;`, true) + '\n})()';
         PUSH_ELE: this._prependTab(this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE)),
         ARG_USE: argUse.fn,
         CSTYLE_PID: this._prependTab(componentStyleId || addParentStyleId ? (
-          `addParentStyleId_${this._id}(el, ${addParentStyleId ? `component[CSTYLE_PID_${this._id}]` : 'null'}${componentStyleId ? `, '${componentStyleId}'` : ''});`
+          `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${addParentStyleId ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${componentStyleId ? `, '${componentStyleId}'` : ''});`
         ) : ''),
         DEFAULT: elements.length > 0 ? this._prependTab(this._gen_render(elements, vmLevel)) : 'null'
       })
@@ -902,90 +931,128 @@ return el;`, true) + '\n})()';
     if (this._underMode_T) {
       this._throwParseError(ctx.start, '<_t> component cannot have <_t> child');
     }
-    const attrCtxs = ctx.htmlAttribute();
-    const info = {
-      key: null,
-      ifLocale: null
-    };
-    attrCtxs.forEach(attrCtx => {
-      let an = attrCtx.ATTR_NAME().getText().trim().split(':');
-      an = an.length > 1 ? an[1] : an[0];
-      if (an === 'if-locale') an = 'ifLocale';
-      let av = attrCtx.ATTR_VALUE();
-      av = av ? av.getText().trim() : '';
-      av = av ? av.substring(1, av.length - 1) : '';
-      if (!(an in info)) {
-        this._throwParseError(attrCtx.start, `attribute "${an}" is not support on <_t> component. see https://todo`);
-      }
-      if (info[an]) this._throwParseError(attrCtx.start, `dulpilcated attribute "${an}"`);
-      if (!av) this._throwParseError(attrCtx.start, `attribute value of "${an}" must be non-empty.`);
-      if (an === 'ifLocale') {
-        info.ifLocale = av;
-        return;
-      }
-      if (info.ifLocale) {
-        this._throwParseError(attrCtx.start, `<_t/> can not both have attributes "if-locale" and "${an}". see https://todo`);
-      }
-      info[an] = av;
-    });
 
-    let cnodes = ctx.htmlNode();
-    const {
-      buildLocale, defaultLocale
-    } = this._i18nOptions;
-    if (!info.ifLocale) {
-      info.text = cnodes.map(c => {
-        if (c.ruleIndex !== TemplateParser.RULE_htmlNode || c.children.length !== 1) throw new Error('unimpossible!?');
-        c = c.children[0];
-        if (c.ruleIndex === TemplateParser.RULE_htmlComment) return '';
-        if (c.ruleIndex === TemplateParser.RULE_htmlElement) {
-          // 尽管 antlr 里面已经使用 channel(HIDDEN) 而不是 skip，
-          // 仍然无法通过 getText() 返回带空格的完整数据。
-          // 因此此处使用 substring 直接截取。
-          return this._source.substring(c.start.start, c.stop.stop + 1);
-          // return c.getText();
-        }
-        if (c.ruleIndex !== TemplateParser.RULE_htmlTextContent) {
-          throw new Error('unimpossible?!');
-        }
-        return c.getText().replace(/[\s\n\r]+/g, ' ');
-      }).join('').trim();
-      if (!info.text && !info.key) return null;
-      const validateErr = this._i18nManager.validate(this._resourcePath, info, this._i18nOptions);
-      if (validateErr) {
-        this._throwParseError(ctx.start, validateErr);
-      }
+    const defaultLocaleContentNodes = ctx.htmlNode();
+    if (defaultLocaleContentNodes.length === 0) {
+      // meet empty <_t></_t>
+      return null;
     }
-    if (info.ifLocale || buildLocale === defaultLocale) {
-      if (info.ifLocale && info.ifLocale !== buildLocale) {
-        return null;
-      }
-      if (cnodes.length === 0) return null;
-      this._underMode_T = true;
-      const results = cnodes.map(n => this.visitHtmlNode(n)).filter(el => !!el);
-      this._underMode_T = false;
+
+    if (i18nManager.written) {
+      /**
+       * 如果多语言脚本资源已经处理过了（i18nManager.written === true），说明是在
+       *   启用了 watch 的研发模式下，文件发生变化后重新编译，这种情况下，由于多方面的复杂
+       *   问题不好解决，暂时先简化为不做多语言的处理。
+       */
+      const code = defaultLocaleContentNodes.map(n => {
+        return this.visitHtmlNode(n);
+      }).filter(el => !!el).map(r => r.value).join(',\n');
       return {
         type: 'component',
         sub: 'normal',
-        value: results.map(r => r.value).join(',\n')
+        value: code
       };
     }
 
-    const [err, tree] = helper.parse(info.text);
-    if (err) {
-      this._throwParseError(ctx.start, `grammar of html content under <_t> is wrong! check text of key "${info.key}" in "translate.${buildLocale}.csv".`);
+    i18nManager.assertPluginInstalled();
+    /*
+     * check translate <_t> component type
+     *   0: text without any expression, such as <_t>Hello, World</t>
+     *   1: text with expression, such as <_t>Hello, ${boy}</t>
+     *   2: text with complex children, such as <_t>Hello, <span>${body}</span></_t>
+     */
+    let type = 0;
+    const innerHtml = defaultLocaleContentNodes.map(c => {
+      if (c.ruleIndex !== TemplateParser.RULE_htmlNode || c.children.length !== 1) {
+        throw new Error('unimpossible!?');
+      }
+      c = c.children[0];
+      if (c.ruleIndex === TemplateParser.RULE_htmlComment) {
+        // ignore comment
+        return '';
+      }
+      if (c.ruleIndex === TemplateParser.RULE_htmlElement) {
+        // 尽管 antlr 里面已经使用 channel(HIDDEN) 而不是 skip，
+        // 仍然无法通过 getText() 返回带空格的完整数据。
+        // 因此此处使用 substring 直接截取。
+        type = 2;
+        return this._source.substring(c.start.start, c.stop.stop + 1);
+      }
+      if (c.ruleIndex !== TemplateParser.RULE_htmlTextContent) {
+        throw new Error('unimpossible?!');
+      }
+      if (c.children.find(cc => {
+        return cc.ruleIndex === TemplateParser.RULE_htmlExpr;
+      })) {
+        type = 1;
+      }
+      return c.getText();
+    }).join('').trim().replace(/\n\s*/g, '');
+
+    if (type === 0) {
+      const key = i18nManager.registerToDict(innerHtml, this._resourcePath);
+      return {
+        type: 'component',
+        sub: 'normal',
+        value: `i18nRenderFn${CORE_UNIQUE_POSTFIX}(component, ${JSON.stringify(key)}, ${this._parent.type === 'component'})`
+      };
     }
 
-    cnodes = tree.htmlNode();
-    if (cnodes.length === 0) return null;
+    const args = ['component', 'vm_0', ...this._vms.map((vm, i) => `vm_${i + 1}`)];
+    const key = i18nManager.registerToRender(innerHtml, this._resourcePath, (locale, contentOrNodes) => {
+      if (typeof contentOrNodes === 'string') {
+        if (!contentOrNodes) {
+          contentOrNodes = defaultLocaleContentNodes;
+        } else {
+          const [err, tree] = parse(contentOrNodes);
+          if (err) {
+            console.error(`i18n parse error locale "${locale}" at ${this._resourcePath}`);
+            contentOrNodes = defaultLocaleContentNodes;
+          } else {
+            contentOrNodes = tree.children;
+          }
+        }
+      }
+      this._underMode_T = true;
+      // <_t> 会被转成 <I18nComponent>
+      this._enter(null, {
+        type: 'component',
+        sub: 'argument'
+      });
+      let renderOfContentNodes = contentOrNodes.map(n => {
+        return this.visitHtmlNode(n);
+      }).filter(el => !!el).map(r => r.value).join(',\n');
+      this._exit();
+      this._underMode_T = false;
+      [CORE_DEP_REG, ALIAS_DEP_REG, IMPORT_DEP_REG].forEach(reg => {
+        renderOfContentNodes = renderOfContentNodes.replace(reg, (m0, m1) => {
+          const idx = i18nManager.registerRenderDep(m1);
+          if (idx >= 0) {
+            this._i18nRenderDepsCodes.push(`i18n${CORE_UNIQUE_POSTFIX}[I18N_REG_DEP${CORE_UNIQUE_POSTFIX}](${idx}, ${m0});`);
+          }
+          return m1;
+        });
+      });
+      const renderFnCode = `function(${args.join(', ')}) { return [
+${prependTab(renderOfContentNodes, true, 4)}
+  ]}`;
+      return renderFnCode;
+    });
 
-    this._underMode_T = true;
-    const results = cnodes.map(n => this.visitHtmlNode(n)).filter(el => !!el);
-    this._underMode_T = false;
+    const isParentComponent = this._parent.type === 'component';
+    const code = this._replace_tpl(TPL.I18N, {
+      PUSH_ELE: this._replace_tpl(isParentComponent ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE),
+      RENDER_KEY: JSON.stringify(key),
+      VMS: args.slice(1).join(', '),
+      CSTYLE_PID: this._componentStyleId || isParentComponent ? (
+        `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${isParentComponent ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`
+      ) : ''
+    });
+
     return {
       type: 'component',
       sub: 'normal',
-      value: results.map(r => r.value).join(',\n')
+      value: code
     };
   }
 
@@ -1043,17 +1110,18 @@ return el;`, true) + '\n})()';
 
     const attrs = [];
     result.argAttrs.length > 0 && attrs.push(...result.argAttrs.map(at => `${attrN(at[0])}: null`));
+    result.translateAttrs.length > 0 && attrs.push(...result.translateAttrs.map(at => `${at[0]}: null`));
     result.constAttrs.length > 0 && attrs.push(...result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`));
     if (elements.length > 0) {
-      attrs.push(`[ARG_COMPONENTS_${this._id}]: {
-${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT_${this._id}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
+      attrs.push(`[ARG_COMPONENTS${CORE_UNIQUE_POSTFIX}]: {
+${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT${CORE_UNIQUE_POSTFIX}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
 }`);
     }
-    const vmAttrs = `const attrs = wrapAttrs_${this._id}({
-${this._isProdMode ? '' : `  [VM_DEBUG_NAME_${this._id}]: "attrs_of_<${tag}>",`}
-${this._prependTab(`[VM_ATTRS_${this._id}]: null,`)}
-${this._prependTab(`[CONTEXT_${this._id}]: component[CONTEXT_${this._id}],`)}
-${result.listeners.length > 0 ? this._prependTab(`[LISTENERS_${this._id}]: {
+    const vmAttrs = `const attrs = wrapAttrs${CORE_UNIQUE_POSTFIX}({
+${this._isProdMode ? '' : `  [VM_DEBUG_NAME${CORE_UNIQUE_POSTFIX}]: "attrs_of_<${tag}>",`}
+${this._prependTab(`[VM_ATTRS${CORE_UNIQUE_POSTFIX}]: null,`)}
+${this._prependTab(`[CONTEXT${CORE_UNIQUE_POSTFIX}]: component[CONTEXT${CORE_UNIQUE_POSTFIX}],`)}
+${result.listeners.length > 0 ? this._prependTab(`[LISTENERS${CORE_UNIQUE_POSTFIX}]: {
 ${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
 },`) : ''}
 ${this._prependTab(attrs.join(',\n'), true)}
@@ -1061,20 +1129,37 @@ ${this._prependTab(attrs.join(',\n'), true)}
 ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
     REL_COM: 'component',
     ROOT_INDEX: i.toString(),
-    RENDER_START: `attrs.${at[0]} = ${at[0].startsWith('_') ? '' : 'wrapViewModel_$ID$('}`,
-    RENDER_END: at[0].startsWith('_') ? ';' : ');'
+    // RENDER_START: `attrs.${at[0]} = ${at[0].startsWith('_') ? '' : 'wrapViewModel$POSTFIX$('}`,
+    // RENDER_END: at[0].startsWith('_') ? ';' : ');'
+    // TODO: add wrapViewModel when expression is literal object/array
+    RENDER_START: `attrs.${at[0]} = `,
+    RENDER_END: ';'
   })).join('\n')}
-`;
+${result.translateAttrs.map((at, i) => {
+      return this._parse_i18n_attr(at, result.argAttrs.length + i, false);
+  }).join('\n')}`;
 
     const needAddParentStyId = result.argPass || result.argUse || this._parent.type === 'component';
-    const styleIdCode = this._componentStyleId || needAddParentStyId ? `addParentStyleId_${this._id}(el, ${needAddParentStyId ? `component[CSTYLE_PID_${this._id}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});` : '';
+    const styleIdCode = this._componentStyleId || needAddParentStyId ? `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${needAddParentStyId ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});` : '';
     const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
 const el = new ${Component}(attrs);
+${result.translateAttrs.map((at, i) => {
+  at = at[1];
+  if (at.type === 'const') {
+    return this._replace_tpl(TPL.ATTR_I18N_COMP_CONST_OFF, {
+      ROOT_INDEX: (result.argAttrs.length + i).toString()
+    });
+  } else {
+    return this._replace_tpl(TPL.ATTR_I18N_COMP_EXPR_OFF, {
+      ROOT_INDEX: (result.argAttrs.length + i).toString()
+    });
+  }
+}).join('\n')}
 ${styleIdCode}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
-return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, true) + '\n})()';
+return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}](component));`, true) + '\n})()';
 
     const rtnEl = {
       type: 'component', sub: 'normal', value: code
@@ -1332,7 +1417,8 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
-        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
+        const needWrapViewModel = expr.type === 'ObjectExpression' || expr.type === 'ArrayExpression';
+        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${needWrapViewModel ? `wrapViewModel${CORE_UNIQUE_POSTFIX}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
         return [`let _${levelId};`, `function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1340,7 +1426,7 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
   _calc_${levelId}();
   _notify_${parentLevelId}();
   _update_${parentLevelId}();
-}`, `${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
+}`, `${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
       }
     } else {
       const assignCodes = [];
@@ -1392,13 +1478,13 @@ return assertRenderResults_${this._id}(el[RENDER_${this._id}](component));`, tru
 }
 function _notify_${lv_id}() {
   const _np = [${__p.join(', ')}];
-  const _eq = _${lv_id}_p && arrayEqual_${this._id}(_${lv_id}_p, _np);
+  const _eq = _${lv_id}_p && arrayEqual${CORE_UNIQUE_POSTFIX}(_${lv_id}_p, _np);
   if (_${lv_id}_p && !_eq) {
-    vm_${level}[VM_ATTRS_${this._id}][VM_OFF_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_OFF${CORE_UNIQUE_POSTFIX}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-    vm_${level}[VM_ATTRS_${this._id}][VM_ON_${this._id}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
 }`);
         initCodes.push(`_calc_${lv_id}();`);
@@ -1408,12 +1494,13 @@ function _notify_${lv_id}() {
       });
 
       if (levelPath.length === 1) {
+        const needWrapViewModel = expr.type === 'ObjectExpression' || expr.type === 'ArrayExpression';
         calcCodes.push(`function _calc_${levelId}() {
-  $RENDER_START$${escodegen.generate(expr)}$RENDER_END$
+  $RENDER_START$${needWrapViewModel ? `wrapViewModel${CORE_UNIQUE_POSTFIX}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$
 }`);
         initCodes.push(`_calc_${levelId}();`);
         updateCodes.unshift(`function _update_${levelId}() { _calc_${levelId}(); }`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
         calcCodes.push(`function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1423,7 +1510,7 @@ function _notify_${lv_id}() {
   _notify_${parentLevelId}();
 }`);
         initCodes.push(`_calc_${levelId}();`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS_${this._id}][VM_ON_${this._id}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
 
       return [
@@ -1439,13 +1526,20 @@ function _notify_${lv_id}() {
   _parse_expr(txt, ctx) {
     // console.log(txt);
     txt = txt.trim();
+    if (txt === 'class' || /\bclass\b/.test(txt)) {
+      this._throwParseError(ctx.start, 'expression can\'t contain js keyword class');
+    }
+    let mayBeObject = false;
+    let mayBeArray = false;
     /*
      * if expression startsWith '{', we treat it as ObjectExpression.
      * we wrap it into '()' to treat it as ObjectExpression.
      */
-    if (txt[0] === '{') txt = '(' + txt + ')';
-    if (txt === 'class' || /\bclass\b/.test(txt)) {
-      this._throwParseError(ctx.start, 'expression can\'t contain js keyword class');
+    if (txt[0] === '{') {
+      mayBeObject = true;
+      txt = '(' + txt + ')';
+    } else if (txt[0] === '[') {
+      mayBeArray = true;
     }
     let expr;
     try {
@@ -1460,12 +1554,18 @@ function _notify_${lv_id}() {
       // console.log(ctx.start.line, this._baseLinePosition);
       this._throwParseError(ctx.start, 'expression only support single ExpressionStatement. see https://[todo].');
     }
-
+    expr = expr.body[0].expression;
+    if (mayBeObject && expr.type !== 'ObjectExpression') {
+      this._throwParseError(ctx.start, 'expression startsWith "{" must be ObjectExpression. see https://[todo].');
+    }
+    if (mayBeArray && expr.type !== 'ArrayExpression') {
+      this._throwParseError(ctx.start, 'expression startsWith "[" must be ArrayExpression. see https://[todo].');
+    }
     const info = {
       startLine: ctx.start.line,
       vars: []
     };
-    return this._parse_expr_node(info, expr.body[0].expression, ['$ROOT_INDEX$']);
+    return this._parse_expr_node(info, expr, ['$ROOT_INDEX$']);
   }
 
   _join_elements(elements) {
@@ -1493,13 +1593,11 @@ ${body}
 
   visitHtml(ctx) {
     const elements = super.visitHtml(ctx).filter(el => !!el);
-    // console.log(elements);
     return {
       renderFn: this._gen_render(elements, 0),
-      aliasImports: Object.keys(this._aliasImports).map(source => {
-        return `import { ${this._aliasImports[source].map(c => `${c} as ${this._aliasLocalMap[source][c]}`).join(', ')} } from '${source}';`;
-      }).join('\n'),
-      imports: this._importOutputCodes.join('\n')
+      i18nDeps: this._i18nRenderDepsCodes.join('\n'),
+      aliasImports: aliasManager.getCode(this._aliasImports),
+      imports: this._importOutputCodes.join('\n').trim()
     };
   }
 
@@ -1534,7 +1632,7 @@ ${body}
         const result = this._replace_tpl(this._parse_expr(txt, cn).join('\n'), {
           REL_COM: 'component',
           ROOT_INDEX: '0',
-          RENDER_START: 'setText_$ID$(el, ',
+          RENDER_START: 'setText$POSTFIX$(el, ',
           RENDER_END: ');'
         });
         eles.push(this._replace_tpl(TPL.TEXT_EXPR, {
@@ -1575,16 +1673,9 @@ ${body}
     } else if (etag === '_slot') {
       return this._parse_component_ele(etag, etag, ctx);
     } else if (/^[a-z\d_-]+$/.test(etag)) {
-      if (etag in this._alias) {
-        const [c, source] = this._alias[etag];
-        let arr = this._aliasImports[source];
-        if (!arr) {
-          arr = this._aliasImports[source] = [];
-        }
-        if (arr.indexOf(c) < 0) {
-          arr.push(c);
-        }
-        return this._parse_component_ele(etag, this._aliasLocalMap[source][c], ctx);
+      const componentTag = aliasManager.getComponentOfAlias(etag, this._aliasImports);
+      if (componentTag) {
+        return this._parse_component_ele(etag, componentTag, ctx);
       }
       if (etag !== 'svg' && this._parent.isSVG && SVGTags.indexOf(etag) < 0) {
         this._logParseError(ctx.start, `${etag} is not known svg tag.`);
@@ -1636,15 +1727,24 @@ ${body}
             line: ctx.start.line + spec.loc.start.line - 1,
             column: spec.loc.start.column
           }, 'Dulplicate imported component name: ' + local);
-        } else {
-          this._imports[local] = node.source.value === '.' ? local : `${local}_${this._tplId}`;
         }
-        if (node.source.value === '.') {
+
+        let src = node.source.value;
+        if (src === '.') {
+          this._imports[local] = local;
           // skip import XX from '.', which means Component used is in same file.
           continue;
         }
+        if (src.startsWith('.')) {
+          src = path.resolve(
+            path.dirname(this._resourcePath),
+            src
+          );
+        }
+        const hash = crypto.createHash('md5');
+        this._imports[local] = local + '_' + hash.update(src).digest('hex').substr(0, 12) + IMPORT_UNIQUE_POSTFIX;
         spec.local = {
-          type: 'Identifier', name: spec.local.name + `_${this._tplId}`
+          type: 'Identifier', name: this._imports[local]
         };
         specifiers.push(spec);
       }

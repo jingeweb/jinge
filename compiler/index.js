@@ -1,6 +1,6 @@
 const {
   ComponentParser
-} = require('./parser');
+} = require('./component');
 const {
   TemplateParser
 } = require('./template');

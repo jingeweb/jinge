@@ -19,9 +19,9 @@ import {
   VM_NOTIFY,
   VM_NOTIFIABLE,
   isViewModel,
-  ADD_PARENT,
-  REMOVE_PARENT,
-  SHIFT_PARENT
+  VM_ADD_PARENT,
+  VM_REMOVE_PARENT,
+  VM_SHIFT_PARENT
 } from './core';
 
 export const VM_SETTER_FN_MAP = Symbol('vm_setter_fn_map');
@@ -69,7 +69,7 @@ function notifyPropChanged(vm, prop) {
   vm[VM_ATTRS][VM_NOTIFY](prop);
 }
 
-function __propSetHandler(target, prop, value, setFn) {
+function __propSetHandler(target, prop, value, setFn, assertVM = true) {
   if (!isPublicProp(prop)) {
     target[prop] = value;
     return true;
@@ -78,18 +78,21 @@ function __propSetHandler(target, prop, value, setFn) {
   if (oldVal === value && !isUndefined(value)) {
     return true;
   }
-  const newValIsVM = isObject(value) && !isInnerObj(value);
-  if (newValIsVM && !(VM_ATTRS in value)) {
-    throw new Error(`public property "${prop}" of ViewModel must also be ViewModel`);
+  let newValIsVM = isObject(value) && !isInnerObj(value);
+  if (newValIsVM) {
+    newValIsVM = VM_ATTRS in value;
+    if (assertVM && !newValIsVM) {
+      throw new Error(`public property "${prop}" of ViewModel must also be ViewModel`);
+    }
   }
   // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
   if (isObject(oldVal)) {
     const a = oldVal[VM_ATTRS];
-    a && a[REMOVE_PARENT](target, prop);
+    a && a[VM_REMOVE_PARENT](target, prop);
   }
   setFn(target, prop, value);
   if (newValIsVM) {
-    value[VM_ATTRS][ADD_PARENT](target, prop);
+    value[VM_ATTRS][VM_ADD_PARENT](target, prop);
   }
   notifyPropChanged(target, prop);
   return true;
@@ -125,6 +128,14 @@ function objectPropSetHandler(target, prop, value) {
   return __propSetHandler(target, prop, value, __objectPropSetFn);
 }
 
+function attrsPropSetHandler(target, prop, value) {
+  if (!target[VM_ATTRS]) {
+    // ViewModel has been destroied.
+    return true;
+  }
+  return __propSetHandler(target, prop, value, __objectPropSetFn, false);
+}
+
 function componentPropSetHandler(target, prop, value) {
   if (!target[VM_ATTRS]) {
     console.warn(`call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`, target);
@@ -158,7 +169,7 @@ function arrayLengthSetHandler(target, value) {
   if (oldLen > value) {
     for (let i = value; i < oldLen; i++) {
       const v = target[i];
-      isViewModel(v) && v[VM_ATTRS][REMOVE_PARENT](target, i);
+      isViewModel(v) && v[VM_ATTRS][VM_REMOVE_PARENT](target, i);
     }
   }
   target.length = value;
@@ -170,15 +181,11 @@ function arrayLengthSetHandler(target, value) {
   return true;
 }
 
-export const ObjectProxyHandler = {
+const ObjectProxyHandler = {
   set: objectPropSetHandler
 };
 
-export const ComponentProxyHandler = {
-  set: componentPropSetHandler
-};
-
-export const PromiseProxyHandler = {
+const PromiseProxyHandler = {
   get(target, prop) {
     if (prop === 'then' || prop === 'catch') {
       const v = target[prop];
@@ -198,11 +205,11 @@ function _arrayFill(target, v) {
       return;
     }
     if (isViewModel(it)) {
-      it[VM_ATTRS][REMOVE_PARENT](target, i);
+      it[VM_ATTRS][VM_REMOVE_PARENT](target, i);
     }
     target[i] = v;
     if (isViewModel(it)) {
-      it[VM_ATTRS][ADD_PARENT](target, i);
+      it[VM_ATTRS][VM_ADD_PARENT](target, i);
     }
     notifyPropChanged(target, i);
   });
@@ -212,13 +219,13 @@ function _arrayFill(target, v) {
 function _arrayReverseSort(target, fn, arg) {
   target.forEach((it, i) => {
     if (isViewModel(it)) {
-      it[VM_ATTRS][ADD_PARENT](target, i);
+      it[VM_ATTRS][VM_ADD_PARENT](target, i);
     }
   });
   target[fn](arg);
   target.forEach((it, i) => {
     if (isViewModel(it)) {
-      it[VM_ATTRS][REMOVE_PARENT](parent, i);
+      it[VM_ATTRS][VM_REMOVE_PARENT](parent, i);
     }
   });
   arrayNotifyItems(target, 0, target.length);
@@ -231,7 +238,7 @@ function _arrayWrapSub(arr, wrapEachItem = false) {
   // handleVMDebug(arr);
   arr.forEach((it, i) => {
     if (isViewModel(it)) {
-      it[VM_ATTRS][ADD_PARENT](arr, i);
+      it[VM_ATTRS][VM_ADD_PARENT](arr, i);
     } else if (wrapEachItem) {
       arr[i] = loopWrapVM(it);
     }
@@ -242,7 +249,7 @@ function _arrayWrapSub(arr, wrapEachItem = false) {
 function _arrayShiftOrUnshiftProp(arr, delta) {
   arr.forEach((el, i) => {
     if (!isViewModel(el)) return;
-    el[VM_ATTRS][SHIFT_PARENT](arr, i, delta);
+    el[VM_ATTRS][VM_SHIFT_PARENT](arr, i, delta);
   });
 }
 
@@ -263,14 +270,14 @@ const ArrayFns = {
     if (idx < 0) idx = 0;
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'splice')) {
-        arg[VM_ATTRS][ADD_PARENT](target, idx + i);
+        arg[VM_ATTRS][VM_ADD_PARENT](target, idx + i);
       }
     });
     for (let i = 0; i < delCount; i++) {
       if (idx + i >= target.length) break;
       const el = target[idx + i];
       if (isViewModel(el)) {
-        el[VM_ATTRS][REMOVE_PARENT](target, idx + i);
+        el[VM_ATTRS][VM_REMOVE_PARENT](target, idx + i);
       }
     }
     const delta = args.length - delCount;
@@ -278,7 +285,7 @@ const ArrayFns = {
       for (let i = idx + delCount; i < target.length; i++) {
         const el = target[i];
         if (!isViewModel(el)) continue;
-        el[VM_ATTRS][SHIFT_PARENT](target, i, delta);
+        el[VM_ATTRS][VM_SHIFT_PARENT](target, i, delta);
       }
     }
     const rtn = _arrayWrapSub(target.splice(idx, delCount, ...args));
@@ -295,7 +302,7 @@ const ArrayFns = {
     _arrayShiftOrUnshiftProp(target, -1);
     const el = target.shift();
     if (isViewModel(el)) {
-      el[VM_ATTRS][REMOVE_PARENT](target, -1);
+      el[VM_ATTRS][VM_REMOVE_PARENT](target, -1);
     }
     notifyPropChanged(target, STR_LENGTH);
     for (let i = 0; i < target.length + 1; i++) {
@@ -307,7 +314,7 @@ const ArrayFns = {
     if (args.length === 0) return target.unshift();
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'unshift')) {
-        arg[VM_ATTRS][ADD_PARENT](target, i);
+        arg[VM_ATTRS][VM_ADD_PARENT](target, i);
       }
     });
     _arrayShiftOrUnshiftProp(target, args.length);
@@ -324,7 +331,7 @@ const ArrayFns = {
     }
     const el = target.pop();
     if (isViewModel(el)) {
-      el[VM_ATTRS][REMOVE_PARENT](target, target.length);
+      el[VM_ATTRS][VM_REMOVE_PARENT](target, target.length);
     }
     notifyPropChanged(target, STR_LENGTH);
     notifyPropChanged(target, target.length);
@@ -334,7 +341,7 @@ const ArrayFns = {
     if (args.length === 0) return target.push();
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'push')) {
-        arg[VM_ATTRS][ADD_PARENT](target, target.length + i);
+        arg[VM_ATTRS][VM_ADD_PARENT](target, target.length + i);
       }
     });
     const rtn = target.push(...args);
@@ -369,7 +376,7 @@ const ArrayFns = {
   }
 };
 
-export const ArrayProxyHandler = {
+const ArrayProxyHandler = {
   get(target, prop) {
     if (prop in ArrayFns) {
       const fn = ArrayFns[prop];
@@ -389,11 +396,11 @@ function wrapProp(vm, prop) {
     return;
   }
   if (VM_ATTRS in v) {
-    v[VM_ATTRS][ADD_PARENT](vm, prop);
+    v[VM_ATTRS][VM_ADD_PARENT](vm, prop);
     return;
   }
   vm[prop] = loopWrapVM(v);
-  v[VM_ATTRS][ADD_PARENT](vm, prop);
+  v[VM_ATTRS][VM_ADD_PARENT](vm, prop);
 }
 
 function wrapProxy(vm, isArr) {
@@ -439,6 +446,9 @@ export function wrapViewModel(plainObjectOrArray) {
   return vm;
 }
 
+// alias for convenient
+export const VM = wrapViewModel;
+
 // function handleVMDebug(vm) {
 //   if (!config[CFG_VM_DEBUG]) {
 //     return;
@@ -466,7 +476,9 @@ export function wrapComponent(component) {
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
   vmAttrs[VM_NOTIFIABLE] = false;
   component[VM_ATTRS] = vmAttrs;
-  const p = new Proxy(component, ComponentProxyHandler);
+  const p = new Proxy(component, {
+    set: componentPropSetHandler
+  });
   vmAttrs[VM_PROXY] = p;
   return p;
 }
@@ -475,17 +487,14 @@ export function wrapAttrs(attrsObj) {
   if (!isObject(attrsObj)) {
     assertFail();
   }
-  for (const k in attrsObj) {
-    if (isPublicProp(k)) {
-      const v = attrsObj[k];
-      if (isObject(v) && !isInnerObj(v) && !(VM_ATTRS in v)) {
-        throw new Error(`value passed to attribute "${k}" must be ViewModel.`);
-      }
-    }
-  }
-  const attrs = wrapProxy(attrsObj, false);
-  // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
+  const vmAttrs = new ViewModelAttrs(attrsObj);
+  // 初始化时 Attrs 默认的 VM_NOTIFIABLE 为 false，
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
-  attrs[VM_ATTRS][VM_NOTIFIABLE] = false;
+  vmAttrs[VM_NOTIFIABLE] = false;
+  attrsObj[VM_ATTRS] = vmAttrs;
+  const attrs = new Proxy(attrsObj, {
+    set: attrsPropSetHandler
+  });
+  vmAttrs[VM_PROXY] = attrs;
   return attrs;
 }

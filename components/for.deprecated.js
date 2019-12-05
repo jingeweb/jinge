@@ -27,10 +27,10 @@ import {
   appendChild,
   getParent,
   insertBefore
-} from '../dom';
+} from '../util/dom';
 import {
   VM_PARENTS
-} from '../viewmodel/common';
+} from '../vm/common';
 
 export const FOR_KEYS = Symbol('keys');
 export const FOR_KEY_NAME = Symbol('key');
@@ -214,7 +214,7 @@ export class ForComponent extends Component {
     }
 
     let st = Date.now();
-    // TODO: do we need better diff algorithm & better dom performance?
+    // TODO: do we need better diff algorithm & better util/dom performance?
     const tmpKeyMap = new Map();
     const newKeys = EMP_ARR.map.call(newItems, (item, i) => {
       assert_vm(item, i);
@@ -290,7 +290,7 @@ export class ForComponent extends Component {
         if ($rd) insertBefore($parent, $f, $rd);
         else appendChild($parent, $f);
         newIdx += diff.count;
-      } else { // key and dom position not changed.
+      } else { // key and util/dom position not changed.
         for (let i = 0; i < diff.count; i++) {
           const el = roots[1 + oldIdx + i];
           const it = newItems[newIdx + i];

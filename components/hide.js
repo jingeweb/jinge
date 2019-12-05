@@ -1,12 +1,10 @@
 import {
-  wrapViewModel
-} from '../viewmodel/proxy';
+  wrapViewModel,
+  vmWatch
+} from '../vm';
 import {
   ToggleClassComponent
 } from './class';
-import {
-  vmWatch
-} from '../viewmodel/core';
 
 export const STR_JG_HIDE = 'jg-hide';
 

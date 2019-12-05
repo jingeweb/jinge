@@ -1,11 +1,38 @@
 import {
+  Symbol,
+  isDOMNode,
+  assertFail,
+  isFunction,
+  STR_DEFAULT,
+  isObject,
+  isArray,
+  createEmptyObject,
+  setImmediate,
+  clearImmediate,
+  assignObject,
+  BEFORE_DESTROY_EVENT_NAME,
+  AFTER_RENDER_EVENT_NAME,
+  getOwnPropertyNames,
+  getOwnPropertySymbols,
+  arrayRemove,
+  getOrCreateMapProperty,
+  getOrCreateArrayProperty,
+  getParent,
+  removeChild,
+  replaceChild,
+  appendChild,
+  registerEvent
+} from '../util';
+import {
   VM_ATTRS,
-  DESTROY as VM_DESTROY,
+  VM_DESTROY,
   VM_NOTIFIABLE,
-  REMOVE_PARENT,
+  VM_REMOVE_PARENT,
   VM_HOST,
-  VM_RELATED_LISTENERS
-} from '../viewmodel/core';
+  VM_RELATED_LISTENERS,
+  wrapComponent,
+  VM_SETTER_FN_MAP
+} from '../vm';
 import {
   Messenger,
   LISTENERS,
@@ -20,40 +47,8 @@ import {
   CSTYLE_ATTACH
 } from './style';
 import {
-  Symbol,
-  isDOMNode,
-  assertFail,
-  isFunction,
-  STR_DEFAULT,
-  isObject,
-  isArray,
-  createEmptyObject,
-  STR_EMPTY,
-  setImmediate,
-  clearImmediate,
-  assignObject,
-  BEFORE_DESTROY_EVENT_NAME,
-  AFTER_RENDER_EVENT_NAME,
-  getOwnPropertyNames,
-  getOwnPropertySymbols,
-  arrayRemove,
-  getOrCreateMapProperty,
-  getOrCreateArrayProperty
-} from '../util';
-import {
-  getParent,
-  removeChild,
-  replaceChild,
-  createComment,
-  createElement,
-  createTextNode,
-  appendChild,
-  registerEvent
-} from '../dom';
-import {
-  wrapComponent,
-  VM_SETTER_FN_MAP
-} from '../viewmodel/proxy';
+  i18n as i18nService
+} from './i18n';
 
 export const NOTIFY_TRANSITION = Symbol('notify_transition');
 export const TEMPLATE_RENDER = Symbol('template_render');
@@ -96,7 +91,10 @@ export const STATE_NAMES = [
 
 export const DOM_ON = Symbol('add_dom_listener');
 export const DOM_PASS_LISTENERS = Symbol('pass_all_listeners_to_dom');
+
+export const I18N_WATCH = Symbol('i18n_watch');
 const DOM_LISTENER_DEREGISTERS = Symbol('dom_listener_deregisters');
+const I18N_LISTENER_DEREGISTERS = Symbol('i18n_listener_deregisters');
 
 function copyContext(context) {
   if (!context) return null;
@@ -215,11 +213,37 @@ export class Component extends Messenger {
      * also be removed.
      */
     this[VM_RELATED_LISTENERS] = null;
-    /**
-     * Store all dom listener deregisters.
-     */
+
+    // saved listener deregisters, will be auto called when component is destroied
     this[DOM_LISTENER_DEREGISTERS] = null;
+    this[I18N_LISTENER_DEREGISTERS] = null;
+
     return wrapComponent(this);
+  }
+
+  /**
+   * Helper function to add i18n LOCALE_CHANGE listener.
+   * Return deregister function which will remove event listener.
+   * If you do dot call deregister function, it will be auto called when component is destroied.
+   * @param {Function} listener listener bind to LOCALE_CHANGE event.
+   * @param {Boolean} immediate call listener immediately, useful for component property initialize
+   * @returns {Function} deregister function to remove listener
+   */
+  [I18N_WATCH](listener, immediate) {
+    const deregs = getOrCreateArrayProperty(
+      this,
+      I18N_LISTENER_DEREGISTERS
+    );
+    const unwatcher = i18nService.watch(() => {
+      // bind component to listener's function context.
+      listener.call(this);
+    }, immediate);
+    const deregister = () => {
+      unwatcher();
+      arrayRemove(deregs, deregister);
+    };
+    deregs.push(deregister);
+    return deregister;
   }
 
   /**
@@ -234,6 +258,7 @@ export class Component extends Messenger {
    */
   [DOM_ON]($el, eventName, listener, capture) {
     const lisDeregister = registerEvent($el, eventName, $event => {
+      // bind component to listener's function context.
       listener.call(this, $event);
     }, capture);
 
@@ -377,12 +402,12 @@ export class Component extends Messenger {
       sfm.forEach((fn, prop) => {
         if (fn === null) return;
         const v = this[prop];
-        if (isObject(v) && (VM_ATTRS in v)) {
-          v[VM_ATTRS][REMOVE_PARENT](
-            this[VM_ATTRS][VM_HOST],
-            prop
-          );
-        }
+        if (!isObject(v)) return;
+        const va = v[VM_ATTRS];
+        va && va[VM_REMOVE_PARENT](
+          this[VM_ATTRS][VM_HOST],
+          prop
+        );
       });
       sfm.clear();
       this[VM_SETTER_FN_MAP] = null;
@@ -409,8 +434,9 @@ export class Component extends Messenger {
     destroyRelatedRefs(this);
     // clear context.
     destroyContext(this);
-    // clear all dom event listener
-    destroyDOMListeners(this);
+    // clear all dom event listener and i18n watcher
+    releaseDeregisters(this, DOM_LISTENER_DEREGISTERS);
+    releaseDeregisters(this, I18N_LISTENER_DEREGISTERS);
 
     // clear properties
     this[STATE] = STATE_DESTROIED;
@@ -434,6 +460,7 @@ export class Component extends Messenger {
       // because those dom nodes will be auto removed when their parent dom is removed.
       component[DESTROY](false);
     });
+    this[NON_ROOT_COMPONENT_NODES].length = 0;
 
     let $parent;
     this[ROOT_NODES].forEach(node => {
@@ -446,6 +473,7 @@ export class Component extends Messenger {
         removeChild($parent, node);
       }
     });
+    this[ROOT_NODES].length = 0;
   }
 
   [HANDLE_AFTER_RENDER]() {
@@ -606,11 +634,11 @@ function destroyContext(comp) {
   comp[CONTEXT] = null;
 }
 
-function destroyDOMListeners(component) {
-  const deregisters = component[DOM_LISTENER_DEREGISTERS];
-  if (!deregisters) return;
-  deregisters.forEach(deregister => deregister());
-  component[DOM_LISTENER_DEREGISTERS] = null;
+function releaseDeregisters(component, nameOfDeregisters) {
+  if (component[nameOfDeregisters]) {
+    component[nameOfDeregisters].forEach(deregister => deregister());
+    component[nameOfDeregisters] = null;
+  }
 }
 
 export function destroyRelatedRefs(comp) {
@@ -647,25 +675,4 @@ export function operateRootHtmlDOM(fn, el, ...args) {
   el[ROOT_NODES].forEach(ce => {
     operateRootHtmlDOM(fn, ce, ...args);
   });
-}
-
-export function emptyRenderFn(component) {
-  const el = createComment(STR_EMPTY);
-  component[ROOT_NODES].push(el);
-  return [el];
-}
-
-export function errorRenderFn(component) {
-  const el = createElement('span', {
-    style: 'color: red !important;'
-  });
-  el.textContent = 'template parsing failed! please check webpack log.';
-  component[ROOT_NODES].push(el);
-  return [el];
-}
-
-export function textRenderFn(component, txtContent) {
-  const el = createTextNode(txtContent);
-  component[ROOT_NODES].push(el);
-  return el;
 }

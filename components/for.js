@@ -12,20 +12,19 @@ import {
   HANDLE_AFTER_RENDER,
   GET_LAST_DOM,
   STATE,
-  STATE_RENDERED
-} from '../core/component';
+  STATE_RENDERED,
+  CSTYLE_PID,
+  addParentStyleId
+} from '../core';
 import {
   isArray,
   Symbol,
   STR_DEFAULT,
-  isObject,
   assertFail,
   STR_EMPTY,
   STR_LENGTH,
   isNumber,
-  isString
-} from '../util';
-import {
+  isString,
   createComment,
   createFragment,
   appendChild,
@@ -33,20 +32,15 @@ import {
   insertBefore,
   removeChild,
   insertAfter
-} from '../dom';
+} from '../util';
 import {
-  wrapAttrs
-} from '../viewmodel/proxy';
-import {
+  wrapAttrs,
   VM_DEBUG_NAME,
   vmWatch,
   VM_ATTRS,
-  isInnerObj
-} from '../viewmodel/core';
-import {
-  CSTYLE_PID,
-  addParentStyleId
-} from '../core/style';
+  VM_ON,
+  isViewModel
+} from '../vm';
 
 export const FOR_LENGTH = Symbol('length');
 export const FOR_KEYS = Symbol('keys');
@@ -61,10 +55,22 @@ const EMP_ARR = [];
 export class ForEachComponent extends Component {
   constructor(attrs, item, index, isLast) {
     super(attrs);
-    this.each = item;
+    if (isViewModel(item)) {
+      this.each = item;
+    } else {
+      this._e = item;
+    }
     this.index = index;
     this.isFirst = index === 0;
     this.isLast = isLast;
+  }
+
+  get each() {
+    return this._e;
+  }
+
+  set each(v) {
+    this._e = v;
   }
 
   [RENDER]() {
@@ -93,11 +99,11 @@ function appendRenderEach(item, i, isLast, itemRenderFn, roots, context, cstyPid
   return el[RENDER]();
 }
 
-function _assertVm(item, i) {
-  if (isObject(item) && !isInnerObj(item) && !(VM_ATTRS in item)) {
-    throw new Error(`loop item [${i}] of <for> component must be ViewModel.`);
-  }
-}
+// function _assertVm(item, i) {
+//   if (isObject(item) && !isInnerObj(item) && !(VM_ATTRS in item)) {
+//     throw new Error(`loop item [${i}] of <for> component must be ViewModel.`);
+//   }
+// }
 
 function _prepareKey(item, i, keyMap, keyName) {
   const key = keyName === KEY_EACH ? item : keyName(item);
@@ -112,7 +118,7 @@ function renderItems(items, itemRenderFn, roots, keys, keyName, context, cstyPid
   const result = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
-    _assertVm(item, i);
+    // _assertVm(item, i);
     if (keyName !== KEY_INDEX) {
       keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
@@ -159,7 +165,25 @@ export class ForComponent extends Component {
       throw new Error('Value of "_key" attribute of <for> component is invalidate. See https://[todo]');
     }
     super(attrs);
-    this.loop = attrs.loop;
+
+    /**
+     * <for> 组件的 loop 属性可以支持不是 ViewModel 的数组，因此直接通过
+     * this._l = attrs.loop 的形式初始化赋值。
+     */
+    if (isViewModel(attrs.loop)) {
+      this.loop = attrs.loop;
+    } else {
+      this._l = attrs.loop;
+    }
+    /**
+     * 上面的写法，编译器将不会自动生成对 attrs 的 VM_ON('loop') 代码。
+     * 只有直接在构造函数体里最顶部的 this.xxx = attrs.xxx 的赋值形式才会，
+     * 而上面的 this.loop = attrs.loop 写在了 if 的条件内部，需要手动添加监听代码。
+     */
+    attrs[VM_ATTRS][VM_ON]('loop', () => {
+      this.loop = attrs.loop;
+    });
+
     this[ID] = INC++;
     const kn = attrs.key || KEY_INDEX;
     this[FOR_KEY_NAME] = kn;
@@ -372,7 +396,7 @@ export class ForComponent extends Component {
     const newKeys = [];
     const newKeyMap = new Map();
     newItems.forEach((item, i) => {
-      _assertVm(item, i);
+      // _assertVm(item, i);
       newKeys.push(_prepareKey(item, i, newKeyMap, keyName));
     });
 

@@ -11,34 +11,8 @@ import {
   CONTEXT,
   isComponent,
   GET_TRANSITION_DOM,
-  BEFORE_DESTROY
-} from '../core/component';
-import {
-  NOTIFY
-} from '../core/messenger';
-import {
-  createComment,
-  getParent,
-  removeChild,
-  insertBefore,
-  removeClass,
-  removeEvent,
-  addClass,
-  addEvent
-} from '../dom';
-import {
-  wrapAttrs
-} from '../viewmodel/proxy';
-import {
-  STR_DEFAULT,
-  STR_EMPTY,
-  Symbol
-} from '../util';
-import {
-  VM_DEBUG_NAME, VM_ATTRS
-} from '../viewmodel/core';
-
-import {
+  BEFORE_DESTROY,
+  NOTIFY,
   TS_STATE_ENTERED,
   TS_STATE_LEAVED,
   TS_STATE_LEAVING,
@@ -58,12 +32,29 @@ import {
   TS_C_LEAVE,
   TS_C_ENTER_ACTIVE,
   TS_C_LEAVE_ACTIVE,
-  getDurationType
-} from '../core/transition';
-import {
+  getDurationType,
   addParentStyleId,
   CSTYLE_PID
-} from '../core/style';
+} from '../core';
+import {
+  createComment,
+  getParent,
+  removeChild,
+  insertBefore,
+  removeClass,
+  removeEvent,
+  addClass,
+  addEvent,
+  STR_DEFAULT,
+  STR_EMPTY,
+  Symbol,
+  setImmediate
+} from '../util';
+import {
+  wrapAttrs,
+  VM_DEBUG_NAME,
+  VM_ATTRS
+} from '../vm';
 
 const IF_STR_ELSE = 'else';
 const T_MAP = Symbol('transition_map');

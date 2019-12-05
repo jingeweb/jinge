@@ -1,10 +1,15 @@
+const antlr = require('antlr4/index');
+const {
+  getUniquePostfix
+} = require('../util');
 const {
   TemplateParser
 } = require('./parser/TemplateParser');
 const {
   TemplateLexer
 } = require('./parser/TemplateLexer');
-const antlr = require('antlr4/index');
+
+const CORE_UNIQUE_POSTFIX = getUniquePostfix();
 
 function parse(source) {
   const lexer = new TemplateLexer(new antlr.InputStream(source));
@@ -35,5 +40,6 @@ function parse(source) {
 }
 
 module.exports = {
+  CORE_UNIQUE_POSTFIX,
   parse
 };

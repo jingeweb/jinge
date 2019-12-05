@@ -1,86 +1,203 @@
 import {
-  isObject,
-  Symbol
+  Symbol,
+  isString,
+  uid,
+  isFunction,
+  getOrCreateArrayProperty
 } from '../util';
 import {
-  config,
-  CFG_I18N_WARN_KEY_NOT_FOUND
-} from '../config';
-import {
   Messenger,
-  NOTIFY
+  NOTIFY,
+  ON,
+  OFF
 } from './messenger';
 
-export const messenger = new Messenger();
-export const I18N_DATA_CHANGED = Symbol('data-changed');
+export const I18N_GET_COMPONENT_RENDER = Symbol('fn_get_component_render');
+export const I18N_GET_ATTRIBUTE_RENDER = Symbol('fn_get_attribute_render');
+export const I18N_GET_TEXT = Symbol('fn_get_text');
+export const I18N_LOCALE_CHANGE = Symbol('locale_change');
+export const I18N_REG_DEP = Symbol('fn_register_render_dependent');
+export const I18N_CURRENT_LOCALE = Symbol('current_locale');
 
-let dictStore = window.JINGE_I18N_DATA || null;
+const RENDER_DEPS = Symbol('render_dependents');
+const LAST_FETCHING_KEY = Symbol('last_fetching_key');
+const CURRENT_DATA = Symbol('current_data');
+const CACHE = Symbol('cache');
+const DEFAULT_FILENAME = 'dist/locale.[locale].js';
 
 /**
- * @param {String} text text to translate
- * @param {Object|String} params params or translate key
+ * convert i18n text template to function
+ * @param {String} text i18n formatted text template
+ */
+function compile(text) {
+  // eslint-disable-next-line no-new-func
+  return new Function('__ctx', `return \`${text.replace(/`/g, '\\`').replace(/\$\{\s*([\w\d._$]+)\s*\}/g, (m, n) => {
+    return '${ __ctx.' + n + ' }';
+  })}\`;`);
+}
+
+function defaultFetchFn(locale, filename) {
+  return window.fetch(filename.replace('[locale]', locale)).then(res => res.text());
+}
+
+class I18nService extends Messenger {
+  constructor(attrs) {
+    super(attrs);
+    this[RENDER_DEPS] = null;
+    this[CURRENT_DATA] = null;
+    this[CACHE] = new Map();
+    this[LAST_FETCHING_KEY] = null;
+
+    this.r(window.JINGE_I18N_DATA);
+  }
+
+  parse(template, params) {
+    return compile(template)(params);
+  }
+
+  get locale() {
+    return this[CURRENT_DATA].locale;
+  }
+
+  /**
+   * Register i18n render depedent.
+   * This method will be called by compiler generated code, don't call it manully.
+   */
+  [I18N_REG_DEP](idx, depent) {
+    const deps = getOrCreateArrayProperty(this, RENDER_DEPS);
+    if (deps[idx]) throw new Error(`conflict at ${idx}`);
+    deps[idx] = depent;
+  }
+
+  /**
+   * Register locale data, will be called in locale resource script.
+   * Usually you don't need call this method manully.
+   */
+  r(data) {
+    if (!data || this[CACHE].has(data.locale)) {
+      return;
+    }
+    this[CACHE].set(data.locale, data);
+    if (!this[CURRENT_DATA]) {
+      this[CURRENT_DATA] = data;
+    }
+  }
+
+  /**
+   * switch to another locale/language
+   * @param {String} locale locale to swtiched
+   * @param {String|Function} filename filename of locale script with full path, or function fetch locale script.
+   */
+  switch(locale, filename = DEFAULT_FILENAME) {
+    if (this[CURRENT_DATA].locale === locale) {
+      return;
+    }
+    const data = this[CACHE].get(locale);
+    if (!data) {
+      const key = uid();
+      this[LAST_FETCHING_KEY] = key;
+      (isFunction(filename) ? filename(locale) : defaultFetchFn(locale, filename)).then(code => {
+        // eslint-disable-next-line no-new-func
+        (new Function('jinge', code))({
+          i18n: this
+        });
+        if (this[LAST_FETCHING_KEY] !== key || this[CURRENT_DATA].locale === locale) {
+          /*
+            * ignore if callback has been expired.
+            * 使用闭包的技巧来检测当前回调是否已经过期，
+            * 即，是否已经有新的 fetchFn 函数的调用。
+            */
+          return;
+        }
+        const data = this[CACHE].get(locale);
+        this[CURRENT_DATA] = data;
+        this[NOTIFY](I18N_LOCALE_CHANGE, this.locale);
+      });
+    } else {
+      this[CURRENT_DATA] = data;
+      this[NOTIFY](I18N_LOCALE_CHANGE, this.locale);
+    }
+  }
+
+  [I18N_GET_TEXT](key, params) {
+    const dict = this[CURRENT_DATA].dictionary;
+    if (!(key in dict)) {
+      return 'i18n_missing';
+    }
+    let text = dict[key];
+    if (isString(text)) {
+      // text.startsWith("«") means reference to another key
+      if (text.charCodeAt(0) === 171) {
+        text = dict[text.substring(1)];
+        if (isString(text)) {
+          text = compile(text);
+        }
+      } else {
+        text = compile(text);
+      }
+      dict[key] = text;
+    }
+    return text(params);
+  }
+
+  [I18N_GET_COMPONENT_RENDER](key) {
+    return getRender(this, 'components', key);
+  }
+
+  [I18N_GET_ATTRIBUTE_RENDER](key) {
+    return getRender(this, 'attributes', key);
+  }
+
+  /**
+   * Bind listener to LOCALE_CHANGE event,
+   * return a function auto remove this listener
+   * @param {Function} handler a listener bind to LOCALE_CHANGE event
+   * @param {Boolean} immediate call listener immediately, default is false.
+   * @returns {Function} a function auto remove listener
+   */
+  watch(listener, immediate) {
+    this[ON](I18N_LOCALE_CHANGE, listener);
+    if (immediate) listener(this.locale);
+    return () => {
+      this[OFF](I18N_LOCALE_CHANGE, listener);
+    };
+  }
+}
+
+function getRender(m, type, key) {
+  const data = m[CURRENT_DATA];
+  const depFns = m[RENDER_DEPS];
+  if (isFunction(data.render)) {
+    if (!depFns) {
+      throw new Error('missing I18N_RENDER_DEPS');
+    }
+    data.render = data.render(...depFns);
+  }
+  const renders = data.render[type];
+  if (!(key in renders)) {
+    throw new Error(`missing i18n ${type} for key: ${key}`);
+  }
+  let fn = renders[key];
+  if (isString(fn)) {
+    // if fn is string, it's a reference to another key.
+    renders[key] = fn = renders[fn];
+  }
+  return fn;
+}
+
+/* Singleton */
+export const i18n = new I18nService();
+
+/**
+ * Compiler helper function, the first parameter will be convert to i18n dictionary key,
+ * and the whole function will be transform to `i18nService[GET_TEXT](key, params)`
+ *
+ * But after i18n locale resource script had been written, compiler won't transform it,
+ * the function will work as text parse util.
+ *
+ * @param {String|Object} text
+ * @param {Object} params
  */
 export function _t(text, params) {
-  return format(text, params);
-}
-
-export function format(text, params) {
-  if (!params || !isObject(params) || text.indexOf('{') < 0) {
-    return text;
-  }
-  return text.replace(/\$\{\s*([\w\d._$]+)\s*\}/g, function(m, n) {
-    // 因为支持 ${ a.b.c } 这样的写法，所以直接构造 eval 函数获取。
-    if (n.indexOf('.') >= 0) {
-      /* eslint no-new-func: "off" */
-      return (new Function(`return obj.${n}`, 'obj'))(params);
-    } else {
-      return params[n];
-    }
-  });
-}
-
-export function i18n(key, params) {
-  if (!dictStore || !(key in dictStore)) {
-    if (config[CFG_I18N_WARN_KEY_NOT_FOUND]) {
-      console.error('Warning: i18n key', key, 'not found.');
-    }
-    return key;
-  }
-  return _t(dictStore[key], params);
-}
-
-export function prefix(prefix) {
-  return function(key, params) {
-    return i18n(prefix + '.' + key, params);
-  };
-}
-
-export function registerData(dict) {
-  if (window.JINGE_I18N_DATA) {
-    /**
-     * 当 window.JINGE_I18N_DATA 存在的情况下，可以不用主动调用
-     *   registerI18nData 就能直接使用 i18n 函数来取多语言文本。
-     *   这种使用方式下， i18n 函数可以在代码文件的任意位置书写，
-     *   包括书写在文件的最顶部。
-     *   但是，书写在文件最顶部的 i18n 代码，都几乎只是用于将多语言
-     *   文本赋予一个常量，然后在其它地方使用。
-     *   我们认为，这种使用方式下，不应该再使用 registerI18nData 来覆盖
-     *   字典数据（从而实现不重新加载 app 的情况下，热更新界面的多语言文本展示）。
-     *
-     * 如果想要通过 registerI18nData 来覆盖字典数据实现热更新，则 i18n 函数
-     *   不应该在文件顶部书写。原因在于，文件顶部的代码，在整个 bundle 加载时就已经被
-     *   执行了，这时候 bootstrap 函数和 registerI18nData 函数是否已经执行
-     *   很难确定（因为各文件的顶部代码的执行顺序取决于文件之间的依赖关系，即打包
-     *   后在 bundle 里的次序）。
-     *
-     * 对于 window.JINGE_I18N_DATA 已经存在的情况下，仍然试图热更新的行为，
-     *   我们给予告警提示，帮助用户尽量避免踩坑。
-     */
-    console.error('Warning: try change i18n dictionary data when window.JINGE_I18N_DATA is set. see https://todo');
-  }
-  const hasOld = !!dictStore;
-  dictStore = dict;
-  if (hasOld) {
-    messenger[NOTIFY](I18N_DATA_CHANGED);
-  }
+  return params ? compile(text)(params) : text;
 }

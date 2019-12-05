@@ -5,15 +5,13 @@ import {
   UPDATE_IF_NEED,
   UPDATE,
   ROOT_NODES
-} from '../core/component';
+} from '../core';
 import {
   createElementWithoutAttrs,
   getParent,
   removeChild,
   createComment,
-  insertBefore
-} from '../dom';
-import {
+  insertBefore,
   STR_EMPTY
 } from '../util';
 

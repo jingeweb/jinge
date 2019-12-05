@@ -1,10 +1,10 @@
 import {
   Component,
   RENDER
-} from '../core/component.js';
+} from '../core';
 import {
   createComment
-} from '../dom/index.js';
+} from '../util';
 
 /**
  * This component is only for development purpose

@@ -1,10 +1,10 @@
 import {
   Component
-} from '../core/component';
+} from '../core';
 import {
   VM_ON,
   VM_ATTRS
-} from '../viewmodel/core';
+} from '../vm';
 
 export class ParameterComponent extends Component {
   constructor(attrs, params) {
