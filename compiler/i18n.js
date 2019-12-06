@@ -152,7 +152,7 @@ class I18nManager {
           src: text,
           text: translateText
         };
-        if (!_util.isString(translateText)) {
+        if (!_util.isString(translateText) || !translateText) {
           targetLocale.nonTranslatedCsv.push(csvRow);
         } else {
           targetLocale.translatedCsv.push(csvRow);
@@ -336,13 +336,9 @@ if (typeof jinge !== 'undefined') {
   window.JINGE_I18N_DATA = i18nData;
 }
 })();`;
-    let filename = this.options.filename.replace('[locale]', locale.name);
-    if (!filename.endsWith('.js')) {
-      filename = filename + '.js';
-    }
+    const filename = this.options.filename.replace('[locale]', locale.name);
     if (store.options.compress) {
       code = terser.minify(code).code;
-      filename = filename.replace(/\.js$/, '.min.js');
     }
     assets[filename] = {
       source: () => code,
