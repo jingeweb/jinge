@@ -275,7 +275,7 @@ export class Component extends Messenger {
    * Helper function to pass all listener to first dom element.
    * @param {Array} ignoredEventNames event names not passed
    */
-  [DOM_PASS_LISTENERS](ignoredEventNames) {
+  [DOM_PASS_LISTENERS](ignoredEventNames, domElement) {
     if (this[STATE] !== STATE_RENDERED) {
       throw new Error('bindDOMListeners must be applied to component which is rendered.');
     }
@@ -283,8 +283,13 @@ export class Component extends Messenger {
     if (!lis || lis.length === 0) {
       return;
     }
-    const $el = this[GET_FIRST_DOM]();
-    if ($el.nodeType !== Node.ELEMENT_NODE) {
+    if (ignoredEventNames && !isArray(ignoredEventNames)) {
+      domElement = ignoredEventNames;
+      ignoredEventNames = null;
+    } else if (!domElement) {
+      domElement = this[GET_FIRST_DOM]();
+    }
+    if (domElement.nodeType !== Node.ELEMENT_NODE) {
       return;
     }
     lis.forEach((handlers, eventName) => {
@@ -292,7 +297,7 @@ export class Component extends Messenger {
         return;
       }
       handlers.forEach(fn => {
-        this[DOM_ON]($el, eventName, fn.tag ? $evt => {
+        this[DOM_ON](domElement, eventName, fn.tag ? $evt => {
           fn.tag.stop && $evt.stopPropagation();
           fn.tag.prevent && $evt.preventDefault();
           fn($evt);
