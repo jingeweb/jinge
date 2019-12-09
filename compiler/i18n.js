@@ -10,19 +10,16 @@ function _r(s, e) {
   return new Array(e - s + 1).fill(0).map((n, i) => String.fromCharCode(s + i));
 }
 
-function _k(regKey) {
-  return /^[\w$_][\w\d$_]*$/.test(regKey) ? regKey : `${JSON.stringify(regKey)}`;
-}
+// function _k(regKey) {
+//   return /^[\w$_][\w\d$_]*$/.test(regKey) ? regKey : `${JSON.stringify(regKey)}`;
+// }
 
 const CHARS = [
   '0',
-  ..._r(97, 122),
-  ..._r(49, 57),
-  ..._r(65, 90),
-  ..._r(32, 47),
-  ..._r(58, 64),
-  ..._r(91, 96),
-  ..._r(123, 126)
+  ..._r(97, 122), // 'a' to 'z'
+  ..._r(49, 57), // '1' to '9'
+  ..._r(65, 90), // 'A' to 'Z'
+  '$', '_'
 ];
 /**
  * Ascii 表上，32 - 126 都是可
@@ -189,7 +186,7 @@ class I18nManager {
       });
       meta.set(text, info);
       outputTarget.push({
-        key: _k(regKey),
+        key: regKey, // _k(regKey),
         output: renderFnCb ? renderFnCb(this.defaultLocale.name, text) : JSON.stringify(text)
       });
       pushNew = true;
@@ -202,8 +199,8 @@ class I18nManager {
           key: regKey
         });
         outputTarget.push({
-          key: _k(regKey),
-          output: `"${type === 'dicts' ? '«' : ''}${info.firstKey}"`
+          key: regKey, // _k(regKey),
+          output: JSON.stringify(`${type === 'dicts' ? '«' : ''}${info.firstKey}`)
         });
         pushNew = true;
       } else {
@@ -218,9 +215,9 @@ class I18nManager {
         targetText = getRef(targetInfo.entries, location, regKey, text);
       }
       targetOutputTarget.push({
-        key: _k(regKey),
+        key: regKey, // _k(regKey),
         output: renderFnCb && !targetText.startsWith('«') ? renderFnCb(targetLocale.name, targetText) : (
-          renderFnCb ? `"${targetText.substring(1)}"` : JSON.stringify(targetText)
+          renderFnCb ? JSON.stringify(targetText.substring(1)) : JSON.stringify(targetText)
         )
       });
     });
