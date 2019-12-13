@@ -10,6 +10,9 @@ function _r(s, e) {
   return new Array(e - s + 1).fill(0).map((n, i) => String.fromCharCode(s + i));
 }
 
+function compare(a, b) {
+  return a.location === b.location ? 0 : (a.location > b.location ? 1 : -1);
+}
 // function _k(regKey) {
 //   return /^[\w$_][\w\d$_]*$/.test(regKey) ? regKey : `${JSON.stringify(regKey)}`;
 // }
@@ -355,7 +358,8 @@ if (typeof jinge !== 'undefined') {
         key: 'text'
       });
     }
-    const content = csvStringify(locale.nonTranslatedCsv.concat(locale.translatedCsv), {
+    const records = locale.nonTranslatedCsv.sort(compare).concat(locale.translatedCsv.sort(compare));
+    const content = csvStringify(records, {
       columns
     });
     await fs.promises.writeFile(
