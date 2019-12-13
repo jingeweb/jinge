@@ -7,11 +7,11 @@ const path = require('path');
 const store = require('../compiler/store');
 const {
   ComponentParser
-} = require('../compiler/parser');
+} = require('../compiler/component');
 const {
   aliasManager
 } = require('../compiler/template/alias');
-const componentBaseManager = require('../compiler/parser/base');
+const componentBaseManager = require('../compiler/component/base');
 
 let componentBaseAndAliasInited = false;
 
