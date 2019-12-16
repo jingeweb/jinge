@@ -9,7 +9,11 @@ import {
   GET_LAST_DOM,
   i18n as i18nService,
   I18N_GET_COMPONENT_RENDER,
-  I18N_WATCH
+  I18N_WATCH,
+  ROOT_NODES,
+  NON_ROOT_COMPONENT_NODES,
+  isComponent,
+  HANDLE_AFTER_RENDER
 } from '../core';
 import {
   getParent,
@@ -62,6 +66,16 @@ export class I18nComponent extends Component {
     } else {
       appendChild($parentEl, els);
     }
+
+    /**
+     * 对切换后渲染的组件触发 AFTER_RENDER 生命周期。
+     */
+    this[ROOT_NODES].forEach(n => {
+      if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
+    });
+    this[NON_ROOT_COMPONENT_NODES].forEach(n => {
+      if (isComponent(n)) n[HANDLE_AFTER_RENDER]();
+    });
   }
 
   [BEFORE_DESTROY]() {
