@@ -1,14 +1,17 @@
 const {
   replaceTplStr
 } = require('../util');
-const store = require('../store');
 const {
-  parse,
-  CORE_UNIQUE_POSTFIX
+  sharedOptions
+} = require('../options');
+const {
+  styleManager
+} = require('../style');
+const {
+  parse
 } = require('./helper');
 const {
-  aliasManager,
-  ALIAS_UNIQUE_POSTFIX
+  aliasManager
 } = require('./alias');
 const {
   TemplateVisitor
@@ -16,25 +19,20 @@ const {
 
 const TPL = require('./tpl');
 
-const CORE_DEP_REG = new RegExp(`(\\w[\\w\\d_]+)${CORE_UNIQUE_POSTFIX}\\b`, 'g');
-
 class JingeTemplateParser {
-  static _parse(content, options = {}) {
+  static _parse(content, options) {
     function cl(s) {
       return s ? '\n' + s : '';
     }
     const tplParser = new JingeTemplateParser(options);
     const result = tplParser.parse(content);
+    const depRegex = new RegExp(`([\\w$_][\\w\\d$_]+)${sharedOptions.symbolPostfix}\\b`, 'g');
     const imports = [
       ...new Set([
-        ...result.renderFn.matchAll(CORE_DEP_REG),
-        ...(result.i18nDeps ? result.i18nDeps.matchAll(CORE_DEP_REG) : [])
+        ...result.renderFn.matchAll(depRegex),
+        ...(result.i18nDeps ? result.i18nDeps.matchAll(depRegex) : [])
       ].map(m => m[1]))
-    ].map(d => `${d} as ${d}${CORE_UNIQUE_POSTFIX}`);
-    // if (result.i18nDeps) {
-      // imports.add('i18n');
-      // imports.add('I18N_REG_DEP');
-    // }
+    ].map(d => `${d} as ${d}${sharedOptions.symbolPostfix}`);
     return options.wrapCode !== false ? {
       code: `import {  ${imports.join(', ')} } from 'jinge';` +
         cl(result.aliasImports) + cl(result.imports) + cl(result.i18nDeps) +
@@ -48,7 +46,7 @@ class JingeTemplateParser {
     };
   }
 
-  static async parse(content, sourceMap, options = {}) {
+  static async parse(content, sourceMap, options) {
     return new Promise((resolve, reject) => {
       try {
         resolve(JingeTemplateParser._parse(content, options));
@@ -61,10 +59,11 @@ class JingeTemplateParser {
   constructor(options) {
     this.resourcePath = options.resourcePath;
     this.baseLinePosition = options.baseLinePosition || 1;
-    const info = store.templates.get(this.resourcePath);
+    const info = styleManager.templates.get(this.resourcePath);
     this.componentStyleId = options.componentStyleId || (
       info ? info.styleId : null
     );
+    this.webpackLoaderContext = options.webpackLoaderContext;
   }
 
   parse(source) {
@@ -73,7 +72,7 @@ class JingeTemplateParser {
         aliasImports: '',
         imports: '',
         renderFn: replaceTplStr(TPL.EMPTY, {
-          POSTFIX: CORE_UNIQUE_POSTFIX
+          POSTFIX: sharedOptions.symbolPostfix
         })
       };
     }
@@ -84,12 +83,13 @@ class JingeTemplateParser {
         aliasImports: '',
         imports: '',
         renderFn: replaceTplStr(TPL.ERROR, {
-          POSTFIX: CORE_UNIQUE_POSTFIX
+          POSTFIX: sharedOptions.symbolPostfix
         })
       };
     }
     const visitor = new TemplateVisitor({
       source: source,
+      webpackLoaderContext: this.webpackLoaderContext,
       baseLinePosition: this.baseLinePosition,
       resourcePath: this.resourcePath,
       componentStyleId: this.componentStyleId
@@ -97,13 +97,12 @@ class JingeTemplateParser {
     try {
       return visitor.visit(tree);
     } catch (ex) {
-      // debugger;
-      console.error(ex);
+      this.webpackLoaderContext.emitError(ex);
       return {
         aliasImports: '',
         imports: '',
         renderFn: replaceTplStr(TPL.ERROR, {
-          POSTFIX: CORE_UNIQUE_POSTFIX
+          POSTFIX: sharedOptions.symbolPostfix
         })
       };
     }
@@ -116,16 +115,14 @@ class JingeTemplateParser {
     }
     idx = idx + 1;
     const eidx = source.indexOf('\n', idx);
-    console.error(`Error occur at line ${tokenPosition.line + this.baseLinePosition - 1}, column ${tokenPosition.column}:
-  > ${source.substring(idx, eidx > idx ? eidx : source.length)}
-  > ${this.resourcePath}
-  > ${msg}`);
+    this.webpackLoaderContext.emitError(new Error(`Error occur at line ${tokenPosition.line + this.baseLinePosition - 1}, column ${tokenPosition.column}:
+> ${source.substring(idx, eidx > idx ? eidx : source.length)}
+> ${this.resourcePath}
+> ${msg}`));
   }
 }
 
 module.exports = {
-  CORE_UNIQUE_POSTFIX,
-  ALIAS_UNIQUE_POSTFIX,
   TemplateParser: JingeTemplateParser,
   aliasManager: aliasManager
 };

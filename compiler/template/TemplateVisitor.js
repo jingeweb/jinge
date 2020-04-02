@@ -6,8 +6,12 @@ const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
 const SVGTags = require('svg-tags');
 const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
-const store = require('../store');
-const i18nManager = require('../i18n');
+const {
+  i18nManager
+} = require('../i18n');
+const {
+  sharedOptions
+} = require('../options');
 const {
   replaceTplStr,
   prependTab,
@@ -16,11 +20,9 @@ const {
   getUniquePostfix
 } = require('../util');
 const {
-  aliasManager,
-  ALIAS_UNIQUE_POSTFIX
+  aliasManager
 } = require('./alias');
 const {
-  CORE_UNIQUE_POSTFIX,
   parse
 } = require('./helper');
 const {
@@ -38,12 +40,6 @@ const {
 } = require('./const');
 const TPL = require('./tpl');
 
-const IMPORT_UNIQUE_POSTFIX = getUniquePostfix();
-
-const CORE_DEP_REG = new RegExp(`([\\w\\d$_]+)${CORE_UNIQUE_POSTFIX}`, 'g');
-const ALIAS_DEP_REG = new RegExp(`([\\w\\d$_]+)${ALIAS_UNIQUE_POSTFIX}`, 'g');
-const IMPORT_DEP_REG = new RegExp(`([\\w\\d$_]+)${IMPORT_UNIQUE_POSTFIX}`, 'g');
-
 const KNOWN_ATTR_TYPES = [
   /* bellow is parameter related attribute types */
   /* s is just alias of str */
@@ -58,6 +54,15 @@ const KNOWN_ATTR_TYPES = [
   '_t'
 ];
 
+function genCstylePid(pid, sid, underI18n) {
+  if (!pid && !sid) return '';
+  else if (pid && sid) return `compStyle: {...${pid}, [cstyId${underI18n ? ' || ""' : ''}]: ${underI18n ? 'cstyId || null' : '""'}},`;
+  else if (pid) return `compStyle: ${pid} ? { ...${pid} } : null,`;
+  else return `compStyle: {[cstyId${underI18n ? ' || ""' : ''}]: ${underI18n ? 'cstyId || null' : '""'}},`;
+}
+
+let cachedImportPostfix = '';
+
 class TemplateVisitor extends TemplateParserVisitor {
   constructor(opts) {
     super();
@@ -66,14 +71,19 @@ class TemplateVisitor extends TemplateParserVisitor {
     this._id = opts.rndId;
     this._source = opts.source;
     this._resourcePath = opts.resourcePath;
-    this._componentStyleId = opts.componentStyleId;
+    this._webpackLoaderContext = opts.webpackLoaderContext;
+    this._importPostfix = cachedImportPostfix || (cachedImportPostfix = '_' + crypto.createHmac('sha256', 'import-postfix').update(sharedOptions.symbolPostfix).digest('hex').substr(0, 12));
     this._baseLinePosition = opts.baseLinePosition || 1;
-    this._isProdMode = store.options.compress;
+    this._isProdMode = sharedOptions.compress;
     this._imports = {};
     this._importOutputCodes = [];
-    this._i18nRenderDepsCodes = [];
+    this._i18nRenderDeps = {
+      codes: [],
+      keys: new Map()
+    };
     this._aliasImports = {};
     this._needHandleComment = true;
+    this._cstyId = opts.componentStyleId;
     this._parent = {
       type: 'component', sub: 'root'
     };
@@ -86,10 +96,10 @@ class TemplateVisitor extends TemplateParserVisitor {
     }
     idx = idx + 1;
     const eidx = this._source.indexOf('\n', idx);
-    console.error(`${type} occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
-  > ${this._source.substring(idx, eidx > idx ? eidx : this._source.length)}
-  > ${this._resourcePath}
-  > ${msg}\n`);
+    this._webpackLoaderContext.emitError(new Error(`${type} occur at line ${tokenPosition.line + this._baseLinePosition - 1}, column ${tokenPosition.column}:
+> ${this._source.substring(idx, eidx > idx ? eidx : this._source.length)}
+> ${this._resourcePath}
+> ${msg}`));
   }
 
   _throwParseError(tokenPosition, msg) {
@@ -99,7 +109,7 @@ class TemplateVisitor extends TemplateParserVisitor {
 
   _replace_tpl(str, ctx) {
     ctx = ctx || {};
-    ctx.POSTFIX = CORE_UNIQUE_POSTFIX;
+    ctx.POSTFIX = sharedOptions.symbolPostfix;
     return replaceTplStr(str, ctx);
   }
 
@@ -258,10 +268,6 @@ class TemplateVisitor extends TemplateParserVisitor {
   }
 
   _parse_attrs(mode, tag, ctx, parentInfo) {
-    // console.log(this._resourcePath);
-    // if (this._resourcePath.endsWith('button.html')) {
-    //   debugger;
-    // }
     const attrCtxs = ctx.htmlAttribute();
     if (!attrCtxs || attrCtxs.length === 0) {
       return {
@@ -718,31 +724,108 @@ class TemplateVisitor extends TemplateParserVisitor {
     }) : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
-    const constAttrs = result.constAttrs;
-    if (this._componentStyleId) {
-      constAttrs.unshift([this._componentStyleId, '']);
-    }
     /**
-     * 如果 html 元素上有 slog-use: 或 slot-pass: 属性，相当于包裹在 <_slot> 组件里。
-     * 比如 <span slot-use:default>default text</span> 等价于:
-     * <_slot slot-use:default><span>default text</span></_slot>
+     * 在某个组件（假设为 A 组件）的模板文件（假设为 a.html）里，任意一个 html 元素（假设为 x 元素）只会有以下四种情况：
      *
-     * 因此，如果 html 元素上满足 result.argUse || result.argPass 则也需要赋予父组件的 styleId，
-     * 但需要理解这个时候的父组件（component），不是当前模板所属于的组件（vm_0）。
+     * 1：x 是模板文件里的根节点，或某个 html 元素的根子节点。x 没有 slot-use: 或 slot-pass: 类型的属性。例如：
+     *
+     * ````html
+     * <!-- a.html -->
+     * <x/> <!-- 模板文件的根节点 -->
+     * <div><x/></div> <!-- 某个 html 元素的根子节点- -->
+     * <B><span><x/></span></B> <!-- 某个 html 元素的根子节点 -->
+     * ````
+     *
+     * 这种情况下， x 会被添加 A 组件的 component style。同时，如果 x 是 a.html 文件的根子节点，还会继承 A 组件继承下来的 component style。
+     *
+     * 2：x 是 <_slot slot-use:? /> 的根子节点，或等价的情况， x 有 slot-use: 类型的属性。例如：
+     *
+     * ````html
+     * <!-- a.html -->
+     * <_slot slot-use:default><x/></_slot>
+     * <div><x slot-use:default/></div>
+     * ````
+     *
+     * 这种情况下，x 会被添加 A 组件的 component style。如果 <_slot> 是 a.html 的根子节点，则 x 需要继承  <_slot> 继承的 component style，而 <_slot> 是根子节点会继承  A，因此 x 最终实际继承 A 组件继承的 component style。
+     * 为了简化代码逻辑，实际的代码逻辑，不论 _slot 是否是根子节点 ，x 始终继承 <_slot/> 继承的 component style。
+     *
+     * 3：x 是 <_slot slot-pass:/> 的根子节点，或等价的，x 有 slot-pass: 类型的属性。例如：
+     *
+     * ````html
+     * <!-- a.html -->
+     * <B><_slot slot-pass:default><x/></_slot></B>
+     * <div><B><x slot-pass:default/><x/></B></div>
+     * ````
+     *
+     * 这种情况下，x 元素实际会被作为 slot 传递给另一个组件（假设为 B 组件）。因此，x 除了会被添加 A 组件的 component style 外，还需要继承 B 组件的 component style，但不需要继承 A 组件继承的 component style。（有个特例是，如果 B 组件在 a.html 模板里是根子节点，则它会继承 A 组件的 component style，这种情况下 x 最终也会继承下来 A 的 component style）。
+     *
+     * 4：x 是另一个组件（假设为 B 组件）的根子节点，或 x 是多语言 <_t> 元素的根子节点。例如：
+     *
+     * ````html
+     * <!-- a.html -->
+     * <B><x/><span>hello</span></B>
+     * <_t><x/></_t>
+     * ````
+     *
+     * 这种情况下，本质等价于：
+     *
+     * ````html
+     * <!-- a.html -->
+     * <B><_slot slot-pass:default><x/><span>hello</span></_slot></B>
+     * <I18nComponent><_slot slot-pass:default><x/></_slot></I18nComponent>
+     * ````
+     *
+     * 因此，只需要按上述第 3 点的情况处理 component style 即可。
+     * 
      */
-    const needAddParentStyId = result.argUse || result.argPass || this._parent.type === 'component';
-    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${constAttrs.length > 0 || needAddParentStyId ? '' : 'WithoutAttrs'}`;
-    const ce = `${ceFn}${CORE_UNIQUE_POSTFIX}`;
+    // 综合上述逻辑，只要 html 元素上有 slot-pass: 类型的属性，或者 html 元素是
+    // component（包括 _slot 和组件元素） 的根子节点，都需要继承上下文父元素的 component style。
+    const needAddParentStyId = result.argPass || this._parent.type === 'component';
+    /**
+     * 如果当前模板有 component style，则需要将该 style 添加到 html 元素上。
+     * 但需要注意，在多语言环境下，不同的模板文件可能复用局部的 <_t> 代码。比如：
+     * 
+     * ````html
+     * <!-- A 组件： a.html -->
+     * <_t><p>Hello</_t>
+     * ````
+     * 
+     * 和：
+     * 
+     * ````html
+     * <!-- B 组件： b.html -->
+     * <_t><p>Hello</_t>
+     * ````
+     * 
+     * 这两个组件，会复用 <p>Hello</p> 这个多语言资源，这个元素的渲染代码实际会被
+     * 抽取到多语言资源包文件里，这种情况下，是无法在编译的时候就知道 p 元素是否需要
+     * 添加模板的 component style 以及该添加哪个模板（a.html 还是 b.html）的 component style。
+     * 
+     * 因此在多语言的情况下，编译时生成的代码始终添加 component style，但实际运行时
+     * 判断 component style id 是否存在。
+     */
+    const needTplStyId = this._cstyId || this._underMode_T;
+
+    const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${result.constAttrs.length > 0 || needTplStyId || needAddParentStyId ? '' : 'WithoutAttrs'}`;
+    const ce = `${ceFn}${sharedOptions.symbolPostfix}`;
     const arr = [`"${etag}"`];
-    if (constAttrs.length > 0) {
-      const attrsCode = '{\n' + this._prependTab(result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`).join(',\n')) + '\n}';
+    if (result.constAttrs.length > 0 || needTplStyId) {
+      const attrsArr = result.constAttrs.map(at => `  ${attrN(at[0])}: ${JSON.stringify(at[1])}`);
+      if (needTplStyId) {
+        if (this._underMode_T) {
+          attrsArr.push(`[cstyId || ""]: cstyId ? "" : null`);
+        } else {
+          attrsArr.push(`[cstyId]: ""`);
+        }
+      }
+      const attrsCode = `{\n${attrsArr.join(',\n')}\n}`;
       if (needAddParentStyId) {
-        arr.push(`assignObject${CORE_UNIQUE_POSTFIX}(${attrsCode}, component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}])`);
+        arr.push(`Object.assign(${attrsCode}, component[__${sharedOptions.symbolPostfix}].compStyle)`);
       } else {
         arr.push(attrsCode);
       }
     } else if (needAddParentStyId) {
-      arr.push(`component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]`);
+      arr.push(`component[__${sharedOptions.symbolPostfix}].compStyle`);
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -756,9 +839,9 @@ ${result.argAttrs.map((at, i) => {
       const attr = HTML_BOOL_IDL_ATTRS[at[0]];
       if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
         return this._replace_tpl(at[1], {
-          REL_COM: 'component',
+          REL_COM: `component[$$${sharedOptions.symbolPostfix}]`,
           ROOT_INDEX: i.toString(),
-          RENDER_START: `el[HTML_ATTR_${at[0]}${CORE_UNIQUE_POSTFIX}] = !!(`,
+          RENDER_START: `el.${at[0]} = !!(`,
           RENDER_END: ');'
         });
       }
@@ -766,15 +849,15 @@ ${result.argAttrs.map((at, i) => {
       const attr = HTML_COMMON_IDL_ATTRS[at[0]];
       if (attr.tags === '*' || attr.tags.indexOf(etag) >= 0) {
         return this._replace_tpl(at[1], {
-          REL_COM: 'component',
+          REL_COM: `component[$$${sharedOptions.symbolPostfix}]`,
           ROOT_INDEX: i.toString(),
-          RENDER_START: `el[HTML_ATTR_${at[0]}${CORE_UNIQUE_POSTFIX}] = `,
+          RENDER_START: `el.${at[0]} = `,
           RENDER_END: ';'
         });
       }
     }
     return this._replace_tpl(at[1], {
-      REL_COM: 'component',
+      REL_COM: `component[$$${sharedOptions.symbolPostfix}]`,
       ROOT_INDEX: i.toString(),
       RENDER_START: `setAttribute$POSTFIX$(el, "${at[0]}", `,
       RENDER_END: ');'
@@ -784,7 +867,7 @@ ${result.translateAttrs.map((at, i) => {
     return this._parse_i18n_attr(at, result.argAttrs.length + i, true);
   }).join('\n')}
 ${result.listeners.map(lt => {
-    return `addEvent${CORE_UNIQUE_POSTFIX}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
+    return `addEvent${sharedOptions.symbolPostfix}(el, '${lt[0]}', function(...args) {${lt[1].code}${lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''}${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   }).join('\n')}
 ${setRefCode}
 ${pushEleCode}
@@ -800,8 +883,7 @@ return el;`, true) + '\n})()';
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
-        [rtnEl], result.argUse, result.vmPass, vmLevel,
-        this._componentStyleId, this._parent.type === 'component'
+        [rtnEl], result.argUse, result.vmPass, vmLevel
       );
     }
     if (result.argPass) {
@@ -828,6 +910,16 @@ return el;`, true) + '\n})()';
     }
 
     const vmsArgs = ['vm_0', ...this._vms.map((n, i) => `vm_${i + 1}`)].join(', ');
+    const registerI18N = (code) => {
+      [...code.matchAll(new RegExp(`[\\w\\d$_]+${sharedOptions.symbolPostfix}`, 'g'))].forEach(m => {
+        if (this._i18nRenderDeps.keys.has(m[0])) return;
+        this._i18nRenderDeps.keys.set(m[0], true);
+        const idx = i18nManager.registerRenderDep(m[0]);
+        if (idx >= 0) {
+          this._i18nRenderDeps.codes.push(`i18n${sharedOptions.symbolPostfix}.__regDep(${idx}, ${m[0]});`);
+        }
+      });
+    };
     const i18nKey = i18nManager.registerToAttr(at.value, this._resourcePath, (locale, text) => {
       const expr = this._parse_attr_value(text || at.value);
       let code;
@@ -835,24 +927,20 @@ return el;`, true) + '\n})()';
         code = this._parse_expr(expr, at.ctx).join('\n');
       } catch (ex) {
         if (locale !== i18nManager.defaultLocale.name) {
-          console.error(`Parse i18n expression failed, locale: ${locale}, expression: ${text}`);
+          this._webpackLoaderContext.emitError(new Error(`Parse i18n expression failed, locale: ${locale}, expression: ${text}`));
         }
         throw ex;
       }
       code = this._replace_tpl(code, {
         ROOT_INDEX: '',
         RENDER_START: 'const __attrV = ',
-        RENDER_END: `;\n      isDOM ? setAttribute${CORE_UNIQUE_POSTFIX}(target, attrName, __attrV) : target[attrName] = __attrV;`,
-        REL_COM: 'component'
+        RENDER_END: `;\n      isDOM ? setAttribute${sharedOptions.symbolPostfix}(target, attrName, __attrV) : target[attrName] = __attrV;`,
+        REL_COM: `component[$$${sharedOptions.symbolPostfix}]`
       });
-      code = code.replace(CORE_DEP_REG, (m0, m1) => {
-        const idx = i18nManager.registerRenderDep(m1);
-        if (idx >= 0) {
-          this._i18nRenderDepsCodes.push(`i18n${CORE_UNIQUE_POSTFIX}[I18N_REG_DEP${CORE_UNIQUE_POSTFIX}](${idx}, ${m0});`);
-        }
-        return m1;
-      });
+      registerI18N(code);
       return `function(target, attrName, isDOM, component, ${vmsArgs}) {\n${prependTab(code, true, 4)}\n  }`;
+    }, code => {
+      registerI18N(code);
     });
 
     return this._replace_tpl(isDOM ? TPL.ATTR_I18N_DOM_EXPR : TPL.ATTR_I18N_COMP_EXPR_ON, {
@@ -863,7 +951,7 @@ return el;`, true) + '\n})()';
     });
   }
 
-  _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel, componentStyleId, addParentStyleId) {
+  _parse_arg_use_parameter(elements, argUse, vmPass, vmLevel) {
     let vmPassInitCode = '';
     let vmPassSetCode = '';
     let vmPassWatchCode = '';
@@ -875,11 +963,11 @@ return el;`, true) + '\n})()';
           ROOT_INDEX: i.toString(),
           RENDER_START: `attrs.${vp.name} = `,
           RENDER_END: ';',
-          REL_COM: 'el'
+          REL_COM: `el[$$${sharedOptions.symbolPostfix}]`
         });
         vmPassWatchCode += this._replace_tpl(vp.expr.slice(3).join('\n'), {
           ROOT_INDEX: i.toString(),
-          REL_COM: 'el'
+          REL_COM: `el[$$${sharedOptions.symbolPostfix}]`
         });
         vmPassParamCode.push(vp.name);
       });
@@ -889,16 +977,14 @@ return el;`, true) + '\n})()';
       sub: 'parameter',
       value: this._replace_tpl(TPL.PARAMETER, {
         VM_RENDERER: argUse.component ? argUse.component : 'vm_0',
-        VM_DEBUG_NAME: this._isProdMode ? '' : `[VM_DEBUG_NAME${CORE_UNIQUE_POSTFIX}]: "attrs_of_<parameter>",`,
+        VM_DEBUG_NAME: !this._isProdMode ? `debugName: "attrs_of_<parameter>",` : '',
         VM_PASS_INIT: vmPassInitCode,
         VM_PASS_SET: this._prependTab(vmPassSetCode),
         VM_PASS_WATCH: this._prependTab(vmPassWatchCode),
         VM_PASS_PARAM: JSON.stringify(vmPassParamCode),
         PUSH_ELE: this._prependTab(this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE)),
         ARG_USE: argUse.fn,
-        CSTYLE_PID: this._prependTab(componentStyleId || addParentStyleId ? (
-          `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${addParentStyleId ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${componentStyleId ? `, '${componentStyleId}'` : ''});`
-        ) : ''),
+        CSTYLE_PID: genCstylePid(this._parent.type === 'component' ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '', this._cstyId, this._underMode_T),
         DEFAULT: elements.length > 0 ? this._prependTab(this._gen_render(elements, vmLevel)) : 'null'
       })
     };
@@ -988,17 +1074,28 @@ return el;`, true) + '\n})()';
       }
       return c.getText();
     }).join('').trim().replace(/\n\s*/g, '');
-
     if (type === 0) {
       const key = i18nManager.registerToDict(innerHtml, this._resourcePath);
       return {
         type: 'component',
         sub: 'normal',
-        value: `i18nRenderFn${CORE_UNIQUE_POSTFIX}(component, ${JSON.stringify(key)}, ${this._parent.type === 'component'})`
+        value: `i18nRenderFn${sharedOptions.symbolPostfix}(component, ${JSON.stringify(key)}, ${this._parent.type === 'component'})`
       };
     }
 
-    const args = ['component', 'vm_0', ...this._vms.map((vm, i) => `vm_${i + 1}`)];
+    const args = ['component', 'cstyId', 'vm_0', ...this._vms.map((vm, i) => `vm_${i + 1}`)];
+    const registerI18N = (renderOfContentNodes) => {
+      [new RegExp(`[\\w\\d$_]+${sharedOptions.symbolPostfix}`, 'g'), new RegExp(`[\\w\\d$_]+${aliasManager.aliasPostfix}`, 'g'), new RegExp(`[\\w\\d$_]+${this._importPostfix}`, 'g')].forEach(reg => {
+        [...renderOfContentNodes.matchAll(reg)].forEach(m => {
+          if (this._i18nRenderDeps.keys.has(m[0])) return;
+          this._i18nRenderDeps.keys.set(m[0], true);
+          const idx = i18nManager.registerRenderDep(m[0]);
+          if (idx >= 0) {
+            this._i18nRenderDeps.codes.push(`i18n${sharedOptions.symbolPostfix}.__regDep(${idx}, ${m[0]});`);
+          }
+        });
+      });
+    }
     const key = i18nManager.registerToRender(innerHtml, this._resourcePath, (locale, contentOrNodes) => {
       if (typeof contentOrNodes === 'string') {
         if (!contentOrNodes) {
@@ -1006,7 +1103,7 @@ return el;`, true) + '\n})()';
         } else {
           const [err, tree] = parse(contentOrNodes);
           if (err) {
-            console.error(`i18n parse error locale "${locale}" at ${this._resourcePath}`);
+            this._webpackLoaderContext.emitError(new Error(`i18n parse error locale "${locale}" at ${this._resourcePath}`));
             contentOrNodes = defaultLocaleContentNodes;
           } else {
             contentOrNodes = tree.children;
@@ -1024,29 +1121,28 @@ return el;`, true) + '\n})()';
       }).filter(el => !!el).map(r => r.value).join(',\n');
       this._exit();
       this._underMode_T = false;
-      [CORE_DEP_REG, ALIAS_DEP_REG, IMPORT_DEP_REG].forEach(reg => {
-        renderOfContentNodes = renderOfContentNodes.replace(reg, (m0, m1) => {
-          const idx = i18nManager.registerRenderDep(m1);
-          if (idx >= 0) {
-            this._i18nRenderDepsCodes.push(`i18n${CORE_UNIQUE_POSTFIX}[I18N_REG_DEP${CORE_UNIQUE_POSTFIX}](${idx}, ${m0});`);
-          }
-          return m1;
-        });
-      });
+      registerI18N(renderOfContentNodes);
       const renderFnCode = `function(${args.join(', ')}) { return [
 ${prependTab(renderOfContentNodes, true, 4)}
   ]}`;
       return renderFnCode;
+    }, (renderOfContentNodes) => {
+      registerI18N(renderOfContentNodes);
     });
 
     const isParentComponent = this._parent.type === 'component';
     const code = this._replace_tpl(TPL.I18N, {
       PUSH_ELE: this._replace_tpl(isParentComponent ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE),
       RENDER_KEY: JSON.stringify(key),
-      VMS: args.slice(1).join(', '),
-      CSTYLE_PID: this._componentStyleId || isParentComponent ? (
-        `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${isParentComponent ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});`
-      ) : ''
+      VMS: args.slice(2).join(', '),
+      CSTYLE_PID: genCstylePid(
+        isParentComponent ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '', 
+        // _t 对应的 I18n 组件，只需要处理从父组件继承的 component style，
+        // 不需要添加模板的 cstyId。
+        false, false
+      ),
+      // 模板的 cstyId 单独传递给组件作特殊处理。
+      CSTYID: this._cstyId ? `cstyId` : 'null',
     });
 
     return {
@@ -1085,8 +1181,7 @@ ${prependTab(renderOfContentNodes, true, 4)}
     const vmLevel = result.vms.length > 0 ? result.vms[result.vms.length - 1].level : -1;
     if (tag === '_slot' && result.argUse) {
       return this._parse_arg_use_parameter(
-        elements, result.argUse, result.vmPass, vmLevel,
-        this._componentStyleId, this._parent.type === 'component'
+        elements, result.argUse, result.vmPass, vmLevel
       );
     }
 
@@ -1112,26 +1207,30 @@ ${prependTab(renderOfContentNodes, true, 4)}
     result.argAttrs.length > 0 && attrs.push(...result.argAttrs.map(at => `${attrN(at[0])}: null`));
     result.translateAttrs.length > 0 && attrs.push(...result.translateAttrs.map(at => `${at[0]}: null`));
     result.constAttrs.length > 0 && attrs.push(...result.constAttrs.map(at => `${attrN(at[0])}: ${JSON.stringify(at[1])}`));
-    if (elements.length > 0) {
-      attrs.push(`[ARG_COMPONENTS${CORE_UNIQUE_POSTFIX}]: {
-${this._prependTab(elements.map(el => `[${el.argPass === 'default' ? `STR_DEFAULT${CORE_UNIQUE_POSTFIX}` : `'${el.argPass}'`}]: ${el.value}`).join(',\n'))}
-}`);
-    }
-    const vmAttrs = `const attrs = wrapAttrs${CORE_UNIQUE_POSTFIX}({
-${this._isProdMode ? '' : `  [VM_DEBUG_NAME${CORE_UNIQUE_POSTFIX}]: "attrs_of_<${tag}>",`}
-${this._prependTab(`[VM_ATTRS${CORE_UNIQUE_POSTFIX}]: null,`)}
-${this._prependTab(`[CONTEXT${CORE_UNIQUE_POSTFIX}]: component[CONTEXT${CORE_UNIQUE_POSTFIX}],`)}
-${result.listeners.length > 0 ? this._prependTab(`[LISTENERS${CORE_UNIQUE_POSTFIX}]: {
-${result.listeners.map(lt => `  ${attrN(lt[0])}: [function(...args) {${lt[1].code}}, ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'}]`)}
+    
+    const needAddParentStyId = result.argPass || this._parent.type === 'component';
+    const cstyle = genCstylePid(
+      needAddParentStyId ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '',
+      this._underMode_T ? true : this._cstyId,
+      this._underMode_T
+    );
+    const vmAttrs = `const attrs = attrs${sharedOptions.symbolPostfix}({
+  [__${sharedOptions.symbolPostfix}]: {
+${!this._isProdMode ? `    debugName: "attrs_of_<${tag}>",` : ''}
+${cstyle ? '    ' + cstyle : ''}
+${this._prependTab(`  context: component[__${sharedOptions.symbolPostfix}].context,`)}
+${result.listeners.length > 0 ? this._prependTab(`  listeners: {
+${result.listeners.map(lt => `    ${attrN(lt[0])}: { fn: function(...args) { ${lt[1].code} }, opts: ${lt[1].tag ? `${JSON.stringify(lt[1].tag)}` : 'null'} }`)}
 },`) : ''}
+${elements.length > 0 ? this._prependTab(`  slots: {
+${elements.map(el => `    '${el.argPass}': ${el.value}`).join(',\n')}
+}`) : ''}
+  },
 ${this._prependTab(attrs.join(',\n'), true)}
 });
 ${result.argAttrs.map((at, i) => this._replace_tpl(at[1], {
-    REL_COM: 'component',
-    ROOT_INDEX: i.toString(),
-    // RENDER_START: `attrs.${at[0]} = ${at[0].startsWith('_') ? '' : 'wrapViewModel$POSTFIX$('}`,
-    // RENDER_END: at[0].startsWith('_') ? ';' : ');'
-    // TODO: add wrapViewModel when expression is literal object/array
+  REL_COM: `component[$$${sharedOptions.symbolPostfix}]`,
+  ROOT_INDEX: i.toString(),
     RENDER_START: `attrs.${at[0]} = `,
     RENDER_END: ';'
   })).join('\n')}
@@ -1139,11 +1238,9 @@ ${result.translateAttrs.map((at, i) => {
       return this._parse_i18n_attr(at, result.argAttrs.length + i, false);
   }).join('\n')}`;
 
-    const needAddParentStyId = result.argPass || result.argUse || this._parent.type === 'component';
-    const styleIdCode = this._componentStyleId || needAddParentStyId ? `addParentStyleId${CORE_UNIQUE_POSTFIX}(el, ${needAddParentStyId ? `component[CSTYLE_PID${CORE_UNIQUE_POSTFIX}]` : 'null'}${this._componentStyleId ? `, '${this._componentStyleId}'` : ''});` : '';
     const code = '...(() => {\n' + this._prependTab(`
 ${vmAttrs}
-const el = new ${Component}(attrs);
+const el = ${Component}.create(attrs);
 ${result.translateAttrs.map((at, i) => {
   at = at[1];
   if (at.type === 'const') {
@@ -1156,10 +1253,9 @@ ${result.translateAttrs.map((at, i) => {
     });
   }
 }).join('\n')}
-${styleIdCode}
 ${setRefCode}
 ${this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : this._replace_tpl(TPL.PUSH_COM_ELE)}
-return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}](component));`, true) + '\n})()';
+return assertRenderResults${sharedOptions.symbolPostfix}(el.__render());`, true) + '\n})()';
 
     const rtnEl = {
       type: 'component', sub: 'normal', value: code
@@ -1167,8 +1263,7 @@ return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}
 
     if (result.argUse) {
       return this._parse_arg_use_parameter(
-        [rtnEl], result.argUse, result.vmPass, vmLevel,
-        this._componentStyleId, this._parent.type === 'component'
+        [rtnEl], result.argUse, result.vmPass, vmLevel
       );
     }
     if (result.argPass) {
@@ -1255,10 +1350,11 @@ return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}
 
       /*
        * convert member expression to optional chain expression:
-       *   a.b.c["d"]e ===>  a?.b?.c?["d"]?.e
-       * TODO: use browser optional chain when supported.
-       *   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Optional_chaining
+       *   a.b.c["d"].e ===>  a?.b?.c?.["d"]?.e
+       * TODO: use browser optional chain when acorn supported.
+       *   https://github.com/acornjs/acorn/pull/891
        */
+      
       const _decl = {
         type: 'VariableDeclaration',
         declarations: new Array(props.length - 1).fill(0).map((n, i) => ({
@@ -1418,7 +1514,7 @@ return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}
     if (computedMemberExprs.length === 0) {
       if (levelPath.length === 1) {
         const needWrapViewModel = expr.type === 'ObjectExpression' || expr.type === 'ArrayExpression';
-        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${needWrapViewModel ? `wrapViewModel${CORE_UNIQUE_POSTFIX}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
+        return ['', `const fn_$ROOT_INDEX$ = () => {\n  $RENDER_START$${needWrapViewModel ? `vm${sharedOptions.symbolPostfix}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$\n};`, 'fn_$ROOT_INDEX$();', '', `${watchPaths.map(p => `${p.vm}[$$${sharedOptions.symbolPostfix}].__watch(${p.n}, fn_$ROOT_INDEX$, $REL_COM$);`).join('\n')}`];
       } else {
         return [`let _${levelId};`, `function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1426,7 +1522,7 @@ return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}
   _calc_${levelId}();
   _notify_${parentLevelId}();
   _update_${parentLevelId}();
-}`, `${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
+}`, `${watchPaths.map(p => `${p.vm}[$$${sharedOptions.symbolPostfix}].__watch(${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`];
       }
     } else {
       const assignCodes = [];
@@ -1478,13 +1574,13 @@ return assertRenderResults${CORE_UNIQUE_POSTFIX}(el[RENDER${CORE_UNIQUE_POSTFIX}
 }
 function _notify_${lv_id}() {
   const _np = [${__p.join(', ')}];
-  const _eq = _${lv_id}_p && arrayEqual${CORE_UNIQUE_POSTFIX}(_${lv_id}_p, _np);
+  const _eq = _${lv_id}_p && arrayEqual${sharedOptions.symbolPostfix}(_${lv_id}_p, _np);
   if (_${lv_id}_p && !_eq) {
-    vm_${level}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_OFF${CORE_UNIQUE_POSTFIX}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[$$${sharedOptions.symbolPostfix}].__unwatch(_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
   if (!_${lv_id}_p || !_eq) {
     _${lv_id}_p = _np;
-    vm_${level}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](_${lv_id}_p, _update_${lv_id}, $REL_COM$);
+    vm_${level}[$$${sharedOptions.symbolPostfix}].__watch(_${lv_id}_p, _update_${lv_id}, $REL_COM$);
   }
 }`);
         initCodes.push(`_calc_${lv_id}();`);
@@ -1496,11 +1592,11 @@ function _notify_${lv_id}() {
       if (levelPath.length === 1) {
         const needWrapViewModel = expr.type === 'ObjectExpression' || expr.type === 'ArrayExpression';
         calcCodes.push(`function _calc_${levelId}() {
-  $RENDER_START$${needWrapViewModel ? `wrapViewModel${CORE_UNIQUE_POSTFIX}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$
+  $RENDER_START$${needWrapViewModel ? `vm${sharedOptions.symbolPostfix}(` : ''}${escodegen.generate(expr)}${needWrapViewModel ? ')' : ''}$RENDER_END$
 }`);
         initCodes.push(`_calc_${levelId}();`);
         updateCodes.unshift(`function _update_${levelId}() { _calc_${levelId}(); }`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[$$${sharedOptions.symbolPostfix}].__watch(${p.n}, _calc_${levelId}, $REL_COM$);`).join('\n')}`);
       } else {
         calcCodes.push(`function _calc_${levelId}() {
   _${levelId} = ${escodegen.generate(expr)};
@@ -1510,7 +1606,7 @@ function _notify_${lv_id}() {
   _notify_${parentLevelId}();
 }`);
         initCodes.push(`_calc_${levelId}();`);
-        watchCodes.push(`${watchPaths.map(p => `${p.vm}[VM_ATTRS${CORE_UNIQUE_POSTFIX}][VM_ON${CORE_UNIQUE_POSTFIX}](${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
+        watchCodes.push(`${watchPaths.map(p => `${p.vm}[$$${sharedOptions.symbolPostfix}].__watch(${p.n}, _update_${levelId}, $REL_COM$);`).join('\n')}`);
       }
 
       return [
@@ -1547,7 +1643,6 @@ function _notify_${lv_id}() {
         locations: true
       });
     } catch (ex) {
-      console.error(ex);
       this._throwParseError(ctx.start, 'expression grammar error.');
     }
     if (expr.body.length > 1 || expr.body[0].type !== 'ExpressionStatement') {
@@ -1573,7 +1668,8 @@ function _notify_${lv_id}() {
   }
 
   _gen_render(elements, vmLevel = -1) {
-    const body = this._prependTab(`${vmLevel >= 0 ? `const vm_${vmLevel} = component;` : ''}
+    const body = this._prependTab(`${vmLevel >= 0 ? `const vm_${vmLevel} = component;
+${this._cstyId ? `const cstyId = "${this._cstyId}";` : ''}` : ''}
 return [
 ${this._join_elements(elements)}
 ];`);
@@ -1595,7 +1691,7 @@ ${body}
     const elements = super.visitHtml(ctx).filter(el => !!el);
     return {
       renderFn: this._gen_render(elements, 0),
-      i18nDeps: this._i18nRenderDepsCodes.join('\n'),
+      i18nDeps: this._i18nRenderDeps.codes.join('\n'),
       aliasImports: aliasManager.getCode(this._aliasImports),
       imports: this._importOutputCodes.join('\n').trim()
     };
@@ -1630,7 +1726,7 @@ ${body}
         txt = txt.substring(2, txt.length - 1).trim(); // extract from '${}'
         if (!txt) return;
         const result = this._replace_tpl(this._parse_expr(txt, cn).join('\n'), {
-          REL_COM: 'component',
+          REL_COM: `component[$$${sharedOptions.symbolPostfix}]`,
           ROOT_INDEX: '0',
           RENDER_START: 'setText$POSTFIX$(el, ',
           RENDER_END: ');'
@@ -1705,9 +1801,9 @@ ${body}
         sourceType: 'module'
       });
     } catch (ex) {
-      console.error('Warning: keyword "import" is found in comment, but got error when tring to parse it as js code. see https://[todo]');
-      console.error(' >', ex.message);
-      console.error(' >', this._resourcePath);
+      this._webpackLoaderContext.emitError(new Error(`Warning: keyword "import" is found in comment, but got error when tring to parse it as js code. see https://[todo]
+ > ${ex.message}
+ > ${this._resourcePath}`));
       return;
     }
     tree.body = tree.body.filter(node => {
@@ -1742,7 +1838,7 @@ ${body}
           );
         }
         const hash = crypto.createHash('md5');
-        this._imports[local] = local + '_' + hash.update(src).digest('hex').substr(0, 12) + IMPORT_UNIQUE_POSTFIX;
+        this._imports[local] = local + '_' + hash.update(src).digest('hex').substr(0, 12) + this._importPostfix;
         spec.local = {
           type: 'Identifier', name: this._imports[local]
         };

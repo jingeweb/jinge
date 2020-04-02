@@ -7,4 +7,5 @@ node_modules
 .jshintrc
 .jshint
 .jshint.json
-dist
+dist/
+lib/

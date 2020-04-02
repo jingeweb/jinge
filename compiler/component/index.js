@@ -3,35 +3,39 @@ const {
 } = require('acorn');
 const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
+const crypto = require('crypto');
 const path = require('path');
+const {
+  sharedOptions
+} = require('../options');
 const {
   TemplateParser
 } = require('../template');
 const {
-  CSSParser
+  CSSParser, styleManager
 } = require('../style');
 const {
   prependTab,
   isString,
   isArray,
   arrayIsEqual,
-  getJingeBase
+  getJingeBase,
+  KeyGenerator
 } = require('../util');
-
-const store = require('../store');
-const i18nManager = require('../i18n');
+const {
+  i18nManager
+} = require('../i18n');
 const baseManager = require('./base');
 const {
-  BASE_UNIQUE_POSTFIX,
-  jingeEntryFile,
-  jingeUtilFile,
-  jingeUtilCommonFile,
   _n_vm,
   _n_wrap
 } = require('./helper');
 
+// html attribute is case insensitive
+const cstyKeyGenerator = new KeyGenerator('abcdefghijklmnopqrstuvwxyz0123456789', '_');
+
 class ComponentParser {
-  static parse(content, sourceMap, options = {}) {
+  static parse(content, sourceMap, options) {
     return (new ComponentParser(options)).parse(content);
   }
 
@@ -39,7 +43,7 @@ class ComponentParser {
     this.resourcePath = options.resourcePath;
     this.jingeBase = getJingeBase(this.resourcePath);
     this.webpackLoaderContext = options.webpackLoaderContext;
-    this._store = {
+    this._localStore = {
       templates: new Map(),
       styles: new Map()
     };
@@ -48,7 +52,6 @@ class ComponentParser {
     this.styleRequireScoped = !!options.styleRequireScoped;
     this._constructorRanges = [];
     this._replaces = null;
-    this._needRemoveSymbolDesc = false;
     this._needHandleI18NTranslate = false;
 
     this._tplGlobalImports = new Set();
@@ -87,13 +90,12 @@ class ComponentParser {
     }
     const _isHtml = /\.htm(?:l)?$/.test(testSource);
     const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(testSource);
-
     if (node.specifiers.length === 0) {
       if (_isStyle) {
         source = source || (await this._resolve(node));
-        if (!store.extractStyles.has(source)) {
-          store.extractStyles.set(source, {
-            code: null
+        if (!styleManager.extractStyles.has(source)) {
+          styleManager.extractStyles.set(source, {
+            css: null, map: null
           });
         }
       }
@@ -124,10 +126,10 @@ class ComponentParser {
           source = await this._resolve(node);
         }
         if (_isHtml) {
-          this._store.templates.set(local, source);
+          this._localStore.templates.set(local, source);
         } else {
           // debugger;
-          this._store.styles.set(local, source);
+          this._localStore.styles.set(local, source);
         }
         return false;
       }
@@ -154,14 +156,6 @@ class ComponentParser {
         if (local === '_t' && node.source.value === 'jinge') {
           // console.log('found _t', this.resourcePath);
           this._needHandleI18NTranslate = true;
-        }
-      }
-      if (store.options.compress && imported === 'Symbol') {
-        if (!source) {
-          source = await this._resolve(node);
-        }
-        if (source === jingeUtilFile || source === jingeUtilCommonFile || source === jingeEntryFile) {
-          this._needRemoveSymbolDesc = true;
         }
       }
       if (!needHandleComponent && (imported in baseManager.componentBase)) {
@@ -206,18 +200,25 @@ class ComponentParser {
     let styInfo;
     if (styNode) {
       if (this._previousClassWithSty) {
+        // 当前版本限定一个文件只能注册一次 component style
         throw new Error(`A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`);
       }
       this._previousClassWithSty = node.id.name;
-      const csm = store.components;
+      const csm = styleManager.components;
       if (!csm.has(this.resourcePath)) {
+        const sid = cstyKeyGenerator.generate(this.resourcePath);
+        if (sid.indexOf('_') >= 0) {
+          this.webpackLoaderContext.emitWarning(new Error(
+            `${this.resourcePath} has conflict hashed style id: ${sid}`
+          ));
+        }
         csm.set(this.resourcePath, {
-          id: store.genId()
+          id: (sharedOptions.style.attrPrefix || '_') + sid
         });
       }
       const sty = this.walkStyle(styNode, csm.get(this.resourcePath));
       if (sty) {
-        const sts = store.styles;
+        const sts = styleManager.styles;
         styInfo = sts.get(sty.file);
         if (styInfo && styInfo.component !== this.resourcePath) {
           throw new Error(`style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
@@ -240,17 +241,14 @@ class ComponentParser {
 
   _addI18nImports() {
     this._tplCodeOfImports.add(`import {
-  i18n as i18n${BASE_UNIQUE_POSTFIX},
-  I18N_GET_TEXT as I18N_GET_TEXT${BASE_UNIQUE_POSTFIX}
+  i18n as __i18n${sharedOptions.symbolPostfix}
 } from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'core')}';`);
   }
 
   _addConstructorImports() {
     this._tplCodeOfImports.add(`import {
-  VM_ATTRS as VM_ATTRS${BASE_UNIQUE_POSTFIX},
-  VM_ON as VM_ON${BASE_UNIQUE_POSTFIX},
-  wrapComponent as wrapComponent${BASE_UNIQUE_POSTFIX}
-} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'vm')}';`);
+  $$ as __$$${sharedOptions.symbolPostfix}
+} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'vm/common')}';`);
   }
 
   _parse_mem_path(memExpr, attrsName) {
@@ -275,7 +273,9 @@ class ComponentParser {
           paths.unshift(propertyExpr.name);
         }
       }
-      if (objectExpr.type === 'Identifier') {
+      if (objectExpr.type === 'ThisExpression') {
+        root = objectExpr;
+      } else if (objectExpr.type === 'Identifier') {
         root = objectExpr;
         paths.unshift(objectExpr.name);
       } else {
@@ -293,7 +293,7 @@ class ComponentParser {
       return null;
     }
 
-    if (root.name !== attrsName) {
+    if (root.type !== 'Identifier' || root.name !== attrsName) {
       return null;
     }
     if (computed > 0) {
@@ -322,17 +322,13 @@ class ComponentParser {
     const an = fn.params.length === 0 ? null : fn.params[0].name;
     if (!an) throw new Error(`constructor of ${ClassName} must accept at least one argument.`);
     let foundSupper = false;
-    const vm = `vm${BASE_UNIQUE_POSTFIX}`;
+    const vm = `__vm${sharedOptions.symbolPostfix}`;
     const replaceThis = stmt => {
       this._walkAcorn(stmt, {
-        MemberExpression: mem => {
-          if (mem.object.type === 'ThisExpression') {
-            mem.object = {
-              type: 'Identifier',
-              name: vm
-            };
-            return false;
-          }
+        ThisExpression: ts => {
+          ts.type = 'Identifier';
+          ts.name = vm;
+          return false;
         }
       });
       return stmt;
@@ -353,7 +349,8 @@ class ComponentParser {
             throw new Error(`constructor of ${ClassName} must pass first argument '${an}' to super-class`);
           }
           foundSupper = true;
-          newBody.push(_n_wrap(an));
+          newBody.push(stmt);
+          newBody.push(_n_wrap(sharedOptions.symbolPostfix));
         } else {
           newBody.push(replaceThis(stmt));
         }
@@ -381,19 +378,12 @@ class ComponentParser {
           }
         });
         if (props.length > 0) {
-          newBody.push(..._n_vm(i, replaceThis(stmt), an, props));
+          newBody.push(..._n_vm(i, replaceThis(stmt), an, props, sharedOptions.symbolPostfix));
         } else {
           newBody.push(replaceThis(stmt));
         }
       } else {
         newBody.push(replaceThis(stmt));
-      }
-    });
-    newBody.push({
-      type: 'ReturnStatement',
-      argument: {
-        type: 'Identifier',
-        name: `vm${BASE_UNIQUE_POSTFIX}`
       }
     });
     fn.body.body = newBody;
@@ -422,11 +412,11 @@ class ComponentParser {
     }
     const arg = st.argument;
     if (arg.type === 'Identifier') {
-      if (!this._store.styles.has(arg.name)) {
+      if (!this._localStore.styles.has(arg.name)) {
         throw new Error('static getter `style` must return variable imported on file topest level.');
       }
       return {
-        file: this._store.styles.get(arg.name),
+        file: this._localStore.styles.get(arg.name),
         id: ci.id
       };
     }
@@ -463,11 +453,11 @@ class ComponentParser {
     const arg = st.argument;
     let tpl = '';
     if (arg.type === 'Identifier') {
-      if (!this._store.templates.has(arg.name)) {
+      if (!this._localStore.templates.has(arg.name)) {
         throw new Error('static getter `template` must return variable imported on file topest level.');
       }
-      const source = this._store.templates.get(arg.name);
-      const tps = store.templates;
+      const source = this._localStore.templates.get(arg.name);
+      const tps = styleManager.templates;
       const tplInfo = tps.get(source);
       if (!tplInfo) {
         tps.set(source, {
@@ -497,6 +487,7 @@ class ComponentParser {
       componentStyleId: styInfo ? styInfo.styleId : null,
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
+      webpackLoaderContext: this.webpackLoaderContext,
       wrapCode: false
     });
 
@@ -542,14 +533,14 @@ class ComponentParser {
           this._addI18nImports();
           node.callee = {
             type: 'MemberExpression',
-            computed: true,
+            computed: false,
             object: {
               type: 'Identifier',
-              name: `i18n${BASE_UNIQUE_POSTFIX}`
+              name: `__i18n${sharedOptions.symbolPostfix}`
             },
             property: {
               type: 'Identifier',
-              name: `I18N_GET_TEXT${BASE_UNIQUE_POSTFIX}`
+              name: `__t`
             }
           };
           const key = i18nManager.registerToDict(text.value, this.resourcePath);
@@ -578,7 +569,7 @@ class ComponentParser {
       tree = Parser.parse(code, {
         ranges: true,
         locations: true,
-        ecmaVersion: 2019,
+        ecmaVersion: 2020,
         sourceType: 'module',
         onComment: comments
       });
@@ -594,26 +585,6 @@ class ComponentParser {
         if ((await this.walkImport(n))) {
           needHandleComponent = true;
         }
-      }
-      // in production mode, we remove symbol description to decrease file size
-      if (this._needRemoveSymbolDesc && (n.type === 'VariableDeclaration' || n.type === 'ExportNamedDeclaration')) {
-        this._walkAcorn(n, {
-          CallExpression: node => {
-            if (node.callee.name === 'Symbol') {
-              const args = node.arguments;
-              if (args.length === 0) return false;
-              if (args.length > 1) {
-                throw new Error('Symbol() arguments more than one.');
-              }
-              this._replaces.push({
-                start: args[0].start,
-                end: args[0].end,
-                code: ''
-              });
-              return false;
-            }
-          }
-        });
       }
     }
     if (needHandleComponent) {
@@ -633,8 +604,7 @@ class ComponentParser {
     }
     if (this._replaces.length === 0) {
       return {
-        code,
-        ast: tree
+        code
       };
     }
 
@@ -655,10 +625,6 @@ class ComponentParser {
     if (start < code.length) {
       output += code.substring(start);
     }
-    // console.log(output);
-    // if (this._needHandleI18NTranslate) {
-    //   console.log(this.resourcePath);
-    // }
     return {
       code: output
     };
@@ -666,7 +632,6 @@ class ComponentParser {
 }
 
 module.exports = {
-  BASE_UNIQUE_POSTFIX,
   ComponentParser,
   componentBaseManager: baseManager
 };

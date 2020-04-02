@@ -1,151 +1,148 @@
 const path = require('path');
-const CleanCSS = require('clean-css');
-// const VirtualModulePlugin = require('virtual-module-webpack-plugin');
-const store = require('./store');
-const i18nManager = require('./i18n');
 const {
-  // jingeRoot,
-  isObject,
-  isUndefined
-} = require('./util');
+  sharedOptions,
+  checkCompressOption
+} = require('./options');
+const {
+  styleManager
+} = require('./style');
+const {
+  i18nManager, i18nRenderDepsRegisterFile
+} = require('./i18n');
 
 const PLUGIN_NAME = 'JINGE_EXTRACT_PLUGIN';
 
-function checkCompressOption(webpackOptions) {
-  const optimization = webpackOptions.optimization;
-  let needComporess = webpackOptions.mode === 'production';
-  if (isObject(optimization) && !isUndefined(optimization.minimize)) {
-    needComporess = !!optimization.minimize;
-  }
-  return needComporess;
-}
-
 class JingeWebpackPlugin {
   constructor(options = {}) {
-    this.options = options;
+    Object.assign(sharedOptions, options);
     this.vmPlugin = null;
   }
 
   _prepareOptions(webpackOptions) {
-    const options = this.options;
-    options.compress = checkCompressOption(webpackOptions);
-
-    const i18nOptions = options.i18n;
+    sharedOptions.compress = checkCompressOption(webpackOptions);
+    sharedOptions.publicPath = webpackOptions.output.publicPath || '';
+    const i18nOptions = sharedOptions.i18n;
     if (i18nOptions) {
       if (!i18nOptions.defaultLocale) {
         throw new Error('JingeWebpackPlugin: i18n options require "defaultLocale" property.');
       }
-      if (!i18nOptions.filename) {
-        i18nOptions.filename = 'locale.[locale].js';
-      }
-      options.i18n = Object.assign({
+      sharedOptions.i18n = Object.assign({
         idBaseDir: process.cwd(),
         translateDir: path.join(process.cwd(), 'translate')
       }, i18nOptions);
     }
 
-    const styleOptions = options.style;
+    const styleOptions = sharedOptions.style;
     if (!styleOptions) {
-      options.style = {
+      sharedOptions.style = {
         extract: false
       };
     } else {
-      if (!styleOptions.filename) {
-        styleOptions.filename = `bundle${options.compress ? '.min' : ''}.css`;
-      }
-      options.style = Object.assign({}, {
+      sharedOptions.style = Object.assign({}, {
         extract: true,
-        keepComment: false
+        keepComments: false
       }, styleOptions);
     }
   }
 
-  async writeExtractStyle(assets) {
-    const opts = this.options.style;
-    if (!opts.extract) {
-      return;
+  apply(compiler) {
+    this._prepareOptions(compiler.options);
+    if (sharedOptions.i18n) {
+      i18nManager.initialize(compiler.options);
     }
-    let output = `.jg-hide {
-  display: none !important;
-}
+    styleManager.initialize();
 
-.jg-hide.jg-hide-enter,
-.jg-hide.jg-hide-leave {
-  display: block !important;
-}\n`;
-    store.extractStyles.forEach(info => {
-      output += info.code || '';
+    compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
+      i18nManager.webpackCompilationWarnings = compilation.warnings;
+      if (sharedOptions.i18n) {
+        compilation.hooks.optimizeModules.tap(PLUGIN_NAME, modules => {
+          if (i18nManager.written) return;
+          const registerMod = modules.find(mod => mod.resource === i18nRenderDepsRegisterFile);
+          if (!registerMod) return;
+          i18nManager.handleDepRegisterModule(registerMod);
+        });
+      }
+      if (sharedOptions.multiChunk) {
+        compilation.hooks.optimizeChunks.tap(PLUGIN_NAME, (chunks) => {
+          chunks.forEach(chunk => {
+            const name = chunk.name || chunk.id.toString();
+            if (name && !/^\w[\w\d_]*$/.test(name)) {
+              compilation.errors.push(new Error('webpackChunkName "' + name + '" not match /^\\w[\\w\\d_]*$/'));
+            }
+          });
+        });
+        compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, (chunks) => {
+          styleManager.handleMultiChunk(compilation);
+          if (!i18nManager.written) {
+            i18nManager.handleMultiChunk(compilation);
+          }
+        });
+      }
+      
+      compilation.hooks.additionalAssets.tap(PLUGIN_NAME, (chunks) => {
+        if (sharedOptions.i18n) {
+          i18nManager.writeOutput(compilation);
+        }
+        styleManager.writeOutput(compilation);
+        if (sharedOptions.writeChunkInfo) {
+          this._writeChunkInfo(compilation);
+        }
+      });
     });
-    store.extractComponentStyles.forEach(info => {
-      output += info.css || '';
+  }
+
+  _writeChunkInfo(compilation) {
+    const info = {
+      public: sharedOptions.publicPath,
+      style: { entry: '', chunks: {} },
+      script: { entry: '', chunks: {} },
+      locale: {}
+    };
+
+    compilation.chunks.forEach(chunk => {
+      if (chunk.entryModule) {
+        info.script.entry = chunk.files.find(f => f.endsWith('.js'));
+      } else {
+        const name = chunk.name || chunk.id.toString();
+        info.script.chunks[name] = chunk.files.find(f => f.endsWith('.js'));
+      }
     });
-    output = output.replace(/@charset "UTF-8";/g, '');
-    // TODO: generate soure map
-    if (this.options.compress) {
-      output = new CleanCSS().minify(output).styles;
+
+    function handleChunkMap(chunksMap, out) {
+      chunksMap.forEach(chunkInfo => {
+        if (chunkInfo.isEntry) {
+          out.entry = chunkInfo.finalFilename;
+          return;
+        }
+        if (chunkInfo.isCommon) {
+          out.chunks[chunkInfo.name] = chunkInfo.isEmpty ? null : chunkInfo.finalFilename;
+          return;
+        }
+        const cns = chunkInfo.deps.map(cn => {
+          return chunksMap.get(cn);
+        }).filter(ck => {
+          return ck && !ck.isEmpty;
+        });
+        if (!chunkInfo.isEmpty) {
+          cns.push(chunkInfo);
+        }
+        out.chunks[chunkInfo.name] = cns.length === 0 ? null : (
+          cns.length === 1 ? cns[0].finalFilename : cns.map(ck => ck.finalFilename)
+        );
+      });
     }
-    assets[opts.filename] = {
+
+    handleChunkMap(styleManager.outputChunks, info.style);
+    i18nManager.outputChunks.forEach((chunksMap, locale) => {
+      if (!info.locale[locale]) info.locale[locale] = { entry: '', chunks: {} };
+      handleChunkMap(chunksMap, info.locale[locale]);
+    });
+
+    const output = sharedOptions.compress ? JSON.stringify(info) : JSON.stringify(info, null, 2);
+    compilation.assets[sharedOptions.writeChunkInfo] = {
       source: () => output,
       size: () => output.length
     };
-  }
-
-  apply(compiler) {
-    this._prepareOptions(compiler.options);
-
-    store.options = this.options;
-
-    if (this.options.i18n) {
-      i18nManager.initialize(this.options.i18n);
-      // this.vmPlugin = new VirtualModulePlugin({
-      //   path: i18nManager.depFns.file,
-      //   contents: i18nManager.depFns.contents
-      // });
-      // this.vmPlugin.apply(compiler);
-      // compiler.hooks.compilation.tap(PLUGIN_NAME, compilation => {
-      // compilation.hooks.finishModules.tap(PLUGIN_NAME, modules => {
-      //   if (i18nManager.written || i18nManager.renderDeps.arr.length === 0) {
-      //     return;
-      //   }
-
-      //   let sourceMode = false;
-      //   let i18nDepsMod = null;
-      //   for (let i = 0; i < modules.length; i++) {
-      //     const mod = modules[i];
-      //     if (!sourceMode && mod.resource === jingeRoot) {
-      //       sourceMode = true;
-      //     }
-      //     if (i18nDepsMod === null && mod.resource === i18nManager.depFns.file) {
-      //       i18nDepsMod = mod;
-      //     }
-      //     if (sourceMode && i18nDepsMod) {
-      //       break;
-      //     }
-      //   }
-      //   if (!i18nDepsMod) {
-      //     return;
-      //   }
-      //   const src = i18nDepsMod._source;
-      //   i18nManager.depFns.contents = src._value + `\n\nif (!__i18n[__I18N_RENDER_DEPS]) __i18n[__I18N_RENDER_DEPS] = {\n  render: [${
-      //     [...i18nManager.depFns.render.keys()].map(k => `__${k}`).join(', ')
-      //   }],\n  attribute: [${
-      //     [...i18nManager.depFns.attribute.keys()].map(k => `__${k}`).join(', ')
-      //   }]\n};`;
-      //   src._value = i18nManager.depFns.contents;
-      // });
-      // });
-    }
-
-    compiler.hooks.emit.tapAsync(PLUGIN_NAME, (compilation, callback) => {
-      Promise.all([
-        this.writeExtractStyle(compilation.assets),
-        i18nManager.writeOutput(compilation.assets)
-      ]).catch(error => {
-        console.error(error);
-      }).then(() => {
-        callback();
-      });
-    });
   }
 }
 

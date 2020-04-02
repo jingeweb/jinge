@@ -1,0 +1,315 @@
+import {
+  __, isComponent, attrs, RenderFn, Component, ComponentAttributes, assertRenderResults
+} from '../core/component';
+import {
+  TransitionStates, getDurationType
+} from '../core/transition';
+import {
+  createFragment, addEvent, setImmediate, removeEvent
+} from '../util';
+
+function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>, parentComponentStyles: Record<string, string>): Component {
+  return Component.create(attrs({
+    [__]: {
+      context,
+      compStyle: parentComponentStyles,
+      slots: {
+        default: renderFn
+      }
+    }
+  }));
+}
+
+function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
+  const value = component._currentValue;
+  const acs = component[__].slots;
+  if (component.transition && acs) {
+    component._transitionMap = new Map();
+    for (const k in acs) {
+      component._transitionMap.set(k, [
+        k === value ? TransitionStates.ENTERED : TransitionStates.LEAVED,
+        null // element
+      ]);
+    }
+    component._previousValue = value;
+    component._onEndHandler = component.onTransitionEnd.bind(component);
+  }
+  const renderFn = acs ? acs[value] : null;
+  const roots = component[__].rootNodes;
+  if (!renderFn) {
+    roots.push(document.createComment('empty'));
+    return roots as Node[];
+  }
+  const el = createEl(renderFn, component[__].context, component[__].compStyle);
+  roots.push(el);
+  return el.__render();
+}
+
+
+function doUpdate(component: IfComponent | SwitchComponent): void {
+  const roots = component[__].rootNodes;
+  const el = roots[0];
+  const isComp = isComponent(el);
+  const firstDOM = (isComp ? (el as Component).__firstDOM : el) as Node;
+  const parentDOM = (isComp ? firstDOM : el as Node).parentNode;
+  const renderFn = component[__].slots?.[component._currentValue];
+  if (renderFn) {
+    const newEl = createEl(renderFn, component[__].context, component[__].compStyle);
+    const nodes = assertRenderResults((newEl as Component).__render()); 
+    parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
+    roots[0] = newEl;
+  } else {
+    roots[0] = document.createComment('empty');
+    parentDOM.insertBefore(roots[0], firstDOM);
+  }
+  if (isComp) {
+    (el as Component).__destroy();
+  } else {
+    parentDOM.removeChild(firstDOM);
+  }
+  renderFn && (roots[0] as Component).__handleAfterRender();
+  component.__notify('branch-switched', component._branch);
+}
+
+
+function cancelTs(t: [TransitionStates, Node], tn: string, e: boolean, component: IfComponent | SwitchComponent): void {
+  const el = t[1] as HTMLElement;
+  if (el.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
+  const onEnd = component._onEndHandler;
+  el.classList.remove(tn + (e ? '-enter' : '-leave'));
+  el.classList.remove(tn + (e ? '-enter-active' : '-leave-active'));
+  removeEvent(el, 'transitionend', onEnd);
+  removeEvent(el, 'animationend', onEnd);
+  component.__notify('transition', e ? 'enter-cancelled' : 'leave-cancelled', el);
+}
+
+function startTs(t: [TransitionStates, Node], tn: string, e: boolean, component: IfComponent | SwitchComponent): void {
+  const el = t[1] as HTMLElement;
+  const onEnd = component._onEndHandler;
+  if (el.nodeType !== Node.ELEMENT_NODE) {
+    onEnd();
+    return;
+  }
+  const classOfStart = tn + (e ? '-enter' : '-leave');
+  const classOfActive = tn + (e ? '-enter-active' : '-leave-active');
+
+  el.classList.add(classOfStart);
+  // force render by calling getComputedStyle
+  getDurationType(el);
+  el.classList.add(classOfActive);
+  const tsEndName = getDurationType(el);
+  if (!tsEndName) {
+    onEnd();
+    return;
+  }
+  t[0] = e ? TransitionStates.ENTERING : TransitionStates.LEAVING;
+  addEvent(el, tsEndName, onEnd);
+  component.__notify('transition', e ? 'before-enter' : 'before-leave', el);
+  setImmediate(() => {
+    component.__notify('transition', e ? 'enter' : 'leave', el);
+  });
+}
+
+function updateSwitchWithTransition(component: IfComponent | SwitchComponent): void {
+  const value = component._currentValue;
+  const pv = component._previousValue;
+  const tn = component.transition;
+  let pt = component._transitionMap.get(pv);
+  if (!pt) {
+    pt = [
+      pv === 'else' ? TransitionStates.LEAVED : TransitionStates.ENTERED,
+      null // element
+    ];
+    component._transitionMap.set(pv, pt);
+  }
+  // debugger;
+  if (pt[0] === TransitionStates.ENTERING) {
+    if (value === pv) return;
+    cancelTs(pt, tn, true, component);
+    startTs(pt, tn, false, component);
+  } else if (pt[0] === TransitionStates.LEAVING) {
+    if (value !== pv) return;
+    cancelTs(pt, tn, false, component);
+    startTs(pt, tn, true, component);
+  } else if (pt[0] === TransitionStates.ENTERED) {
+    pt[1] = component.__transitionDOM;
+    startTs(pt, tn, false, component);
+  } else if (pt[0] === TransitionStates.LEAVED) {
+    pt[1] = component.__transitionDOM;
+    startTs(pt, tn, true, component);
+  }
+}
+
+function updateSwitch(component: IfComponent | SwitchComponent): void {
+  if (!isComponent(component[__].rootNodes[0]) && (
+    !component[__].slots || !component[__].slots[component._currentValue]
+  )) {
+    return;
+  }
+
+  if (component._transitionMap) {
+    updateSwitchWithTransition(component);
+    return;
+  }
+
+  doUpdate(component);
+}
+
+function updateSwitchOnTransitionEnd(component: IfComponent | SwitchComponent): void {
+  // console.log('on end')
+  const value = component._currentValue;
+  const pv = component._previousValue;
+  const tn = component.transition;
+  const pt = component._transitionMap.get(pv);
+  const e = pt[0] === TransitionStates.ENTERING;
+  const el = pt[1] as HTMLElement;
+
+  if (el.nodeType === Node.ELEMENT_NODE) {
+    removeEvent(el, 'transitionend', component._onEndHandler);
+    removeEvent(el, 'animationend', component._onEndHandler);
+    el.classList.remove(tn + (e ? '-enter' : '-leave'));
+    el.classList.remove(tn + (e ? '-enter-active' : '-leave-active'));
+    component.__notify('transition', e ? 'after-enter' : 'after-leave');
+  }
+
+  pt[0] = e ? TransitionStates.ENTERED : TransitionStates.LEAVED;
+
+  if (e) return;
+
+  doUpdate(component);
+  component._previousValue = value;
+  const ct = component._transitionMap.get(value);
+  if (!ct) {
+    return;
+  }
+  const fd = component.__transitionDOM as HTMLElement;
+  if (fd.nodeType !== Node.ELEMENT_NODE) {
+    ct[0] = TransitionStates.ENTERED;
+    return;
+  }
+
+  ct[1] = fd;
+  startTs(ct, tn, true, component);
+}
+
+function destroySwitch(component: IfComponent | SwitchComponent): void {
+  if (component._transitionMap) {
+    component._transitionMap.forEach(ts => {
+      const el = ts[1] as Element;
+      if (el) {
+        removeEvent(el, 'transitionend', component._onEndHandler);
+        removeEvent(el, 'animationend', component._onEndHandler);
+      }
+    });
+    component._transitionMap = null;
+  }
+}
+
+export class IfComponent extends Component {
+  _transitionMap: Map<string, [TransitionStates, Node]>;
+  _previousValue: string;
+  _currentValue: string;
+  _onEndHandler: () => void;
+
+  transition: string;
+
+  constructor(attrs: ComponentAttributes) {
+    super(attrs);
+
+    this._currentValue = 'default';
+    this._onEndHandler = null;
+    this._transitionMap = null;
+    this._previousValue = null;
+
+    this.expect = attrs.expect as boolean;
+    this.transition = attrs.transition as string;
+  }
+
+  get expect(): boolean {
+    return this._currentValue === 'default';
+  }
+
+  set expect(value: boolean) {
+    const v = value ? 'default' : 'else';
+    if (this._currentValue === v) return;
+    this._currentValue = v;
+    this.__updateIfNeed();
+  }
+
+  get _branch(): boolean {
+    return this.expect;
+  }
+
+  onTransitionEnd(): void {
+    updateSwitchOnTransitionEnd(this);
+  }
+
+  __render(): Node[] {
+    return renderSwitch(this);
+  }
+
+  __update(): void {
+    updateSwitch(this);
+  }
+
+  __beforeDestroy(): void {
+    destroySwitch(this);
+  }
+}
+
+export class SwitchComponent extends Component {
+  _transitionMap: Map<string, [TransitionStates, Node]>;
+  _previousValue: string;
+  _currentValue: string;
+  _onEndHandler: () => void;
+
+  transition: string;
+
+  constructor(attrs: ComponentAttributes) {
+    super(attrs);
+
+    this._onEndHandler = null;
+    this._transitionMap = null;
+    this._previousValue = null;
+    this._currentValue = null;
+
+    this.test = attrs.test as string;
+    this.transition = attrs.transition as string;
+  }
+
+  get test(): string {
+    return this._currentValue;
+  }
+
+  set test(v: string) {
+    const acs = this[__].slots;
+    if (!acs || !(v in acs)) {
+      v = 'default';
+    }
+    if (this._currentValue === v) return;
+    this._currentValue = v;
+    this.__updateIfNeed();
+  }
+
+  get _branch(): string {
+    return this.test;
+  }
+
+  onTransitionEnd(): void {
+    updateSwitchOnTransitionEnd(this);
+  }
+
+  __render(): Node[] {
+    return renderSwitch(this);
+  }
+
+  __update(): void {
+    updateSwitch(this);
+  }
+
+  __beforeDestroy(): void {
+    destroySwitch(this);
+  }
+}

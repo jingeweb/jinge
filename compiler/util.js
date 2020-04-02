@@ -1,9 +1,17 @@
 const path = require('path');
 const fs = require('fs').promises;
+const os = require('os');
 const crypto = require('crypto');
+const execSync = require('child_process').execSync;
 
-function getUniquePostfix() {
-  return '_' + crypto.randomBytes(6).toString('hex');
+let cachedSymbolPostfix;
+function getSymbolPostfix() {
+  if (cachedSymbolPostfix) {
+    return cachedSymbolPostfix;
+  }
+  const buf = crypto.createHash('sha256').update('jinge-mvvm-framework-by-yuhangge-https://github.com/jinge-design/jinge');
+  cachedSymbolPostfix = '_' + buf.digest('hex').substr(0, 12);
+  return cachedSymbolPostfix;
 }
 
 function isString(v) {
@@ -60,7 +68,7 @@ function isSimpleType(v) {
 
 function replaceTplStr(tpl, ctx) {
   for (const k in ctx) {
-    tpl = tpl.replace(new RegExp('\\$' + k + '\\$', 'g'), ctx[k]);
+    tpl = tpl.replace(new RegExp('\\$' + k + '\\$', 'g'), ctx[k].replace(/\$/g, '$$$$'));
   }
   return tpl;
 }
@@ -112,7 +120,7 @@ function deepClone(obj) {
   }
 }
 
-const jingeRoot = path.resolve(__dirname, '../');
+const jingeRoot = path.resolve(__dirname, '../lib');
 
 function getJingeBase(resourcePath) {
   return resourcePath.startsWith(jingeRoot) ? path.relative(
@@ -121,8 +129,68 @@ function getJingeBase(resourcePath) {
   ) : 'jinge';
 }
 
+const RIX =  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$_ ~!@#%^&*()+=-`[]|}{;\'<,.>/?';
+
+class KeyGenerator {
+  constructor(rix = RIX, sep = ':') {
+    if (rix.indexOf(sep) >= 0) {
+      throw new Error('invalid char');
+    }
+    if ((new Set(rix)).size !== rix.length) {
+      throw new Error('duplicate char');
+    }
+    this._cache = new Map();
+    this._rix = rix;
+    this._sep = sep;
+  }
+  _hash32_b(text) {
+    const buf = new TextEncoder().encode(text);
+    let h = 9;
+    for(let i = 0; i < buf.length;i++) {
+      h = Math.imul(h^buf[i], 9**9);
+    }
+    return (h^h>>>9) >>> 0;
+  }
+  _hash32(text) {
+    const buf = new TextEncoder().encode(text);
+    let hash = 0;
+    for (let i = 0; i < buf.length; i++) {
+      hash = (((hash << 5) - hash) + buf[i]) | 0; // Convert to 32bit integer
+    }
+    return hash >>> 0; // convert to usinged 32 bit integer
+  }
+  num2str(n) {
+    let result = '';
+    while (true) {
+      const rixit = n % this._rix.length;
+      result = this._rix.charAt(rixit) + result;
+      n = Math.floor(n / this._rix.length);
+      if (n === 0)
+        break;
+    }
+    return result;
+  }
+  generate(text) {
+    /**
+     * 此处需要将 text 哈希成 4 bytes 整数。到底是直接用 sha256 然后取前 4 bytes 更好，
+     * 还是用其它的算法更好，不是很确定。。。
+     * https://stackoverflow.com/questions/7616461/generate-a-hash-from-string-in-javascript
+     */
+    // const buf = crypto.createHash('sha256').update(text).digest();
+    const n = this._hash32_b(text); // buf.readUInt32LE();
+    if (this._cache.has(n)) {
+      const c = this._cache.get(n) + 1;
+      this._cache.set(n, c);
+      return this.num2str(n) + this._sep + this.num2str(c);
+    } else {
+      this._cache.set(n, 0);
+      return this.num2str(n);
+    }
+  }
+}
+
 module.exports = {
-  getUniquePostfix,
+  getSymbolPostfix,
   jingeRoot,
   getJingeBase,
   mkdirp,
@@ -141,5 +209,6 @@ module.exports = {
   isBoolean,
   replaceTplStr,
   prependTab,
+  KeyGenerator,
   attrN: convertAttributeName
 };

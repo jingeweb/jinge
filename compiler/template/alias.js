@@ -1,7 +1,5 @@
 const crypto = require('crypto');
-const {
-  getUniquePostfix
-} = require('../util');
+const { sharedOptions } = require('../options');
 
 function mergeAlias(src, dst) {
   if (src) {
@@ -17,10 +15,9 @@ function mergeAlias(src, dst) {
   return dst;
 }
 
-const ALIAS_UNIQUE_POSTFIX = getUniquePostfix();
-
 class ComponentAliasManager {
   constructor() {
+    this.aliasPostfix = '';
     this.alias = {};
     this.localMap = {};
   }
@@ -45,6 +42,7 @@ class ComponentAliasManager {
   }
 
   initialize(componentAlias) {
+    this.aliasPostfix = '_' + crypto.createHmac('sha256', 'component-alias-postfix').update(sharedOptions.symbolPostfix).digest('hex').substr(0, 12);
     if (Array.isArray(componentAlias)) {
       componentAlias = Object.assign({}, ...componentAlias);
     }
@@ -57,7 +55,8 @@ class ComponentAliasManager {
         SwitchComponent: 'switch',
         HideComponent: 'hide',
         BindHtmlComponent: 'bind-html',
-        ToggleClassComponent: 'toggle-class'
+        ToggleClassComponent: 'toggle-class',
+        DynamicRenderComponent: 'dynamic'
       }
     });
     for (const source in componentAlias) {
@@ -69,7 +68,7 @@ class ComponentAliasManager {
         throw new Error('component base source must be absolute path or package under node_modules');
       }
       const hash = crypto.createHash('md5');
-      const postfix = '_' + hash.update(source).digest('hex').substr(0, 12) + ALIAS_UNIQUE_POSTFIX;
+      const postfix = '_' + hash.update(source).digest('hex').substr(0, 12) + this.aliasPostfix;
       Object.keys(m).map((c, i) => {
         if (!(c in this.localMap[source])) {
           this.localMap[source][c] = (c === 'default' ? 'Component_default_' + i : c) + postfix;
@@ -84,6 +83,5 @@ class ComponentAliasManager {
 }
 
 module.exports = {
-  ALIAS_UNIQUE_POSTFIX,
   aliasManager: new ComponentAliasManager()
 };

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2019",
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "stripInternal": true,
+    "alwaysStrict": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationDir": "types",
+    "sourceMap": true,
+    "outDir": "lib",
+    "baseUrl": ".",
+    "paths": {
+      
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

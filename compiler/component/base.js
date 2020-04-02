@@ -9,9 +9,9 @@ class ComponentBaseManager {
   initialize(componentBase) {
     const defaultBase = {
       Component: [
-        path.resolve(__dirname, '../../index.js'),
-        path.resolve(__dirname, '../../core/component.js'),
-        path.resolve(__dirname, '../../core/index.js')
+        path.resolve(__dirname, '../../lib/index.js'),
+        path.resolve(__dirname, '../../lib/core/component.js'),
+        path.resolve(__dirname, '../../lib/core/index.js')
       ]
     };
     if (Array.isArray(componentBase)) {

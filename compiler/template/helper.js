@@ -9,8 +9,6 @@ const {
   TemplateLexer
 } = require('./parser/TemplateLexer');
 
-const CORE_UNIQUE_POSTFIX = getUniquePostfix();
-
 function parse(source) {
   const lexer = new TemplateLexer(new antlr.InputStream(source));
   const tokens = new antlr.CommonTokenStream(lexer);
@@ -40,6 +38,5 @@ function parse(source) {
 }
 
 module.exports = {
-  CORE_UNIQUE_POSTFIX,
   parse
 };
