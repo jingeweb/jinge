@@ -3,10 +3,10 @@ import {
   ComponentAttributes
 } from './component';
 
-export function bootstrap<T extends Component & { create(attrs: object): T }>(ComponentClazz: T, dom: HTMLElement, attrs?: ComponentAttributes): T {
+export function bootstrap<T extends (typeof Component) & { create(attrs: object): Component }>(ComponentClazz: T, dom: HTMLElement, attrs?: ComponentAttributes): InstanceType<T> {
   const app = ComponentClazz.create(attrs);
   app.__renderToDOM(
     dom, dom !== document.body
   );
-  return app;
+  return app as InstanceType<T>;
 }
