@@ -115,7 +115,8 @@ class I18nService extends Messenger {
     this.__key = null;
     this.__loader = null;
 
-    this.__regLoc(window.JINGE_I18N_DATA);
+    const d = window.JINGE_I18N_DATA;
+    d && this.__regLoc(d);
   }
 
   get locale(): string {
