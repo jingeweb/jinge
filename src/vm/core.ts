@@ -29,15 +29,15 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
   __listeners: Map<string, ViewModelNode>;
   __notifiable: boolean;
   __related: RelatedListenersMap;
-  __setters: Map<string | symbol, Function>;
+  __setters: Map<string | symbol, (v: unknown) => void>;
 
-  target: object;
+  target: unknown;
   proxy: unknown;
 
   /**
    * Don't use the constructor. Use createViewModel instead.
    */
-  constructor(target: object) {
+  constructor(target: unknown) {
     this.__notifiable = true;
     this.__parents = null;
     this.__listeners = null;
@@ -192,7 +192,7 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
           return;
         }
         const v = target[prop as string];
-        if (!isObject(v) || !($$ in (v as object))) {
+        if (!isObject(v) || !($$ in (v as Record<symbol, unknown>))) {
           return;
         }
         removeParent((v as ViewModelObject)[$$], this, prop as string);
@@ -201,7 +201,7 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
     }
     Object.getOwnPropertyNames(target).forEach(prop => {
       const v = target[prop];
-      if (!isObject(v) || !($$ in (v as object))) {
+      if (!isObject(v) || !($$ in (v as Record<symbol, unknown>))) {
         return;
       }
       removeParent((v as ViewModelObject)[$$], this, prop);

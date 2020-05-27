@@ -20,10 +20,10 @@ export interface ViewModelCore {
   __parents: ViewModelParent[];
   __notifiable: boolean;
   __related: RelatedListenersMap;
-  __setters: Map<string | symbol, Function>;
+  __setters: Map<string | symbol, (v: unknown) => void>;
 
   proxy: unknown;
-  target: object;
+  target: unknown;
 
   __watch(propertyPath?: string | PropertyPathItem | PropertyPathItem[], handler?: ViewModelWatchHandler, related?: ViewModelCore): void;
   __unwatch(propertyPath?: string | PropertyPathItem | PropertyPathItem[], handler?: ViewModelWatchHandler, related?: ViewModelCore): void;
@@ -55,7 +55,7 @@ export function isInnerObj(v: unknown): boolean {
 }
 
 export function isViewModel(v: unknown): boolean {
-  return isObject(v) && ($$ in (v as object));
+  return isObject(v) && ($$ in (v as Record<symbol, unknown>));
 }
 
 export function isPublicProperty(v: unknown): boolean {

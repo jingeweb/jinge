@@ -137,8 +137,8 @@ export interface ComponentProperties {
 
 /** Bellow is utility functions **/
  
-export function isComponent(v: object): boolean {
-  return __ in v;
+export function isComponent(v: unknown): boolean {
+  return __ in (v as Record<symbol, unknown>);
 }
 
 export function assertRenderResults(renderResults: Node[]): Node[] {

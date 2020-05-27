@@ -11,7 +11,7 @@ import {
 
 let autoIncrement = 0;
 let nextHandle = 1; // Spec says greater than zero
-let tasksByHandle: Map<number, Function>;
+let tasksByHandle: Map<number, () => void>;
 let currentlyRunningATask = false;
 let registerImmediate: (nextHandle: number) => void;
 

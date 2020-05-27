@@ -23,11 +23,11 @@ type RenderDicts = {
 }
 type Locale = {
   locale: string;
-  dictionary: {
+  dictionary?: {
     [k: string]: string | RenderTextFn;
   };
-  render: RenderDicts | RenderFactory;
-  __renders: RenderFactory[];
+  render?: RenderDicts | RenderFactory;
+  __renders?: RenderFactory[];
 }
 
 declare global {
