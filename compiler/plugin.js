@@ -16,6 +16,7 @@ class JingeWebpackPlugin {
   constructor(options = {}) {
     Object.assign(sharedOptions, options);
     this.vmPlugin = null;
+    this._inited = false;
   }
 
   _prepareOptions(webpackOptions) {
@@ -47,10 +48,6 @@ class JingeWebpackPlugin {
 
   apply(compiler) {
     this._prepareOptions(compiler.options);
-    if (sharedOptions.i18n) {
-      i18nManager.initialize(compiler.options);
-    }
-    styleManager.initialize();
 
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       i18nManager.webpackCompilationWarnings = compilation.warnings;
@@ -58,8 +55,14 @@ class JingeWebpackPlugin {
         compilation.hooks.optimizeModules.tap(PLUGIN_NAME, modules => {
           if (i18nManager.written) return;
           const registerMod = modules.find(mod => mod.resource === i18nRenderDepsRegisterFile);
-          if (!registerMod) return;
-          i18nManager.handleDepRegisterModule(registerMod);
+          if (!registerMod) {
+            // 如果没有找到 i18nRenderDepsRegisterFile 这个文件，说明 jinge 框架是以 external 的模式引入的（即没有编译源码）
+            if (!sharedOptions.i18n.external) {
+              compilation.errors.push(new Error('Please set JingeWebpackPlugin option "i18n.external" to `true` if use jinge as external library.'));
+            }
+          } else {
+            i18nManager.handleDepRegisterModule(registerMod);
+          }
         });
       }
       if (sharedOptions.multiChunk) {

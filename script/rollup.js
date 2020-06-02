@@ -3,19 +3,15 @@ const rollup = require('rollup');
 const banner = require('rollup-plugin-banner').default;
 const resolve = require('rollup-plugin-node-resolve');
 const { terser } = require('rollup-plugin-terser');
-const { getSymbolPostfix } = require('../compiler/util');
-const { jingeBuildSelfPlugin } = require('./rollup-plugin');
+const jingePlugin = require('../compiler/rollup-plugin');
 
 const needComporess = 'COMPRESS' in process.env;
 const plugins = [
   resolve({
     extensions: ['.js']
   }),
-  jingeBuildSelfPlugin({
-    compress: needComporess,
-    symbolPostfix: getSymbolPostfix(),
-    jingeRoot: path.resolve(__dirname, '../'),
-    innerComponentsDir: path.resolve(__dirname, '../components')
+  jingePlugin({
+    compress: needComporess
   })
 ];
 

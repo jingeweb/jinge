@@ -6,7 +6,8 @@ const {
   componentBaseManager
 } = require('./component');
 const {
-  CSSParser
+  CSSParser,
+  styleManager
 } = require('./style');
 const {
   sharedOptions
@@ -21,14 +22,14 @@ const {
   aliasManager
 } = require('./template/alias');
 const {
+  i18nManager,
   i18nRenderDeps,
   i18nRenderDepsRegisterFile
 } = require('./i18n')
 
-let componentBaseAndAliasInited = false;
-let sharedOptionsInited = false;
+let inited = false;
 
-function initSharedOptions(loaderOpts, webpackOpts) {
+function initialize(loaderOpts, webpackOpts) {
   if (loaderOpts.symbolPostfix) {
     if (sharedOptions.symbolPostfix && loaderOpts.symbolPostfix !== sharedOptions.symbolPostfix) {
       throw new Error('conflict symbolPostfix');
@@ -51,6 +52,12 @@ function initSharedOptions(loaderOpts, webpackOpts) {
   } else if (!sharedOptions.style.attrPrefix) {
     sharedOptions.style.attrPrefix = loaderOpts.attrPrefix;
   }
+  if (sharedOptions.i18n) {
+    i18nManager.initialize();
+  }
+  styleManager.initialize();
+  componentBaseManager.initialize(loaderOpts.componentBase);
+  aliasManager.initialize(loaderOpts.componentAlias);
 }
 
 function jingeLoader(source, sourceMap) {
@@ -58,9 +65,12 @@ function jingeLoader(source, sourceMap) {
   const resourcePath = this.resourcePath;
   const opts = this.query || {};
   
-  if (!sharedOptionsInited) {
-    initSharedOptions(opts, this._compiler.options);
-    sharedOptionsInited = true;
+  if (!inited) {
+    if (!resourcePath.endsWith('.js')) {
+      return callback(new Error('Entry must be .js file'));
+    }
+    initialize(opts, this._compiler.options);
+    inited = true;
   }
   
   if (resourcePath === i18nRenderDepsRegisterFile) {
@@ -84,12 +94,6 @@ function jingeLoader(source, sourceMap) {
   } else {
     if (!/\.(js|html)$/.test(resourcePath)) {
       return callback(new Error('jingeLoader only support .js,.html,.css,.less,.scss file'));
-    }
-
-    if (!componentBaseAndAliasInited) {
-      componentBaseManager.initialize(opts.componentBase);
-      aliasManager.initialize(opts.componentAlias);
-      componentBaseAndAliasInited = true;
     }
 
     parseOpts = {

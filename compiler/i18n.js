@@ -69,11 +69,7 @@ class I18nManager {
       attrs: new _util.KeyGenerator(),
       renders: new _util.KeyGenerator()
     };
-    this.renderDeps = {
-      inner: Object.fromEntries(i18nRenderDeps.map(d => [d, -1])),
-      arr: [],
-      map: new Map()
-    };
+    this.renderDeps = null;
     this.keysOfResources = {
       dicts: new Map(),
       renders: new Map(),
@@ -93,10 +89,22 @@ class I18nManager {
   /**
    * initialize if need
    */
-  initialize(webpackOptions) {
+  initialize() {
     if (this._inited) return;
     this._inited = true;
-    
+    // 如果 jinge 框架是以 external 的形式引用，则所有依赖都已经在 jinge.min.js 中被注册。这种情况下，i18n 也默认注册好了所有依赖。
+    const postfix = sharedOptions.symbolPostfix;
+    this.renderDeps = {
+      inner: Object.fromEntries(i18nRenderDeps.map(d => [d, -1])),
+      arr: sharedOptions.i18n.external
+        ? i18nRenderDeps.map(d => d + postfix)
+        : [],
+      map: sharedOptions.i18n.external 
+        ? new Map(i18nRenderDeps.map((d, idx) => {
+          return [d + postfix, idx];
+        }))
+        : new Map()
+    };
     this.defaultLocale = {
       name: sharedOptions.i18n.defaultLocale,
       translatedCsv: [],
@@ -420,7 +428,6 @@ class I18nManager {
       return;
     }
 
-    const tags = this.chunkTags;
     const chunks = compilation.chunks.slice(0);
     const idx = chunks.indexOf(entryChunks[0]);
     // 把 entry 所在的 chunk 移到最前面。
