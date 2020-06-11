@@ -189,6 +189,25 @@ class KeyGenerator {
   }
 }
 
+const reasons = new Set([
+  'split chunk (cache group: default)',
+  'split chunk (cache group: defaultVendors)'
+]);
+function isCommonChunk(chunk) {
+  /**
+   * 目前的逻辑通过 chunkReason 是否为空来判断某个 chunk 是否是 webpack 内部提取出来的公共（common）复用 chunk。
+   * 从 webpack 源码来看，似乎只要 chunkReason 不为空都是公共 chunk，但不同的内部 plugin 生成的 chunkReason 各有不同，
+   * 只有 "split chunk (cache group: default)" 这个是目前测试遇到了可以确认处理逻辑无误的。
+   * 
+   * 对于其它 chunkReason，暂时以告警的形式打印。实际遇到的时候再来确认下是否逻辑无误。
+   */
+  if (chunk.chunkReason && !reasons.has(chunk.chunkReason)) {
+    reasons.add(chunk.chunkReason);
+    console.warn(`WARNING: unknown chunk reason "${chunk.chunkReason}" of chunk "${chunk.name || chunk.id}"`);
+  };
+  return !!chunk.chunkReason;
+}
+
 module.exports = {
   getSymbolPostfix,
   jingeRoot,
@@ -210,5 +229,6 @@ module.exports = {
   replaceTplStr,
   prependTab,
   KeyGenerator,
-  attrN: convertAttributeName
+  attrN: convertAttributeName,
+  isCommonChunk
 };

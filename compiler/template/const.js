@@ -12,7 +12,7 @@ const HTML_BOOL_IDL_ATTRS = {
     tags: ['audio', 'video']
   },
   disabled: {
-    tags: ['button', 'fieldset', 'input', 'optgroup', 'option', 'select', 'textarea']
+    tags: ['a', 'button', 'fieldset', 'input', 'optgroup', 'option', 'select', 'textarea']
   },
   readonly: {
     tags: ['input', 'textarea'],

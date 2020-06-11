@@ -62,6 +62,9 @@ function initialize(loaderOpts, webpackOpts) {
 
 function jingeLoader(source, sourceMap) {
   const callback = this.async();
+  if (this._compiler.parentCompilation) {
+    return callback(null, source, sourceMap);
+  }
   const resourcePath = this.resourcePath;
   const opts = this.query || {};
   

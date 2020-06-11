@@ -1,6 +1,7 @@
 const CleanCSS = require('clean-css');
 const crypto = require('crypto');
 const { sharedOptions } = require('../options');
+const _util = require('../util');
 
 class StyleManager {
   constructor() {
@@ -26,11 +27,15 @@ class StyleManager {
     // nothing to do.
   }
   handleMultiChunk(compilation) {
-    if (!sharedOptions.multiChunk) return;
+    if (!sharedOptions.chunk.multiple) return;
     this.chunkTags = new Map();
+    const chunkGraph = compilation.chunkGraph;
     compilation.chunks.forEach((chunk) => {
       const tag = new Set();
-      chunk._modules.forEach(mod => {
+      const modules = chunkGraph.getChunkModules(chunk).filter(m => {
+        return m.resource;
+      });
+      modules.forEach(mod => {
         tag.add(mod.resource);
       });
       this.chunkTags.set(chunk, tag);
@@ -40,8 +45,10 @@ class StyleManager {
     if (!sharedOptions.style.extract) {
       return;
     }
-    const { assets } = compilation;
-    const entryChunks = compilation.chunks.filter(chunk => chunk.entryModule);
+    const { chunkGraph } = compilation;
+    const entryChunks = Array.from(compilation.chunks).filter(chunk => {
+      return chunkGraph.getNumberOfEntryModules(chunk) > 0;
+    });
     if (entryChunks.length === 0) {
       throw new Error('Entry chunk not found!');
     }
@@ -49,11 +56,11 @@ class StyleManager {
       throw new Error('This version do not support multiply entries.');
     }
 
-    if (!sharedOptions.multiChunk) {
-      if (compilation.chunks.length > 1) {
-        throw new Error('must set multiChunk = true if use webpack code splitting multi-chunk');
+    if (!sharedOptions.chunk.multiple) {
+      if (compilation.chunks.size > 1) {
+        throw new Error('must set chunk.multiple = true if use webpack code splitting multi-chunk');
       }
-      const filename = entryChunks[0].files.find(f => f.endsWith('.js'));
+      const filename = Array.from(entryChunks[0].files).find(f => f.endsWith('.js'));
       let output = '';
       /**
        * 将没有被关联为 component style 的样式（全局样式）放在前面，
@@ -79,7 +86,7 @@ class StyleManager {
     }
 
     this.outputChunks.clear();
-    const chunks = compilation.chunks.slice(0);
+    const chunks = Array.from(compilation.chunks);
     const idx = chunks.indexOf(entryChunks[0]);
     // 把 entry 所在的 chunk 移到最前面。
     if (idx !== 0) {
@@ -109,14 +116,10 @@ class StyleManager {
       });
       const chunkInfo = {
         name: chunk.name || chunk.id.toString(),
-        /**
-         * 当前版本限定了 webpackChunkName 必须满足 /^\w[\w\d_$]*$/，
-         * 因此不可能出现 ~ 符号。如果出现 ~ 符号，则是当前版本的 webpack 抽取出来的公共 chunk。 
-         */
-        isCommon: (chunk.name || chunk.id.toString()).indexOf('~') >= 0,
+        isCommon: _util.isCommonChunk(chunk),
         isEntry: i === 0,
         isEmpty: false,
-        filename: chunk.files.find(f => f.endsWith('.js')),
+        filename: Array.from(chunk.files).find(f => f.endsWith('.js')),
         finalFilename: '',
         deps: []
       }
@@ -167,7 +170,9 @@ class StyleManager {
     this.outputCache.set(filename, output);
     assets[filename] = {
       source: () => output,
-      size: () => output.length
+      // 由于 scss -> css 的 sourcmap 作用不算很大，而生成 css 的sourcemap 的逻辑还有点复杂，暂时没有实现。
+      // TODO: support sourcemap
+      map: () => null
     };
   }
 }

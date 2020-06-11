@@ -230,12 +230,12 @@ class I18nManager {
           key: regKey
           // output: JSON.stringify(`${type === 'dicts' ? '«' : ''}${info.firstOutput.key}`)
         });
-        if (sharedOptions.multiChunk && multiChunkCallback) {
+        if (sharedOptions.chunk.multiple && multiChunkCallback) {
           multiChunkCallback(info.firstOutput.output);
         }
         pushNew = true;
       } else {
-        if (sharedOptions.multiChunk && multiChunkCallback) {
+        if (sharedOptions.chunk.multiple && multiChunkCallback) {
           multiChunkCallback(info.firstOutput.output);
         }
         regKey = info.firstOutput.key;
@@ -266,7 +266,7 @@ class I18nManager {
           key: regKey,
           ref: entry.firstOutput
         };
-        if (sharedOptions.multiChunk && multiChunkCallback) {
+        if (sharedOptions.chunk.multiple && multiChunkCallback) {
           multiChunkCallback(entry.firstOutput.output);
         }
       }
@@ -290,7 +290,7 @@ class I18nManager {
       return null;
     }
 
-    if (!this.written && sharedOptions.multiChunk) {
+    if (!this.written && sharedOptions.chunk.multiple) {
       let keySet = this.keysOfResources[type].get(resourcePath);
       if (!keySet) {
         this.keysOfResources[type].set(resourcePath, keySet = new Set());
@@ -336,7 +336,7 @@ class I18nManager {
 
     const postfix = sharedOptions.symbolPostfix;
     if (!depId.endsWith(postfix)) {
-      return (sharedOptions.multiChunk || first) ? idx : -1;
+      return (sharedOptions.chunk.multiple || first) ? idx : -1;
     }
     const dep = depId.substr(0, depId.length - postfix.length);
     if (!(dep in this.renderDeps.inner)) {
@@ -348,13 +348,17 @@ class I18nManager {
 
   handleMultiChunk(compilation) {
     if (!this._inited || this.written) return;
-    if (!sharedOptions.multiChunk) return;
+    if (!sharedOptions.chunk.multiple) return;
     this.chunkTags = new Map();
-    compilation.chunks.forEach((chunk) => {
+    const chunkGraph = compilation.chunkGraph;
+    compilation.chunks.forEach(chunk => {
       const tag = {
         dicts: new Map(), renders: new Map(), attrs: new Map()
       };
-      chunk._modules.forEach(mod => {
+      const modules = chunkGraph.getChunkModules(chunk).filter(m => {
+        return m.resource;
+      });
+      modules.forEach(mod => {
         ['dicts', 'renders', 'attrs'].forEach(type => {
           const keySet = this.keysOfResources[type].get(mod.resource);
           if (!keySet) return;
@@ -393,25 +397,28 @@ class I18nManager {
      *   然后更新其它语言包，再重新运行和测试其它语言。
      */
     if (!this._inited || this.written) return;
-    this.written = true;    
+    this.written = true;
 
     this.writeTranslateCSV(this.defaultLocale);
     this.targetLocales.forEach(locale => this.writeTranslateCSV(locale))
     
-    const { assets, additionalChunkAssets } = compilation;
-    const entryChunks = compilation.chunks.filter(chunk => chunk.entryModule);
+    const { assets, additionalChunkAssets, chunkGraph } = compilation;
+    const entryChunks = Array.from(compilation.chunks).filter(chunk => {
+      return chunkGraph.getNumberOfEntryModules(chunk) > 0;
+    });
     if (entryChunks.length === 0) {
       throw new Error('Entry chunk not found!');
     }
     if (entryChunks.length > 1) {
       throw new Error('This version do not support multiply entries.');
     }
+    const compilationChunks = Array.from(compilation.chunks);
 
-    if (!sharedOptions.multiChunk) {
-      if (compilation.chunks.length > 1) {
-        throw new Error('must set multiChunk = true if use webpack code splitting multi-chunk');
+    if (!sharedOptions.chunk.multiple) {
+      if (compilationChunks.length > 1) {
+        throw new Error('must set chunk.multiple = true if use webpack code splitting multi-chunk');
       }
-      const filename = entryChunks[0].files.find(f => f.endsWith('.js'));
+      const filename = Array.from(entryChunks[0].files).find(f => f.endsWith('.js'));
       this.writeGenerateLocales(this.defaultLocale.name, {
         isEntry: true, isEmpty: false,
         filename: filename,
@@ -428,24 +435,25 @@ class I18nManager {
       return;
     }
 
-    const chunks = compilation.chunks.slice(0);
-    const idx = chunks.indexOf(entryChunks[0]);
+    const idx = compilationChunks.indexOf(entryChunks[0]);
+    if (idx < 0) throw new Error('unexpected. need handle it.');
     // 把 entry 所在的 chunk 移到最前面。
     if (idx !== 0) {
-      chunks.unshift(chunks.splice(idx, 1)[0]);
+      compilationChunks.unshift(compilationChunks.splice(idx, 1)[0]);
     }
-    const filenames = chunks.map(chunk => {
-      const f = chunk.files.find(f => f.endsWith('.js'));
+    const filenames = compilationChunks.map(chunk => {
+      const f = Array.from(chunk.files).find(f => f.endsWith('.js'));
       if (!f) {
         throw new Error('output filename must be ends with ".js"');
       }
       return f;
     });
+
     const _write = (localeData) => {
       const chunkInfoMap = new Map();
       let entryChunkInfo;
       let entryOutputResult;
-      chunks.forEach((chunk, chunkIdx) => {
+      compilationChunks.forEach((chunk, chunkIdx) => {
         const outputResult = {
           dicts: [], renders: [], attrs: []
         };
@@ -485,16 +493,11 @@ class I18nManager {
           name: chunk.name || chunk.id.toString(),
           isEntry: chunkIdx === 0,
           isEmpty: isEmpty,
-          isCommon: (chunk.name || chunk.id.toString()).indexOf('~') >= 0,
+          isCommon: _util.isCommonChunk(chunk),
           filename: filenames[chunkIdx],
           finalFilename: '',
           deps: []
         };
-        /**
-         * 当前版本限定了 webpackChunkName 必须满足 /^\w[\w\d_$]*$/，
-         * 因此不可能出现 ~ 符号。如果出现 ~ 符号，则是当前版本的 webpack 抽取
-         * 出来的公共 chunk。 
-         */
         if (!chunkInfo.isCommon) {
           // 非公共 chunk 才需要输出到依赖字典。
           chunk._groups.forEach(chunkGroup => {
@@ -573,7 +576,8 @@ if (typeof jinge !== 'undefined') {
     chunkInfo.finalFilename = filename;
     assets[filename] = {
       source: () => code,
-      size: () => code.length
+      // 多语言资源字典没有 sourcemap 的说法。
+      map: () => null
     };
   }
 
