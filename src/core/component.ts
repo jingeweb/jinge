@@ -258,9 +258,9 @@ export class Component extends Messenger {
     if (!deregs) {
       this[__].deregI18N = deregs = [];
     }
-    const unwatcher = i18nService.watch(() => {
+    const unwatcher = i18nService.watch((locale) => {
       // bind component to listener's function context.
-      listener.call(this);
+      listener.call(this, locale);
     }, opts as WatchOptions);
     const deregister = (): void => {
       unwatcher();
