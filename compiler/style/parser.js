@@ -68,9 +68,10 @@ function parseNodes(nodes, styleId) {
         } else if ((n.type === 'combinator' && n.value === '/deep/') ||
           (n.type === 'pseudo' && n.value === '::deep')
         ) {
-          selector.insertAfter(n, parser.string({
-            value: ' '
-          }));
+          // console.log(n.parent);
+          // selector.insertAfter(n, parser.string({
+          //   value: ' '
+          // }));
           selector.removeChild(n);
           return false;
         }
