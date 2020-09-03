@@ -2,7 +2,8 @@ const path = require('path');
 const _util = require('./util');
 const {
   sharedOptions,
-  checkCompressOption
+  checkCompressOption,
+  getWebpackVersion
 } = require('./options');
 const {
   styleManager
@@ -12,6 +13,10 @@ const {
 } = require('./i18n');
 
 const PLUGIN_NAME = 'JINGE_EXTRACT_PLUGIN';
+
+function isCommonChunk(chunk) {
+  return sharedOptions.webpackVersion >= 5 ? _util.isCommonChunk_v5(chunk) : _util.isCommonChunk_v4(chunk);
+}
 
 class JingeWebpackPlugin {
   constructor(options = {}) {
@@ -58,6 +63,9 @@ class JingeWebpackPlugin {
   }
 
   apply(compiler) {
+    if (!('webpackVersion' in sharedOptions)) {
+      sharedOptions.webpackVersion = getWebpackVersion(compiler);
+    }
     this._prepareOptions(compiler.options);
 
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
@@ -86,6 +94,14 @@ class JingeWebpackPlugin {
             if (!name) {
               compilation.warnings.push(new Error('chunk miss webpackChunkName'));
             }
+            if (sharedOptions.webpackVersion < 5) {
+              // 对于 webpack 4，暂时没找到好的方法判断一个 chunk 是否是 webpack 自动提取出来的共用代码公共 chunk，
+              // 只能依靠它的名称是否包含 ~ 字符判断（webpack 生成共用 chunk 的名称的规则是用 ~ 符号连接各 chunk 名称）
+              // 因此要求 chunk 的名称里不能包含 ~ 字符。
+              if (name && name.indexOf('~') >= 0) {
+                compilation.errors.push(new Error('webpackChunkName must not include "~", but got: ' + name));
+              }
+            }
           });
         });
         compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, (chunks) => {
@@ -109,6 +125,7 @@ class JingeWebpackPlugin {
   }
 
   _writeChunkInfo(compilation) {
+    const { webpackVersion } = sharedOptions;
     const info = {
       public: sharedOptions.publicPath,
       style: { entry: '', chunks: {} },
@@ -118,18 +135,27 @@ class JingeWebpackPlugin {
 
     const chunkGraph = compilation.chunkGraph;
     compilation.chunks.forEach(chunk => {
-      const files = Array.from(chunk.files);
-      const ems = Array.from(chunkGraph.getChunkEntryModulesIterable(chunk));
-      if (ems.length > 1 && ems.filter(em => {
-        return em.resource && em.resource.indexOf('webpack-dev-server/') < 0;
-      }).length > 1) {
-        compilation.warnings.push(new Error('UNEXPECTED: number of entry modules is greater than 1.'));
-      }
-      if (ems.length > 0) {
-        info.script.entry = files.find(f => f.endsWith('.js'));
-      } else if (!_util.isCommonChunk(chunk) || sharedOptions.chunk.includeCommon) {
-        const name = chunk.name || chunk.id.toString();
-        info.script.chunks[name] = files.find(f => f.endsWith('.js'));
+      if (webpackVersion >= 5) {
+        const files = Array.from(chunk.files);
+        const ems = Array.from(chunkGraph.getChunkEntryModulesIterable(chunk));
+        if (ems.length > 1 && ems.filter(em => {
+          return em.resource && em.resource.indexOf('webpack-dev-server/') < 0;
+        }).length > 1) {
+          compilation.warnings.push(new Error('UNEXPECTED: number of entry modules is greater than 1.'));
+        }
+        if (ems.length > 0) {
+          info.script.entry = files.find(f => f.endsWith('.js'));
+        } else if (!isCommonChunk(chunk) || sharedOptions.chunk.includeCommon) {
+          const name = chunk.name || chunk.id.toString();
+          info.script.chunks[name] = files.find(f => f.endsWith('.js'));
+        }
+      } else {
+        if (chunk.entryModule) {
+          info.script.entry = chunk.files.find(f => f.endsWith('.js'));
+        } else if (!isCommonChunk(chunk) || sharedOptions.chunk.includeCommon) {
+          const name = chunk.name || chunk.id.toString();
+          info.script.chunks[name] = chunk.files.find(f => f.endsWith('.js'));
+        }
       }
     });
 
@@ -166,9 +192,12 @@ class JingeWebpackPlugin {
     });
 
     const output = sharedOptions.compress ? JSON.stringify(info) : JSON.stringify(info, null, 2);
-    compilation.assets[sharedOptions.chunk.writeInfo] = {
+    compilation.assets[sharedOptions.chunk.writeInfo] = webpackVersion >= 5 ? {
       source: () => output,
       map: () => null
+    } : {
+      source: () => output,
+      size: () => output.length
     };
   }
 }

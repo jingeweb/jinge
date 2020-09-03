@@ -189,11 +189,29 @@ class KeyGenerator {
   }
 }
 
+/**
+ * 判断给定的 chunk 是否是 webpack 自动抽取的被共用的代码的公共 chunk。
+ * 用于 webpack 4 及以下版本。且必须限制 chunk 的名称本身不能出现 ~ 符号。
+ * @param {Chunk} chunk 
+ */
+function isCommonChunk_v4(chunk) {
+  /**
+   * 当前版本限定了 webpackChunkName 必须满足 /^\w[\w\d_$]*$/，
+   * 因此不可能出现 ~ 符号。如果出现 ~ 符号，则是当前版本的 webpack 抽取出来的公共 chunk。 
+   */
+  return (chunk.name || chunk.id.toString()).indexOf('~') >= 0;
+}
+
 const reasons = new Set([
   'split chunk (cache group: default)',
   'split chunk (cache group: defaultVendors)'
 ]);
-function isCommonChunk(chunk) {
+/**
+ * 判断给定的 chunk 是否是 webpack 自动抽取的被共用的代码的公共 chunk。
+ * 用于 webpack 5 及以上版本。
+ * @param {Chunk} chunk 
+ */
+function isCommonChunk_v5(chunk) {
   /**
    * 目前的逻辑通过 chunkReason 是否为空来判断某个 chunk 是否是 webpack 内部提取出来的公共（common）复用 chunk。
    * 从 webpack 源码来看，似乎只要 chunkReason 不为空都是公共 chunk，但不同的内部 plugin 生成的 chunkReason 各有不同，
@@ -230,5 +248,6 @@ module.exports = {
   prependTab,
   KeyGenerator,
   attrN: convertAttributeName,
-  isCommonChunk
+  isCommonChunk_v5,
+  isCommonChunk_v4
 };

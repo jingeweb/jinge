@@ -14,7 +14,13 @@ function checkCompressOption(webpackOptions) {
   return needComporess;
 }
 
+function getWebpackVersion(compiler) {
+  // 暂时用不怎么靠谱的方式来判别 webpack 的版本号。
+  return 'root' in compiler ? 5 : 4;
+}
+
 module.exports = {
   sharedOptions,
+  getWebpackVersion,
   checkCompressOption
 };

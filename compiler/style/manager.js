@@ -28,13 +28,13 @@ class StyleManager {
   }
   handleMultiChunk(compilation) {
     if (!sharedOptions.chunk.multiple) return;
+    const { webpackVersion } = sharedOptions;
     this.chunkTags = new Map();
-    const chunkGraph = compilation.chunkGraph;
     compilation.chunks.forEach((chunk) => {
       const tag = new Set();
-      const modules = chunkGraph.getChunkModules(chunk).filter(m => {
+      const modules = webpackVersion >= 5 ? compilation.chunkGraph.getChunkModules(chunk).filter(m => {
         return m.resource;
-      });
+      }) : chunk._modules;
       modules.forEach(mod => {
         tag.add(mod.resource);
       });
@@ -45,10 +45,19 @@ class StyleManager {
     if (!sharedOptions.style.extract) {
       return;
     }
-    const { chunkGraph } = compilation;
-    const entryChunks = Array.from(compilation.chunks).filter(chunk => {
-      return chunkGraph.getNumberOfEntryModules(chunk) > 0;
-    });
+    const { webpackVersion } = sharedOptions;
+    const compilationChunks = Array.from(compilation.chunks);
+
+    let entryChunks;
+    if (webpackVersion >= 5) {
+      const { chunkGraph } = compilation;
+      entryChunks = compilationChunks.filter(chunk => {
+        return chunkGraph.getNumberOfEntryModules(chunk) > 0;
+      });
+    } else {
+      entryChunks = compilationChunks.filter(chunk => chunk.entryModule);
+    }
+
     if (entryChunks.length === 0) {
       throw new Error('Entry chunk not found!');
     }
@@ -57,7 +66,7 @@ class StyleManager {
     }
 
     if (!sharedOptions.chunk.multiple) {
-      if (compilation.chunks.size > 1) {
+      if (compilationChunks.size > 1) {
         throw new Error('must set chunk.multiple = true if use webpack code splitting multi-chunk');
       }
       const filename = Array.from(entryChunks[0].files).find(f => f.endsWith('.js'));
@@ -86,15 +95,14 @@ class StyleManager {
     }
 
     this.outputChunks.clear();
-    const chunks = Array.from(compilation.chunks);
-    const idx = chunks.indexOf(entryChunks[0]);
+    const idx = compilationChunks.indexOf(entryChunks[0]);
     // 把 entry 所在的 chunk 移到最前面。
     if (idx !== 0) {
-      chunks.unshift(chunks.splice(idx, 1)[0]);
+      compilationChunks.unshift(compilationChunks.splice(idx, 1)[0]);
     }
     const ss1 = new Map(this.extractStyles);
     const ss2 = new Map(this.extractComponentStyles);
-    chunks.forEach((chunk, i) => {
+    compilationChunks.forEach((chunk, i) => {
       const tag = this.chunkTags.get(chunk);
       let output = '';
       /**
@@ -116,7 +124,7 @@ class StyleManager {
       });
       const chunkInfo = {
         name: chunk.name || chunk.id.toString(),
-        isCommon: _util.isCommonChunk(chunk),
+        isCommon: sharedOptions.webpackVersion >= 5 ? _util.isCommonChunk_v5(chunk) : _util.isCommonChunk_v4(chunk),
         isEntry: i === 0,
         isEmpty: false,
         filename: Array.from(chunk.files).find(f => f.endsWith('.js')),
@@ -168,11 +176,14 @@ class StyleManager {
       return;
     }
     this.outputCache.set(filename, output);
-    assets[filename] = {
+    assets[filename] = sharedOptions.webpackVersion >= 5 ? {
       source: () => output,
       // 由于 scss -> css 的 sourcmap 作用不算很大，而生成 css 的sourcemap 的逻辑还有点复杂，暂时没有实现。
       // TODO: support sourcemap
       map: () => null
+    } : {
+      source: () => output,
+      size: () => output.length
     };
   }
 }

@@ -10,7 +10,7 @@ const {
   styleManager
 } = require('./style');
 const {
-  sharedOptions
+  sharedOptions, getWebpackVersion
 } = require('./options');
 const {
   checkCompressOption
@@ -71,6 +71,9 @@ function jingeLoader(source, sourceMap) {
   if (!inited) {
     if (!resourcePath.endsWith('.js')) {
       return callback(new Error('Entry must be .js file'));
+    }
+    if (!('webpackVersion' in sharedOptions)) {
+      sharedOptions = getWebpackVersion(this._compiler);
     }
     initialize(opts, this._compiler.options);
     inited = true;

@@ -349,15 +349,15 @@ class I18nManager {
   handleMultiChunk(compilation) {
     if (!this._inited || this.written) return;
     if (!sharedOptions.chunk.multiple) return;
+    const { webpackVersion } = sharedOptions;
     this.chunkTags = new Map();
-    const chunkGraph = compilation.chunkGraph;
     compilation.chunks.forEach(chunk => {
       const tag = {
         dicts: new Map(), renders: new Map(), attrs: new Map()
       };
-      const modules = chunkGraph.getChunkModules(chunk).filter(m => {
+      const modules = webpackVersion >= 5 ? compilation.chunkGraph.getChunkModules(chunk).filter(m => {
         return m.resource;
-      });
+      }) : chunk._modules;
       modules.forEach(mod => {
         ['dicts', 'renders', 'attrs'].forEach(type => {
           const keySet = this.keysOfResources[type].get(mod.resource);
@@ -400,19 +400,30 @@ class I18nManager {
     this.written = true;
 
     this.writeTranslateCSV(this.defaultLocale);
-    this.targetLocales.forEach(locale => this.writeTranslateCSV(locale))
+    this.targetLocales.forEach(locale => this.writeTranslateCSV(locale));
+
+    const webpackVersion = sharedOptions.webpackVersion;
+    const { assets, additionalChunkAssets } = compilation;
+    // Array.from 是一种兼容性写法：compilation.chunks 在 webpack4 下面是 Array，在 webpack5 下面是 Set。
+    // 其它地方的 Array.from 同理。
+    const compilationChunks = Array.from(compilation.chunks);
+
+    let entryChunks;
+    if (webpackVersion >= 5) {
+      const { chunkGraph } = compilation;
+      entryChunks = compilationChunks.filter(chunk => {
+        return chunkGraph.getNumberOfEntryModules(chunk) > 0;
+      });
+    } else {
+      entryChunks = compilationChunks.filter(chunk => chunk.entryModule);
+    }
     
-    const { assets, additionalChunkAssets, chunkGraph } = compilation;
-    const entryChunks = Array.from(compilation.chunks).filter(chunk => {
-      return chunkGraph.getNumberOfEntryModules(chunk) > 0;
-    });
     if (entryChunks.length === 0) {
       throw new Error('Entry chunk not found!');
     }
     if (entryChunks.length > 1) {
       throw new Error('This version do not support multiply entries.');
     }
-    const compilationChunks = Array.from(compilation.chunks);
 
     if (!sharedOptions.chunk.multiple) {
       if (compilationChunks.length > 1) {
@@ -493,7 +504,7 @@ class I18nManager {
           name: chunk.name || chunk.id.toString(),
           isEntry: chunkIdx === 0,
           isEmpty: isEmpty,
-          isCommon: _util.isCommonChunk(chunk),
+          isCommon: sharedOptions.webpackVersion >= 5 ? _util.isCommonChunk_v5(chunk) : _util.isCommonChunk_v4(chunk),
           filename: filenames[chunkIdx],
           finalFilename: '',
           deps: []
@@ -574,10 +585,13 @@ if (typeof jinge !== 'undefined') {
       additionalChunkAssets.push(filename);
     }
     chunkInfo.finalFilename = filename;
-    assets[filename] = {
+    assets[filename] = sharedOptions.webpackVersion >= 5 ? {
       source: () => code,
       // 多语言资源字典没有 sourcemap 的说法。
       map: () => null
+    } : {
+      source: () => code,
+      size: () => code.length
     };
   }
 
