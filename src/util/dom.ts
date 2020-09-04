@@ -3,6 +3,9 @@ import {
   isUndefined,
   isObject
 } from './type';
+import {
+  DeregisterFn
+} from './common';
 
 export function setText($element: Node, text: unknown): void {
   if (!isString(text)) {
@@ -126,7 +129,7 @@ export function removeEvent($element: Element, eventName: string, handler: Event
  *
  * @returns {Function} deregister function which will removeEventListener
  */
-export function registerEvent($element: Element, eventName: string, handler: EventListener, capture?: boolean | AddEventListenerOptions): () => void {
+export function registerEvent($element: Element, eventName: string, handler: EventListener, capture?: boolean | AddEventListenerOptions): DeregisterFn {
   addEvent($element, eventName, handler, capture);
   return function deregister(): void {
     removeEvent($element, eventName, handler);

@@ -2,8 +2,7 @@ import {
   isString,
   uid,
   isFunction,
-  isBoolean,
-  isObject
+  DeregisterFn
 } from '../util';
 import {
   Messenger
@@ -64,18 +63,6 @@ function mergeDictOrRender(main: Record<string, unknown>, chunk: Record<string, 
       main[k] = chunk[k];
     }
   }
-}
-
-
-export type WatchOptions = {
-  /**
-   * call watch listener immediatly. default is false.
-   */
-  immediate?: boolean;
-  /**
-   * unshift listener to start of queue. default is false. 
-   */
-  prepend?: boolean;
 }
 
 function _assert(s: I18nService): void {
@@ -262,26 +249,8 @@ class I18nService extends Messenger {
    * @param immediate call listener immediately, default is false.
    * @returns a function auto remove listener
    */
-  watch(listener: (locale: string) => void, immediate?: boolean): () => void;
-  /**
-   * 
-   * @param listener a listener bind to change event
-   * @param options `immediate` call listener immediately, default is false. `prepend` unshift listener to make listener be called first. 
-   * @returns a function auto remove listener
-   */
-  watch(listener: (locale: string) => void, options?: WatchOptions): () => void;
-  watch(listener: (locale: string) => void, opts?: boolean | WatchOptions): () => void {
-    let immediate = false;
-    let prepend = false;
-    if (isBoolean(opts)) {
-      immediate = opts as boolean;
-    } else if (isObject(opts)) {
-      immediate = (opts as WatchOptions).immediate;
-      prepend = (opts as WatchOptions).prepend;
-    }
-    this.__on('change', listener, {
-      prepend
-    });
+  watch(listener: (locale: string) => void, immediate = false): DeregisterFn {
+    this.__on('change', listener);
     if (immediate) {
       listener(this.locale);
     }

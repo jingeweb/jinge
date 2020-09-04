@@ -12,3 +12,5 @@ export function warn(...args: unknown[]): void {
 export function disableWarning(): void {
   warning = false;
 }
+
+export type DeregisterFn = () => void;

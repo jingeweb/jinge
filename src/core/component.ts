@@ -1,7 +1,7 @@
 import {
   isObject, isArray, arrayRemove, registerEvent,
   isFunction, clearImmediate, setImmediate,
-  appendChildren, replaceChildren, warn
+  appendChildren, replaceChildren, warn, DeregisterFn
 } from '../util';
 import {
   $$, ViewModelCore, ViewModelObject
@@ -16,7 +16,7 @@ import {
   manager as StyleManager, ComponentStyle
 } from './style';
 import {
-  i18n as i18nService, WatchOptions
+  i18n as i18nService
 } from './i18n';
 
 export enum ComponentStates {
@@ -33,7 +33,6 @@ export enum ContextStates {
 }
 export const __ = Symbol('__');
 
-export type DeregisterFn = () => void;
 export type RenderFn = (comp: Component) => Node[];
 
 interface CompilerAttributes {
@@ -126,13 +125,9 @@ export interface ComponentProperties {
    */
   upNextMap: Map<(() => void) | number, number>;
   /**
-   * dom listeners deregister
+   * deregister functions
    */
-  deregDOM: DeregisterFn[];
-  /**
-   * i18n watchers deregister
-   */
-  deregI18N: DeregisterFn[];
+  deregFns: Set<DeregisterFn>;
 }
 
 /** Bellow is utility functions **/
@@ -241,57 +236,48 @@ export class Component extends Messenger {
       relatedRefs: null,
       upNextMap: null,
       compStyle: compilerAttrs.compStyle || null,
-      deregDOM: null,
-      deregI18N: null
+      deregFns: null
     };
   }
 
   /**
-   * Helper function to add i18n change listener.
-   * Return deregister function which will remove event listener.
-   * If you do dot call deregister function, it will be auto called when component is destroied.
+   * store deregisterFn and auto call it when component is being destroy.
    */
-  __i18nWatch(listener: (locale: string) => void, immediate?: boolean): DeregisterFn;
-  __i18nWatch(listener: (locale: string) => void, options?: WatchOptions): DeregisterFn;
-  __i18nWatch(listener: (locale: string) => void, opts?: boolean | WatchOptions): DeregisterFn {
-    let deregs = this[__].deregI18N;
+  __addDeregisterFn(deregisterFn: DeregisterFn): void {
+    let deregs = this[__].deregFns;
     if (!deregs) {
-      this[__].deregI18N = deregs = [];
+      this[__].deregFns = deregs = new Set();
     }
-    const unwatcher = i18nService.watch((locale) => {
+    deregs.add(deregisterFn);
+  }
+
+  /**
+   * Helper function to add i18n change listener.
+   * The listener will be auto removed when component is destroied.
+   */
+  __i18nWatch(listener: (locale: string) => void, immediate = false): void {
+    this.__addDeregisterFn(i18nService.watch((locale) => {
       // bind component to listener's function context.
       listener.call(this, locale);
-    }, opts as WatchOptions);
-    const deregister = (): void => {
-      unwatcher();
-      arrayRemove(deregs, deregister);
-    };
-    deregs.push(deregister);
-    return deregister;
+    }, immediate));
   }
 
   /**
    * Helper function to add dom event listener.
    * Return deregister function which will remove event listener.
    * If you do dot call deregister function, it will be auto called when component is destroied.
-   * @param {Boolean|Object} capture
    * @returns {Function} deregister function to remove listener
    */
   __domAddListener($el: HTMLElement, eventName: string, listener: EventListener, capture?: boolean | AddEventListenerOptions): DeregisterFn {
-    let deregs = this[__].deregDOM;
-    if (!deregs) {
-      this[__].deregDOM = deregs = [];
-    }
-    const lisDeregister = registerEvent($el, eventName, $event => {
+    const deregEvtFn = registerEvent($el, eventName, $event => {
       // bind component to listener's function context.
       listener.call(this, $event);
     }, capture);
-    const deregister = (): void => {
-      lisDeregister();
-      arrayRemove(deregs, deregister);
+    this.__addDeregisterFn(deregEvtFn);
+    return () => {
+      deregEvtFn();
+      this[__].deregFns.delete(deregEvtFn);
     };
-    deregs.push(deregister);
-    return deregister;
   }
 
   /**
@@ -323,17 +309,18 @@ export class Component extends Messenger {
       if (ignoredEventNames && (ignoredEventNames as string[]).indexOf(eventName) >= 0) {
         return;
       }
-      handlers.forEach(handler => {
-        const {opts, fn} = handler;
-        this.__domAddListener(targetEl, eventName, (
-          handler.opts && (handler.opts.stop || handler.opts.prevent)
-          ? function($evt: Event): void {
+      handlers.forEach((opts, handler) => {
+        const deregFn = registerEvent(targetEl, eventName, (
+          opts && (opts.stop || opts.prevent)
+          ? ($evt: Event): void => {
             opts.stop && $evt.stopPropagation();
             opts.prevent && $evt.preventDefault();
-            // this.domAddListener 会将 this 变成当前组件。所以需要显式地使用 fn.call(this) 来传递组件。
-            fn.call(this, $evt);
-          } : fn
-        ), handler.opts as unknown as AddEventListenerOptions);
+            handler.call(this, $evt);
+          } : ($evt: Event): void => {
+            handler.call(this, $evt);
+          }
+        ), opts as unknown as AddEventListenerOptions);
+        this.__addDeregisterFn(deregFn);
       });
     });
   }
@@ -460,14 +447,12 @@ export class Component extends Messenger {
       });
       comp.relatedRefs = null;
     } 
-    // clear all dom event listener and i18n watcher
-    if (comp.deregDOM) {
-      comp.deregDOM.forEach(deregFn => deregFn());
-      comp.deregDOM = null;
-    }
-    if (comp.deregI18N) {
-      comp.deregI18N.forEach(deregFn => deregFn());
-      comp.deregI18N = null;
+
+    // auto call all deregister functions
+    if (comp.deregFns) {
+      comp.deregFns.forEach((deregFn) => deregFn());
+      comp.deregFns.clear();
+      comp.deregFns = null;
     }
 
     // clear properties
