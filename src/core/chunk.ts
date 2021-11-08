@@ -1,9 +1,5 @@
-import {
-  isArray, createElement
-} from '../util';
-import {
-  i18n, I18NChunkLoader
-} from './i18n';
+import { isArray, createElement } from '../util';
+import { i18n, I18NChunkLoader } from './i18n';
 
 interface Resource {
   entry: string;
@@ -29,7 +25,7 @@ function loadLink(href: string): Promise<unknown> {
     }
     const $s = createElement('link', {
       rel: 'stylesheet',
-      href: href
+      href: href,
     }) as HTMLLinkElement;
     $s.onload = (): void => {
       fileCache.set(href, true);
@@ -41,21 +37,31 @@ function loadLink(href: string): Promise<unknown> {
 }
 
 function loadLocale(url: string): Promise<unknown> {
-  return fileCache.has(url) ? Promise.resolve() : fetch(url).then(res => res.text()).then(code => {
-    fileCache.set(url, true);
-    new Function('jinge', code)({
-      i18n
-    });
-  });
+  return fileCache.has(url)
+    ? Promise.resolve()
+    : fetch(url)
+        .then((res) => res.text())
+        .then((code) => {
+          fileCache.set(url, true);
+          new Function('jinge', code)({
+            i18n,
+          });
+        });
 }
 
-function load(fn: (url: string) => Promise<unknown>, file: string | string[], chunkName: string, loadedSet: Set<string>, baseHref: string): Promise<unknown> {
+function load(
+  fn: (url: string) => Promise<unknown>,
+  file: string | string[],
+  chunkName: string,
+  loadedSet: Set<string>,
+  baseHref: string,
+): Promise<unknown> {
   if (!file) {
     loadedSet.add(chunkName);
     return Promise.resolve();
   }
   if (isArray(file)) {
-    return Promise.all((file as string[]).map(lf => fn(baseHref + lf))).then(() => {
+    return Promise.all((file as string[]).map((lf) => fn(baseHref + lf))).then(() => {
       loadedSet.add(chunkName);
     });
   } else {
@@ -114,7 +120,7 @@ export class ChunkResourceLoader implements I18NChunkLoader {
     if (!lloc) {
       this._lcs.locale[locale] = lloc = new Set();
     }
-    this._acs.forEach(chunkName => {
+    this._acs.forEach((chunkName) => {
       if (!lsty.has(chunkName)) {
         promises.push(load(loadLink, meta.style.chunks[chunkName], chunkName, lsty, baseHref));
       }
@@ -140,4 +146,3 @@ export class ChunkResourceLoader implements I18NChunkLoader {
 // singleton
 export const chunk = new ChunkResourceLoader();
 i18n.__loader = chunk;
-

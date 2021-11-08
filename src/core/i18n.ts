@@ -1,12 +1,5 @@
-import {
-  isString,
-  uid,
-  isFunction,
-  DeregisterFn
-} from '../util';
-import {
-  Messenger
-} from './messenger';
+import { isString, uid, isFunction, DeregisterFn } from '../util';
+import { Messenger } from './messenger';
 
 type FetchFn = (locale: string) => Promise<string>;
 type StringOrFetchFn = string | FetchFn;
@@ -15,11 +8,11 @@ type RenderFactory = (...deps: unknown[]) => RenderDicts;
 type RenderFn = (...args: unknown[]) => Node[];
 type RenderDict = {
   [k: string]: string | RenderFn;
-}
+};
 type RenderDicts = {
   components: RenderDict;
   attributes: RenderDict;
-}
+};
 type Locale = {
   locale: string;
   dictionary?: {
@@ -27,14 +20,13 @@ type Locale = {
   };
   render?: RenderDicts | RenderFactory;
   __renders?: RenderFactory[];
-}
+};
 
 declare global {
   interface Window {
     JINGE_I18N_DATA: Locale;
   }
 }
-
 
 const TextFnCache = new Map<string, RenderTextFn>();
 /**
@@ -44,21 +36,23 @@ const TextFnCache = new Map<string, RenderTextFn>();
 export function compile(text: string): RenderTextFn {
   let fn = TextFnCache.get(text);
   if (!fn) {
-    fn = new Function('__ctx', `return \`${text.replace(/`/g, '\\`').replace(/\$\{\s*([\w\d._$]+)\s*\}/g, (m, n) => {
-      return '${ __ctx.' + n + ' }';
-    })}\`;`) as RenderTextFn;
+    fn = new Function(
+      '__ctx',
+      `return \`${text.replace(/`/g, '\\`').replace(/\$\{\s*([\w\d._$]+)\s*\}/g, (m, n) => {
+        return '${ __ctx.' + n + ' }';
+      })}\`;`,
+    ) as RenderTextFn;
     TextFnCache.set(text, fn);
   }
   return fn;
 }
 
 function defaultFetchFn(url: string): Promise<string> {
-  return window.fetch(url).then(res => res.text());
+  return window.fetch(url).then((res) => res.text());
 }
 
-
 function mergeDictOrRender(main: Record<string, unknown>, chunk: Record<string, unknown>): void {
-  for(const k in chunk) {
+  for (const k in chunk) {
     if (!(k in main)) {
       main[k] = chunk[k];
     }
@@ -135,7 +129,7 @@ class I18nService extends Messenger {
         locale: data.locale,
         dictionary: null,
         render: { components: {}, attributes: {} },
-        __renders: []
+        __renders: [],
       });
     }
     const localeData: Locale = cache.get(data.locale);
@@ -169,19 +163,17 @@ class I18nService extends Messenger {
     this.__notify('before-change', this.locale, locale);
     let data = this.__cache.get(locale);
     if (!data) {
-      const code = await (
-        isString(filenameOrLoadFn) 
+      const code = await (isString(filenameOrLoadFn)
         ? defaultFetchFn(filenameOrLoadFn as string)
-        : (filenameOrLoadFn as FetchFn)(locale)
-      ); 
-      (new Function('jinge', code))({
-        i18n: this
+        : (filenameOrLoadFn as FetchFn)(locale));
+      new Function('jinge', code)({
+        i18n: this,
       });
       if (this.__key !== key) {
         /*
-          * ignore if callback has been expired.
-          * 使用闭包的技巧来检测当前回调是否已经过期，
-          */
+         * ignore if callback has been expired.
+         * 使用闭包的技巧来检测当前回调是否已经过期，
+         */
         return;
       }
       data = this.__cache.get(locale);
@@ -193,7 +185,7 @@ class I18nService extends Messenger {
         return;
       }
     }
-    
+
     this.__notify('change', this.locale);
   }
 
@@ -225,7 +217,7 @@ class I18nService extends Messenger {
     const render = this.__data.render as RenderDicts;
     if (__renders && __renders.length > 0) {
       if (!this.__deps) throw new Error('missing deps');
-      __renders.forEach(renderFactory => {
+      __renders.forEach((renderFactory) => {
         const r = renderFactory(...this.__deps);
         mergeDictOrRender(render.components, r.components);
         mergeDictOrRender(render.attributes, r.attributes);
@@ -259,7 +251,6 @@ class I18nService extends Messenger {
     };
   }
 }
-
 
 /* Singleton */
 export const i18n = new I18nService();

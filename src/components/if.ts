@@ -1,23 +1,31 @@
 import {
-  __, isComponent, attrs, RenderFn, Component, ComponentAttributes, assertRenderResults
+  __,
+  isComponent,
+  attrs,
+  RenderFn,
+  Component,
+  ComponentAttributes,
+  assertRenderResults,
 } from '../core/component';
-import {
-  TransitionStates, getDurationType
-} from '../core/transition';
-import {
-  createFragment, addEvent, setImmediate, removeEvent
-} from '../util';
+import { TransitionStates, getDurationType } from '../core/transition';
+import { createFragment, addEvent, setImmediate, removeEvent } from '../util';
 
-function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>, parentComponentStyles: Record<string, string>): Component {
-  return Component.create(attrs({
-    [__]: {
-      context,
-      compStyle: parentComponentStyles,
-      slots: {
-        default: renderFn
-      }
-    }
-  }));
+function createEl(
+  renderFn: RenderFn,
+  context: Record<string | symbol, unknown>,
+  parentComponentStyles: Record<string, string>,
+): Component {
+  return Component.create(
+    attrs({
+      [__]: {
+        context,
+        compStyle: parentComponentStyles,
+        slots: {
+          default: renderFn,
+        },
+      },
+    }),
+  );
 }
 
 function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
@@ -28,7 +36,7 @@ function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
     for (const k in acs) {
       component._transitionMap.set(k, [
         k === value ? TransitionStates.ENTERED : TransitionStates.LEAVED,
-        null // element
+        null, // element
       ]);
     }
     component._previousValue = value;
@@ -45,17 +53,16 @@ function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
   return el.__render();
 }
 
-
 function doUpdate(component: IfComponent | SwitchComponent): void {
   const roots = component[__].rootNodes;
   const el = roots[0];
   const isComp = isComponent(el);
   const firstDOM = (isComp ? (el as Component).__firstDOM : el) as Node;
-  const parentDOM = (isComp ? firstDOM : el as Node).parentNode;
+  const parentDOM = (isComp ? firstDOM : (el as Node)).parentNode;
   const renderFn = component[__].slots?.[component._currentValue];
   if (renderFn) {
     const newEl = createEl(renderFn, component[__].context, component[__].compStyle);
-    const nodes = assertRenderResults((newEl as Component).__render()); 
+    const nodes = assertRenderResults((newEl as Component).__render());
     parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
     roots[0] = newEl;
   } else {
@@ -70,7 +77,6 @@ function doUpdate(component: IfComponent | SwitchComponent): void {
   renderFn && (roots[0] as Component).__handleAfterRender();
   component.__notify('branch-switched', component._branch);
 }
-
 
 function cancelTs(t: [TransitionStates, Node], tn: string, e: boolean, component: IfComponent | SwitchComponent): void {
   const el = t[1] as HTMLElement;
@@ -120,7 +126,7 @@ function updateSwitchWithTransition(component: IfComponent | SwitchComponent): v
   if (!pt) {
     pt = [
       pv === 'else' ? TransitionStates.LEAVED : TransitionStates.ENTERED,
-      null // element
+      null, // element
     ];
     component._transitionMap.set(pv, pt);
   }
@@ -143,9 +149,10 @@ function updateSwitchWithTransition(component: IfComponent | SwitchComponent): v
 }
 
 function updateSwitch(component: IfComponent | SwitchComponent): void {
-  if (!isComponent(component[__].rootNodes[0]) && (
-    !component[__].slots || !component[__].slots[component._currentValue]
-  )) {
+  if (
+    !isComponent(component[__].rootNodes[0]) &&
+    (!component[__].slots || !component[__].slots[component._currentValue])
+  ) {
     return;
   }
 
@@ -196,7 +203,7 @@ function updateSwitchOnTransitionEnd(component: IfComponent | SwitchComponent): 
 
 function destroySwitch(component: IfComponent | SwitchComponent): void {
   if (component._transitionMap) {
-    component._transitionMap.forEach(ts => {
+    component._transitionMap.forEach((ts) => {
       const el = ts[1] as Element;
       if (el) {
         removeEvent(el, 'transitionend', component._onEndHandler);

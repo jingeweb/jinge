@@ -1,12 +1,15 @@
 import {
-  Component, ComponentAttributes, __, attrs, RenderFn, isComponent, ComponentStates, assertRenderResults
+  Component,
+  ComponentAttributes,
+  __,
+  attrs,
+  RenderFn,
+  isComponent,
+  ComponentStates,
+  assertRenderResults,
 } from '../core/component';
-import {
-  isViewModel, ViewModelArray, $$, ViewModelObject
-} from '../vm/common';
-import {
-  isString, isNumber, isArray, createFragment, insertAfter
-} from '../util';
+import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/common';
+import { isString, isNumber, isArray, createFragment, insertAfter } from '../util';
 
 type ForKeyNameFn = (v: unknown) => string;
 type ForKeyName = string | ForKeyNameFn;
@@ -42,19 +45,39 @@ export class ForEachComponent extends Component {
   }
 }
 
-function createEl(item: unknown, i: number, isLast: boolean, itemRenderFn: RenderFn, context: Record<string | symbol, unknown>, parentCompomentStyles: Record<string, string>): ForEachComponent {
-  return (new ForEachComponent(attrs({
-    [__]: {
-      context,
-      compStyle: parentCompomentStyles,
-      slots: {
-        default: itemRenderFn
-      }
-    }
-  }), item, i, isLast))[$$].proxy as ForEachComponent;
+function createEl(
+  item: unknown,
+  i: number,
+  isLast: boolean,
+  itemRenderFn: RenderFn,
+  context: Record<string | symbol, unknown>,
+  parentCompomentStyles: Record<string, string>,
+): ForEachComponent {
+  return new ForEachComponent(
+    attrs({
+      [__]: {
+        context,
+        compStyle: parentCompomentStyles,
+        slots: {
+          default: itemRenderFn,
+        },
+      },
+    }),
+    item,
+    i,
+    isLast,
+  )[$$].proxy as ForEachComponent;
 }
 
-function appendRenderEach(item: unknown, i: number, isLast: boolean, itemRenderFn: RenderFn, roots: (Component | Node)[], context: Record<string | symbol, unknown>, parentCompomentStyles: Record<string, string>): Node[] {
+function appendRenderEach(
+  item: unknown,
+  i: number,
+  isLast: boolean,
+  itemRenderFn: RenderFn,
+  roots: (Component | Node)[],
+  context: Record<string | symbol, unknown>,
+  parentCompomentStyles: Record<string, string>,
+): Node[] {
   const el = createEl(item, i, isLast, itemRenderFn, context, parentCompomentStyles);
   roots.push(el);
   return el.__render();
@@ -70,13 +93,25 @@ function _prepareKey(item: unknown, i: number, keyMap: Map<unknown, number>, key
   const key = keyName === 'each' ? item : (keyName as ForKeyNameFn)(item);
   if (keyMap.has(key)) {
     // eslint-disable-next-line no-console
-    console.error(`loop items [${i}] and [${keyMap.get(key)}] of <for> component both have key '${key}', dulplicated key may cause update error.`);
+    console.error(
+      `loop items [${i}] and [${keyMap.get(
+        key,
+      )}] of <for> component both have key '${key}', dulplicated key may cause update error.`,
+    );
   }
   keyMap.set(key, i);
   return key;
 }
 
-function renderItems(items: unknown[], itemRenderFn: RenderFn, roots: (Component | Node)[], keys: unknown[], keyName: ForKeyName, context: Record<string | symbol, unknown>, parentCompomentStyles: Record<string, string>): Node[] {
+function renderItems(
+  items: unknown[],
+  itemRenderFn: RenderFn,
+  roots: (Component | Node)[],
+  keys: unknown[],
+  keyName: ForKeyName,
+  context: Record<string | symbol, unknown>,
+  parentCompomentStyles: Record<string, string>,
+): Node[] {
   const result: Node[] = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
@@ -84,13 +119,15 @@ function renderItems(items: unknown[], itemRenderFn: RenderFn, roots: (Component
     if (keyName !== 'index') {
       keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
-    result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context, parentCompomentStyles));
+    result.push(
+      ...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context, parentCompomentStyles),
+    );
   });
   return result;
 }
 
 function loopAppend($parent: Node, el: Component): void {
-  el[__].rootNodes.forEach(node => {
+  el[__].rootNodes.forEach((node) => {
     if (isComponent(node)) {
       loopAppend($parent, node as Component);
     } else {
@@ -104,7 +141,7 @@ function updateEl(el: ForEachComponent, i: number, items: unknown[]): void {
     el.isFirst = i === 0;
   }
   if (el.isLast !== (i === items.length - 1)) {
-    el.isLast = (i === items.length - 1);
+    el.isLast = i === items.length - 1;
   }
   if (el.index !== i) {
     el.index = i;
@@ -115,7 +152,7 @@ function updateEl(el: ForEachComponent, i: number, items: unknown[]): void {
 }
 
 function _parseIndexPath(p: string | number): string | number {
-  return (isString(p) && p !== 'length' && /^\d+$/.test(p as string)) ? Number(p) : p;
+  return isString(p) && p !== 'length' && /^\d+$/.test(p as string) ? Number(p) : p;
 }
 
 export class ForComponent extends Component {
@@ -149,7 +186,7 @@ export class ForComponent extends Component {
       this.loop = attrs.loop as ViewModelArray;
     });
 
-    const kn = attrs.key as string || 'index';
+    const kn = (attrs.key as string) || 'index';
     this._keyName = kn;
     this._length = 0;
     this._keys = null;
@@ -161,7 +198,7 @@ export class ForComponent extends Component {
       // console.log('loop.*.' + kn.slice(5));
       const propCount = kn.split('.').length + 1;
       // console.log(propCount);
-      
+
       this[$$].__watch('loop.*.' + kn.slice(5), (propPath: (string | number)[]) => {
         if (propPath.length !== propCount || this._waitingUpdate) {
           // ignore if it's parent path
@@ -224,15 +261,7 @@ export class ForComponent extends Component {
       return roots as Node[];
     }
     this._length = items.length;
-    return renderItems(
-      items,
-      itemRenderFn,
-      roots,
-      this._keys,
-      keyName,
-      this[__].context,
-      this[__].compStyle
-    );
+    return renderItems(items, itemRenderFn, roots, this._keys, keyName, this[__].context, this[__].compStyle);
   }
 
   _updateItem(index: number): void {
@@ -254,14 +283,9 @@ export class ForComponent extends Component {
       const oldKey = keys[index];
       if (newKey !== oldKey) {
         const $fd = oldEl.__firstDOM;
-        const newEl = createEl(
-          item, index, oldEl.isLast,
-          itemRenderFn, this[__].context, this[__].compStyle
-        );
+        const newEl = createEl(item, index, oldEl.isLast, itemRenderFn, this[__].context, this[__].compStyle);
         const rr = assertRenderResults(newEl.__render());
-        $fd.parentNode.insertBefore(
-          rr.length > 1 ? createFragment(rr) : rr[0], $fd
-        );
+        $fd.parentNode.insertBefore(rr.length > 1 ? createFragment(rr) : rr[0], $fd);
         oldEl.__destroy();
         roots[index] = newEl;
         keys[index] = newKey;
@@ -281,7 +305,7 @@ export class ForComponent extends Component {
     const itemRenderFn = this[__].slots?.default;
     if (!itemRenderFn) return;
 
-    const newItems: ViewModelArray = isArray(this.loop) ? this.loop : [] as ViewModelArray;
+    const newItems: ViewModelArray = isArray(this.loop) ? this.loop : ([] as ViewModelArray);
     const roots = this[__].rootNodes;
     const nl = newItems.length;
     const ol = this._length;
@@ -310,7 +334,7 @@ export class ForComponent extends Component {
     const ctx = this[__].context;
     const parentComponentStyles = this[__].compStyle;
     const firstEl = roots[0]; // if ol === 0, firstEl is comment, else is component
-    const $parent = (ol === 0 ? firstEl as Node : (firstEl as ForEachComponent).__firstDOM).parentNode;
+    const $parent = (ol === 0 ? (firstEl as Node) : (firstEl as ForEachComponent).__firstDOM).parentNode;
 
     if (keyName === 'index') {
       let $f: DocumentFragment = null;
@@ -321,13 +345,15 @@ export class ForComponent extends Component {
           updateEl(roots[i] as ForEachComponent, i, newItems);
         } else {
           if (!$f) $f = createFragment();
-          appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx, parentComponentStyles).forEach(el => {
-            $f.appendChild(el);
-          });
+          appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx, parentComponentStyles).forEach(
+            (el) => {
+              $f.appendChild(el);
+            },
+          );
         }
       }
       if ($f) {
-        const $le = ol === 0 ? firstEl as Node : (roots[ol - 1] as ForEachComponent).__lastDOM;
+        const $le = ol === 0 ? (firstEl as Node) : (roots[ol - 1] as ForEachComponent).__lastDOM;
         insertAfter($parent, $f, $le);
         for (let i = ol; i < nl; i++) {
           (roots[i] as ForEachComponent).__handleAfterRender();
@@ -348,13 +374,10 @@ export class ForComponent extends Component {
     const oldKeys = this._keys;
     if (ol === 0) {
       roots.length = 0;
-      const rs = renderItems(
-        newItems, itemRenderFn, roots,
-        oldKeys, keyName, this[__].context, this[__].compStyle
-      );
+      const rs = renderItems(newItems, itemRenderFn, roots, oldKeys, keyName, this[__].context, this[__].compStyle);
       insertAfter($parent, createFragment(rs), firstEl as Node);
       $parent.removeChild(firstEl as Node);
-      roots.forEach(el => (el as ForEachComponent).__handleAfterRender());
+      roots.forEach((el) => (el as ForEachComponent).__handleAfterRender());
       return;
     }
 
@@ -397,7 +420,7 @@ export class ForComponent extends Component {
         for (; ni < nl; ni++) {
           const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx, parentComponentStyles);
           if (!$f) $f = createFragment();
-          el.__render().forEach($n => $f.appendChild($n));
+          el.__render().forEach(($n) => $f.appendChild($n));
           newRoots.push(el);
         }
         if ($f) {
@@ -430,7 +453,7 @@ export class ForComponent extends Component {
         if (!$f) $f = createFragment();
         if (!reuseEl) {
           reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx, parentComponentStyles);
-          reuseEl.__render().forEach($n => $f.appendChild($n));
+          reuseEl.__render().forEach(($n) => $f.appendChild($n));
           if (!$nes) $nes = [];
           $nes.push(reuseEl);
         } else {
@@ -445,7 +468,7 @@ export class ForComponent extends Component {
       }
       const el = roots[oi] as ForEachComponent;
       $f && $parent.insertBefore($f, el.__firstDOM);
-      $nes && $nes.forEach(el => el.__handleAfterRender());
+      $nes && $nes.forEach((el) => el.__handleAfterRender());
       updateEl(el, ni, newItems);
       newRoots.push(el);
       oi++;

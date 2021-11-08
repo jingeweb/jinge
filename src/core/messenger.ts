@@ -1,4 +1,3 @@
-
 export type MessengerListener = (...args: unknown[]) => void;
 export interface MessengerListenerOptions {
   once?: boolean;
@@ -49,7 +48,7 @@ export class Messenger {
     }
     let listeners = this[MESSENGER_LISTENERS].get(eventName);
     if (!listeners) {
-      this[MESSENGER_LISTENERS].set(eventName, listeners = new Map());
+      this[MESSENGER_LISTENERS].set(eventName, (listeners = new Map()));
     }
     listeners.set(eventListener, options);
   }
@@ -72,7 +71,7 @@ export class Messenger {
       return;
     }
     if (!eventName) {
-      lisMap.forEach(listeners => listeners.clear());
+      lisMap.forEach((listeners) => listeners.clear());
       lisMap.clear();
       return;
     }

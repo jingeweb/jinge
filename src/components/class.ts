@@ -1,19 +1,11 @@
-import {
-  Component, __, ComponentAttributes, isComponent
-} from '../core/component';
-import {
-  isObject, removeEvent, addEvent, setImmediate
-} from '../util';
-import {
-  $$
-} from '../vm/common';
-import {
-  TransitionStates, getDurationType
-} from '../core/transition';
+import { Component, __, ComponentAttributes, isComponent } from '../core/component';
+import { isObject, removeEvent, addEvent, setImmediate } from '../util';
+import { $$ } from '../vm/common';
+import { TransitionStates, getDurationType } from '../core/transition';
 
 function loopOperateClass(el: Component | Node, isAddOperate: boolean, domClass: string): void {
   if (isComponent(el)) {
-    (el as Component)[__].rootNodes.forEach(ce => loopOperateClass(ce, isAddOperate, domClass));
+    (el as Component)[__].rootNodes.forEach((ce) => loopOperateClass(ce, isAddOperate, domClass));
   } else if (isAddOperate) {
     (el as HTMLElement).classList.add(domClass);
   } else {
@@ -53,7 +45,7 @@ export class ToggleClassComponent extends Component {
   }
 
   __update(first: boolean): void {
-    const el = this.transition ? this.__transitionDOM as HTMLElement : null;
+    const el = this.transition ? (this.__transitionDOM as HTMLElement) : null;
     if (el && el.nodeType !== Node.ELEMENT_NODE) {
       // ignore comment or text-node
       return;
@@ -62,7 +54,7 @@ export class ToggleClassComponent extends Component {
       this._t = new Map();
     }
     const cs = this.domClass;
-    Object.keys(cs).forEach(k => {
+    Object.keys(cs).forEach((k) => {
       const v = cs[k];
       if (!this.transition) {
         loopOperateClass(this as unknown as Component, !!v, k);
@@ -72,7 +64,7 @@ export class ToggleClassComponent extends Component {
       if (first) {
         this._t.set(k, [
           v ? TransitionStates.ENTERED : TransitionStates.LEAVED, // state
-          null // saved onEnd callback
+          null, // saved onEnd callback
         ]);
         if (v) {
           el.classList.add(k);

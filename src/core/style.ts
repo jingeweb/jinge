@@ -1,11 +1,9 @@
-import {
-  uid, createElement
-} from '../util';
+import { uid, createElement } from '../util';
 
 function isHideCssExists(): boolean {
   const $e = createElement('span', {
     style: 'position:absolute;left:-10000px;',
-    class: 'jg-hide'
+    class: 'jg-hide',
   });
   document.body.appendChild($e);
   const exist = getComputedStyle($e).getPropertyValue('display') === 'none';
@@ -16,19 +14,19 @@ function isHideCssExists(): boolean {
 export type ComponentStyle = {
   id: string;
   css: string;
-}
+};
 type StyleInfo = {
   id?: string;
   css: string;
   dom: string;
   refs?: number;
-}
+};
 
 class ComponentStyleManager {
   private m: Map<string, StyleInfo>;
   /**
-   * State  
-   * 0: not attached  
+   * State
+   * 0: not attached
    * 1: attached
    */
   private s: number;
@@ -42,7 +40,7 @@ class ComponentStyleManager {
     if (this.s === 0) return;
     const $style = createElement('style', {
       type: 'text/css',
-      id: sty.dom
+      id: sty.dom,
     }) as HTMLStyleElement & {
       styleSheet: {
         cssText: string;
@@ -68,7 +66,7 @@ class ComponentStyleManager {
       id: sty.id,
       css: sty.css,
       dom: `__${sty.id}__`,
-      refs: 1
+      refs: 1,
     };
     styleMap.set(sty.id, info);
     this.create(info);
@@ -82,10 +80,10 @@ class ComponentStyleManager {
     if (!isHideCssExists()) {
       this.create({
         dom: `__jgsty_${uid()}__`,
-        css: '.jg-hide{display:none!important}.jg-hide.jg-hide-enter,.jg-hide.jg-hide-leave{display:block!important}'
+        css: '.jg-hide{display:none!important}.jg-hide.jg-hide-enter,.jg-hide.jg-hide-leave{display:block!important}',
       });
     }
-    this.m.forEach(info => {
+    this.m.forEach((info) => {
       this.create(info);
     });
   }
@@ -102,9 +100,7 @@ class ComponentStyleManager {
     if (this.s === 0) {
       return;
     }
-    document.head.removeChild(
-      document.getElementById(info.dom)
-    );
+    document.head.removeChild(document.getElementById(info.dom));
   }
 }
 

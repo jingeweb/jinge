@@ -23,13 +23,13 @@ export function isArray(v: unknown): boolean {
 }
 
 export function isBoolean(v: unknown): boolean {
-  return typeof v === 'boolean' || (v instanceof Boolean);
+  return typeof v === 'boolean' || v instanceof Boolean;
 }
 
 export function isFunction(v: unknown): boolean {
   return typeOf(v) === 'function';
 }
 
-export function isPromise(obj: {then?: unknown}): boolean {
+export function isPromise(obj: { then?: unknown }): boolean {
   return isObject(obj) && isFunction(obj.then);
 }

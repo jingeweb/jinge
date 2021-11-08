@@ -1,6 +1,4 @@
-import {
-  Component, ComponentAttributes
-} from '../core/component';
+import { Component, ComponentAttributes } from '../core/component';
 
 /**
  * This component is only for development purpose

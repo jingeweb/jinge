@@ -1,9 +1,5 @@
-import {
-  Component, ComponentAttributes, __, isComponent
-} from '../core/component';
-import {
-  i18n as i18nService
-} from '../core/i18n';
+import { Component, ComponentAttributes, __, isComponent } from '../core/component';
+import { i18n as i18nService } from '../core/i18n';
 import { createFragment } from '../util';
 import { $$ } from '../vm/common';
 
@@ -32,7 +28,7 @@ export class I18nComponent extends Component {
   __update(): void {
     if (this[$$].__related) {
       this[$$].__related.forEach((hooks, origin) => {
-        hooks.forEach(hook => {
+        hooks.forEach((hook) => {
           origin.__unwatch(hook.prop, hook.handler);
         });
       });
@@ -63,10 +59,10 @@ export class I18nComponent extends Component {
     /**
      * 对切换后渲染的组件触发 AFTER_RENDER 生命周期。
      */
-    this[__].rootNodes.forEach(n => {
+    this[__].rootNodes.forEach((n) => {
       if (isComponent(n)) (n as Component).__handleAfterRender();
     });
-    this[__].nonRootCompNodes.forEach(n => {
+    this[__].nonRootCompNodes.forEach((n) => {
       (n as Component).__handleAfterRender();
     });
   }

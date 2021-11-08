@@ -1,16 +1,13 @@
-import {
-  setImmediate,
-  clearImmediate
-} from '../util';
-import {
-  ViewModelNode, ViewModelWatchHandler,
-  PropertyPathItem, getPropertyName
-} from './common';
+import { setImmediate, clearImmediate } from '../util';
+import { ViewModelNode, ViewModelWatchHandler, PropertyPathItem, getPropertyName } from './common';
 
-const handleTasks: Map<ViewModelWatchHandler, {
-  immediate: number;
-  propertyPath: PropertyPathItem[];
-}> = new Map();
+const handleTasks: Map<
+  ViewModelWatchHandler,
+  {
+    immediate: number;
+    propertyPath: PropertyPathItem[];
+  }
+> = new Map();
 
 /**
  * @internal
@@ -40,7 +37,7 @@ export function handleOnce(handler: ViewModelWatchHandler, propertyPath: Propert
   });
   handleTasks.set(handler, {
     immediate: imm,
-    propertyPath: propertyPath
+    propertyPath: propertyPath,
   });
 }
 
@@ -49,17 +46,19 @@ export function handleOnce(handler: ViewModelWatchHandler, propertyPath: Propert
  */
 export function loopHandle(propertyPath: PropertyPathItem[], node: ViewModelNode, immediate: boolean): void {
   const handlers = node.__handlers;
-  handlers && handlers.forEach(handler => {
-    if (immediate) {
-      handler(propertyPath);
-    } else {
-      handleOnce(handler, propertyPath);
-    }
-  });
+  handlers &&
+    handlers.forEach((handler) => {
+      if (immediate) {
+        handler(propertyPath);
+      } else {
+        handleOnce(handler, propertyPath);
+      }
+    });
   const listeners = node.__listeners;
-  listeners && listeners.forEach(c => {
-    loopHandle(propertyPath, c, immediate);
-  });
+  listeners &&
+    listeners.forEach((c) => {
+      loopHandle(propertyPath, c, immediate);
+    });
 }
 
 /**

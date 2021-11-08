@@ -1,11 +1,5 @@
-import {
-  ViewModelNode,
-  PropertyPathItem,
-  getPropertyName
-} from './common';
-import {
-  handleCancel
-} from './notify';
+import { ViewModelNode, PropertyPathItem, getPropertyName } from './common';
+import { handleCancel } from './notify';
 
 /**
  * @internal
@@ -21,7 +15,7 @@ export function loopCreateNode(parentNode: ViewModelNode, propertyPath: Property
       __parent: parentNode,
       __property: propertyName,
       __handlers: null,
-      __listeners: null
+      __listeners: null,
     };
     parentNode.__listeners.set(propertyName, node);
   }
@@ -55,9 +49,7 @@ export function loopGetNode(parentNode: ViewModelNode, propertyPath: PropertyPat
  * @internal
  */
 export function deleteNode(node: ViewModelNode): ViewModelNode {
-  if ((node && node.__handlers && node.__handlers.length > 0) ||
-    (node.__listeners && node.__listeners.size > 0)
-  ) {
+  if ((node && node.__handlers && node.__handlers.length > 0) || (node.__listeners && node.__listeners.size > 0)) {
     return null;
   }
   /**
@@ -77,7 +69,7 @@ export function loopClearNode(node: ViewModelNode): void {
   const listeners = node.__listeners;
   if (listeners) {
     // loop clear all child nodes
-    listeners.forEach(sn => loopClearNode(sn));
+    listeners.forEach((sn) => loopClearNode(sn));
     node.__listeners = null;
   }
   // destroy all handlers

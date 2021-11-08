@@ -3,11 +3,7 @@
  * Copied from https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js
  * Simplified by Yuhang-Ge<abeyuhang@gmail.com>
  */
-import {
-  isUndefined,
-  isFunction,
-  isString
-} from './type';
+import { isUndefined, isFunction, isString } from './type';
 
 let autoIncrement = 0;
 let nextHandle = 1; // Spec says greater than zero
@@ -61,16 +57,17 @@ declare global {
 if (isUndefined(window.setImmediate)) {
   tasksByHandle = new Map();
   const messagePrefix = 'setImmediate$' + (autoIncrement++).toString(32) + '$';
-  window.addEventListener('message', event => {
-    if (event.source === window &&
-      isString(event.data) &&
-      event.data.startsWith(messagePrefix)
-    ) {
-      runIfPresent(Number(event.data.slice(messagePrefix.length)));
-    }
-  }, false);
+  window.addEventListener(
+    'message',
+    (event) => {
+      if (event.source === window && isString(event.data) && event.data.startsWith(messagePrefix)) {
+        runIfPresent(Number(event.data.slice(messagePrefix.length)));
+      }
+    },
+    false,
+  );
 
-  registerImmediate = function(handle: number): void {
+  registerImmediate = function (handle: number): void {
     window.postMessage(messagePrefix + handle, '*');
   };
 }

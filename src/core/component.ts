@@ -1,35 +1,33 @@
 import {
-  isObject, isArray, arrayRemove, registerEvent,
-  isFunction, clearImmediate, setImmediate,
-  appendChildren, replaceChildren, warn, DeregisterFn
+  isObject,
+  isArray,
+  arrayRemove,
+  registerEvent,
+  isFunction,
+  clearImmediate,
+  setImmediate,
+  appendChildren,
+  replaceChildren,
+  warn,
+  DeregisterFn,
 } from '../util';
-import {
-  $$, ViewModelCore, ViewModelObject
-} from '../vm/common';
-import {
-  createComponent, createAttributes
-} from '../vm/proxy';
-import {
-  Messenger, MESSENGER_LISTENERS, MessengerHandler
-} from './messenger';
-import {
-  manager as StyleManager, ComponentStyle
-} from './style';
-import {
-  i18n as i18nService
-} from './i18n';
+import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
+import { createComponent, createAttributes } from '../vm/proxy';
+import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
+import { manager as StyleManager, ComponentStyle } from './style';
+import { i18n as i18nService } from './i18n';
 
 export enum ComponentStates {
   INITIALIZE = 0,
   RENDERED = 1,
   WILLDESTROY = 2,
-  DESTROIED = 3
+  DESTROIED = 3,
 }
 export enum ContextStates {
   UNTOUCH = 0,
   TOUCHED = 1,
   UNTOUCH_FREEZED = 2,
-  TOUCHED_FREEZED = 3
+  TOUCHED_FREEZED = 3,
 }
 export const __ = Symbol('__');
 
@@ -106,7 +104,7 @@ export interface ComponentProperties {
    * 当被 ref: 标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素被添加到当前模板组件（称为 origin component)的 refs 里，
    *   但显然当 <if> 元素控制销毁时，也需要将这个元素从 origin component 的 refs 中删除，
    *   否则 origin component 中通过 __getRef 还能拿到这个已经被销毁的元素。
-   * 
+   *
    * 为了实现这个目的，会在将 ref: 标记的元素添加到模板组件 refs 中时，同时也添加到 relatedRefs 中，
    *   这样，在关联节点（比如受 <if> 控制的元素，或 <if> 下面的 DOM 节点）被销毁时，
    *   也会从模板组件的 refs 里面删除。
@@ -131,7 +129,7 @@ export interface ComponentProperties {
 }
 
 /** Bellow is utility functions **/
- 
+
 export function isComponent(v: unknown): boolean {
   return __ in (v as Record<symbol, unknown>);
 }
@@ -143,18 +141,19 @@ export function assertRenderResults(renderResults: Node[]): Node[] {
   return renderResults;
 }
 
-function wrapAttrs<T extends {
-  [__]?: CompilerAttributes;
-}>(target: T): T & ViewModelObject {
+function wrapAttrs<
+  T extends {
+    [__]?: CompilerAttributes;
+  },
+>(target: T): T & ViewModelObject {
   if (!isObject(target) || isArray(target)) {
     throw new Error('attrs() traget must be plain object.');
   }
   return createAttributes<T>(target);
 }
-export {wrapAttrs as attrs};
+export { wrapAttrs as attrs };
 
 export class Component extends Messenger {
-
   /**
    * 指定组件的渲染模板。务必使用 getter 的形式指定，例如：
    * ````js
@@ -184,12 +183,12 @@ export class Component extends Messenger {
   /**
    * 某些情况下，需要判断一个函数是否是组件的构造函数。添加一个静态成员属性符号用于进行该判断。
    * isComponent 函数既可以判断是否是构造函数（配合 isFunction），又可以判断一个对像是否是组件实例。
-   * 
+   *
    * 示例：
-   * 
+   *
    * ````js
    * import { isComponent, Component } from 'jinge';
-   * 
+   *
    * class A {};
    * class B extends Component {};
    * console.log(isComponent(A)); // false
@@ -198,12 +197,15 @@ export class Component extends Messenger {
    */
   static readonly [__] = true;
 
-  static create<T extends Component>(this: { new(attrs: ComponentAttributes): T }, attrs?: Record<string, unknown> | ComponentAttributes): T {
+  static create<T extends Component>(
+    this: { new (attrs: ComponentAttributes): T },
+    attrs?: Record<string, unknown> | ComponentAttributes,
+  ): T {
     attrs = attrs || wrapAttrs({});
     if (!isObject(attrs) || !($$ in attrs)) {
       attrs = wrapAttrs(attrs || {});
     }
-    return (new this(attrs as ComponentAttributes))[$$].proxy as T;
+    return new this(attrs as ComponentAttributes)[$$].proxy as T;
   }
 
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */
@@ -213,7 +215,7 @@ export class Component extends Messenger {
 
   /**
    * ATTENTION!!!
-   * 
+   *
    * Don't use constructor directly, use static factory method `create(attrs)` instead.
    */
   constructor(attrs: ComponentAttributes) {
@@ -236,7 +238,7 @@ export class Component extends Messenger {
       relatedRefs: null,
       upNextMap: null,
       compStyle: compilerAttrs.compStyle || null,
-      deregFns: null
+      deregFns: null,
     };
   }
 
@@ -256,10 +258,12 @@ export class Component extends Messenger {
    * The listener will be auto removed when component is destroied.
    */
   __i18nWatch(listener: (locale: string) => void, immediate = false): void {
-    this.__addDeregisterFn(i18nService.watch((locale) => {
-      // bind component to listener's function context.
-      listener.call(this, locale);
-    }, immediate));
+    this.__addDeregisterFn(
+      i18nService.watch((locale) => {
+        // bind component to listener's function context.
+        listener.call(this, locale);
+      }, immediate),
+    );
   }
 
   /**
@@ -268,11 +272,21 @@ export class Component extends Messenger {
    * If you do dot call deregister function, it will be auto called when component is destroied.
    * @returns {Function} deregister function to remove listener
    */
-  __domAddListener($el: HTMLElement, eventName: string, listener: EventListener, capture?: boolean | AddEventListenerOptions): DeregisterFn {
-    const deregEvtFn = registerEvent($el, eventName, $event => {
-      // bind component to listener's function context.
-      listener.call(this, $event);
-    }, capture);
+  __domAddListener(
+    $el: HTMLElement,
+    eventName: string,
+    listener: EventListener,
+    capture?: boolean | AddEventListenerOptions,
+  ): DeregisterFn {
+    const deregEvtFn = registerEvent(
+      $el,
+      eventName,
+      ($event) => {
+        // bind component to listener's function context.
+        listener.call(this, $event);
+      },
+      capture,
+    );
     this.__addDeregisterFn(deregEvtFn);
     return () => {
       deregEvtFn();
@@ -310,16 +324,20 @@ export class Component extends Messenger {
         return;
       }
       handlers.forEach((opts, handler) => {
-        const deregFn = registerEvent(targetEl, eventName, (
+        const deregFn = registerEvent(
+          targetEl,
+          eventName,
           opts && (opts.stop || opts.prevent)
-          ? ($evt: Event): void => {
-            opts.stop && $evt.stopPropagation();
-            opts.prevent && $evt.preventDefault();
-            handler.call(this, $evt);
-          } : ($evt: Event): void => {
-            handler.call(this, $evt);
-          }
-        ), opts as unknown as AddEventListenerOptions);
+            ? ($evt: Event): void => {
+                opts.stop && $evt.stopPropagation();
+                opts.prevent && $evt.preventDefault();
+                handler.call(this, $evt);
+              }
+            : ($evt: Event): void => {
+                handler.call(this, $evt);
+              },
+          opts as unknown as AddEventListenerOptions,
+        );
         this.__addDeregisterFn(deregFn);
       });
     });
@@ -327,33 +345,33 @@ export class Component extends Messenger {
 
   /**
    * Get rendered DOM Node which should be apply transition.
-   * 
+   *
    * 返回在 transition 动画时应该被应用到的 DOM 节点。
    */
   get __transitionDOM(): Node {
     const el = this[__].rootNodes[0];
-    return isComponent(el) ? (el as Component).__transitionDOM : el as Node;
+    return isComponent(el) ? (el as Component).__transitionDOM : (el as Node);
   }
 
   /**
    * Get first rendered DOM Node after Component is rendered.
-   * 
+   *
    * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
    */
   get __firstDOM(): Node {
     const el = this[__].rootNodes[0];
-    return isComponent(el) ? (el as Component).__firstDOM : el as Node;
+    return isComponent(el) ? (el as Component).__firstDOM : (el as Node);
   }
 
   /**
    * Get last rendered DOM Node after Component is rendered.
-   * 
+   *
    * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
    */
   get __lastDOM(): Node {
     const rns = this[__].rootNodes;
     const el = rns[rns.length - 1];
-    return isComponent(el) ? (el as Component).__lastDOM : el as Node;
+    return isComponent(el) ? (el as Component).__lastDOM : (el as Node);
   }
 
   /**
@@ -374,10 +392,10 @@ export class Component extends Messenger {
   }
 
   /**
-   * Render Component to HTMLElement. 
+   * Render Component to HTMLElement.
    * This method is usually used to render the entire application.
    * See the `bootstrap()` function in `./bootstrap.js`.
-   * 
+   *
    * By default, the target element will be replaced(that means deleted).
    * But you can disable it by pass `replaceMode`=`false`,
    * which means component append to target as it's children.
@@ -427,7 +445,7 @@ export class Component extends Messenger {
 
     // clear next tick update setImmediate
     if (comp.upNextMap) {
-      comp.upNextMap.forEach(imm => {
+      comp.upNextMap.forEach((imm) => {
         clearImmediate(imm);
       });
       comp.upNextMap = null;
@@ -435,7 +453,7 @@ export class Component extends Messenger {
 
     // destroy related refs:
     if (comp.relatedRefs) {
-      comp.relatedRefs.forEach(info => {
+      comp.relatedRefs.forEach((info) => {
         const refs = info.origin[__].refs;
         if (!refs) return;
         const rns = refs.get(info.ref);
@@ -446,7 +464,7 @@ export class Component extends Messenger {
         }
       });
       comp.relatedRefs = null;
-    } 
+    }
 
     // auto call all deregister functions
     if (comp.deregFns) {
@@ -458,19 +476,18 @@ export class Component extends Messenger {
     // clear properties
     comp.state = ComponentStates.DESTROIED;
     // unlink all symbol properties. maybe unnecessary.
-    comp.rootNodes = comp.nonRootCompNodes =
-      comp.refs = comp.slots = comp.context = null;
+    comp.rootNodes = comp.nonRootCompNodes = comp.refs = comp.slots = comp.context = null;
   }
 
   __handleBeforeDestroy(removeDOM = false): void {
-    this[__].nonRootCompNodes.forEach(component => {
+    this[__].nonRootCompNodes.forEach((component) => {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
       component.__destroy(false);
     });
 
     let $parent: Node;
-    this[__].rootNodes.forEach(node => {
+    this[__].rootNodes.forEach((node) => {
       if (isComponent(node)) {
         (node as Component).__destroy(removeDOM);
       } else if (removeDOM) {
@@ -490,21 +507,22 @@ export class Component extends Messenger {
     this[__].passedAttrs[$$].__notifiable = true;
     this[$$].__notifiable = true;
 
-    this[__].rootNodes.forEach(n => {
+    this[__].rootNodes.forEach((n) => {
       if (isComponent(n)) (n as Component).__handleAfterRender();
     });
-    this[__].nonRootCompNodes.forEach(n => {
+    this[__].nonRootCompNodes.forEach((n) => {
       if (isComponent(n)) (n as Component).__handleAfterRender();
     });
     this[__].state = ComponentStates.RENDERED;
-    this[__].contextState = this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
+    this[__].contextState =
+      this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
     this.__afterRender();
     this.__notify('after-render');
   }
 
   __updateIfNeed(nextTick?: boolean): void;
   __updateIfNeed(handler: () => void, nextTick?: boolean): void;
-  __updateIfNeed(handler?: (() => void) | boolean, nextTick: boolean = true): void {
+  __updateIfNeed(handler?: (() => void) | boolean, nextTick = true): void {
     if (this[__].state !== ComponentStates.RENDERED) {
       return;
     }
@@ -527,10 +545,13 @@ export class Component extends Messenger {
       // already in queue.
       return;
     }
-    ntMap.set(handler as () => void, setImmediate(() => {
-      ntMap.delete(handler as () => void);
-      (handler as () => void).call(this);
-    }));
+    ntMap.set(
+      handler as () => void,
+      setImmediate(() => {
+        ntMap.delete(handler as () => void);
+        (handler as () => void).call(this);
+      }),
+    );
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -539,8 +560,11 @@ export class Component extends Messenger {
   }
 
   __setContext(key: string | symbol, value: unknown, forceOverride = false): void {
-    if (this[__].contextState === ContextStates.UNTOUCH_FREEZED || this[__].contextState === ContextStates.TOUCHED_FREEZED) {
-      throw new Error('Can\'t setContext after component has been rendered. Try put setContext code into constructor.');
+    if (
+      this[__].contextState === ContextStates.UNTOUCH_FREEZED ||
+      this[__].contextState === ContextStates.TOUCHED_FREEZED
+    ) {
+      throw new Error("Can't setContext after component has been rendered. Try put setContext code into constructor.");
     }
     if (this[__].contextState === ContextStates.UNTOUCH) {
       // we copy context to make sure child component do not modify context passed from parent.
@@ -554,7 +578,9 @@ export class Component extends Messenger {
       // so we force programmer to pass third argument to
       //   tell us he/she know what he/she is doing.
       if (!forceOverride) {
-        throw new Error(`Contenxt with key: ${key.toString()} is exist. Pass third argument forceOverride=true to override it.`);
+        throw new Error(
+          `Contenxt with key: ${key.toString()} is exist. Pass third argument forceOverride=true to override it.`,
+        );
       }
     }
     this[__].context[key as string] = value;
@@ -599,7 +625,7 @@ export class Component extends Messenger {
     rbs.push({
       origin: this,
       ref,
-      node: isComp ? null : el as Node
+      node: isComp ? null : (el as Node),
     });
   }
 
@@ -608,7 +634,9 @@ export class Component extends Messenger {
    */
   __getRef(ref: string): Component | Node | (Component | Node)[] {
     if (this[__].state !== ComponentStates.RENDERED) {
-      warn(`Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing. see https://[TODO]`);
+      warn(
+        `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing. see https://[TODO]`,
+      );
     }
     return this[__].refs ? this[__].refs.get(ref) : null;
   }

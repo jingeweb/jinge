@@ -1,6 +1,4 @@
-import {
-  arrayRemove, isArray, arrayEqual, isObject
-} from '../util';
+import { arrayRemove, isArray, arrayEqual, isObject } from '../util';
 import {
   ViewModelNode,
   ViewModelParent,
@@ -13,16 +11,8 @@ import {
   $$,
   removeParent,
 } from './common';
-import {
-  loopCreateNode,
-  loopGetNode,
-  loopClearNode,
-  deleteNode
-} from './node';
-import {
-  handleCancel,
-  loopNotify
-} from './notify';
+import { loopCreateNode, loopGetNode, loopClearNode, deleteNode } from './node';
+import { handleCancel, loopNotify } from './notify';
 
 export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
   __parents: ViewModelParent[];
@@ -51,11 +41,15 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
       value: this,
       writable: false,
       configurable: true,
-      enumerable: false
+      enumerable: false,
     });
   }
 
-  __watch(propertyPath: string | PropertyPathItem | PropertyPathItem[], handler: ViewModelWatchHandler, related?: ViewModelCore): void {
+  __watch(
+    propertyPath: string | PropertyPathItem | PropertyPathItem[],
+    handler: ViewModelWatchHandler,
+    related?: ViewModelCore,
+  ): void {
     propertyPath = parsePropertyPath(propertyPath);
     const dbStarIdx = propertyPath.indexOf('**');
     if (dbStarIdx >= 0 && dbStarIdx !== propertyPath.length - 1) {
@@ -109,7 +103,11 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
     }
   }
 
-  __unwatch(propertyPath?: string | PropertyPathItem | PropertyPathItem[], handler?: ViewModelWatchHandler, related?: ViewModelCore): void {
+  __unwatch(
+    propertyPath?: string | PropertyPathItem | PropertyPathItem[],
+    handler?: ViewModelWatchHandler,
+    related?: ViewModelCore,
+  ): void {
     if (!propertyPath) {
       loopClearNode(this);
       return;
@@ -125,7 +123,8 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
       return;
     }
 
-    if (!handler) { // remove all if second parameter is not provided
+    if (!handler) {
+      // remove all if second parameter is not provided
       handlers.forEach(handleCancel);
       handlers.length = 0;
     } else {
@@ -149,18 +148,16 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
       loopNotify(this, propertyPath, immediate);
     }
     const parents = this.__parents;
-    parents && parents.forEach(ps => {
-      const vm = ps.core;
-      if (!vm) {
-        // eslint-disable-next-line no-console
-        console.error('dev-warn-unexpected: parent of ViewModelCore has been destroied but not unlink.');
-        return;
-      }
-      vm.__notify(
-        [ps.prop].concat(propertyPath),
-        immediate
-      );
-    });
+    parents &&
+      parents.forEach((ps) => {
+        const vm = ps.core;
+        if (!vm) {
+          // eslint-disable-next-line no-console
+          console.error('dev-warn-unexpected: parent of ViewModelCore has been destroied but not unlink.');
+          return;
+        }
+        vm.__notify([ps.prop].concat(propertyPath), immediate);
+      });
   }
 
   __destroy(): void {
@@ -173,7 +170,7 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
 
     if (this.__related) {
       this.__related.forEach((hooks, origin) => {
-        hooks.forEach(hook => {
+        hooks.forEach((hook) => {
           origin.__unwatch(hook.prop, hook.handler);
         });
       });
@@ -199,7 +196,7 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
       });
       this.__setters = null;
     }
-    Object.getOwnPropertyNames(target).forEach(prop => {
+    Object.getOwnPropertyNames(target).forEach((prop) => {
       const v = target[prop];
       if (!isObject(v) || !($$ in (v as Record<symbol, unknown>))) {
         return;
@@ -212,29 +209,38 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
     this.target = null;
   }
 
-  __addRelated(origin: ViewModelCoreImpl, propertyPath: PropertyPathItem | PropertyPathItem[], handler: ViewModelWatchHandler): void {
+  __addRelated(
+    origin: ViewModelCoreImpl,
+    propertyPath: PropertyPathItem | PropertyPathItem[],
+    handler: ViewModelWatchHandler,
+  ): void {
     if (!this.__related) this.__related = new Map();
     let hook = this.__related.get(origin);
     if (!hook) {
-      this.__related.set(origin, hook = []);
+      this.__related.set(origin, (hook = []));
     }
     hook.push({
       prop: propertyPath,
-      handler
+      handler,
     });
   }
 
-  __rmRelated(origin: ViewModelCoreImpl, propertyPath: PropertyPathItem | PropertyPathItem[], handler: ViewModelWatchHandler): void {
+  __rmRelated(
+    origin: ViewModelCoreImpl,
+    propertyPath: PropertyPathItem | PropertyPathItem[],
+    handler: ViewModelWatchHandler,
+  ): void {
     if (!this.__related) return;
     const hook = this.__related.get(origin);
     if (!hook) return;
     const isPropArray = isArray(propertyPath);
-    const i = hook.findIndex(it => {
-      return handler === it.handler &&
+    const i = hook.findIndex((it) => {
+      return (
+        handler === it.handler &&
         (isPropArray
           ? arrayEqual(propertyPath as PropertyPathItem[], it.prop as PropertyPathItem[])
-          : (propertyPath as PropertyPathItem) === (it.prop as PropertyPathItem)
-        );
+          : (propertyPath as PropertyPathItem) === (it.prop as PropertyPathItem))
+      );
     });
     if (i >= 0) {
       hook.splice(i, 1);

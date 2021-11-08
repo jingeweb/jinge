@@ -2,7 +2,7 @@ export enum TransitionStates {
   ENTERING = 1,
   ENTERED = 2,
   LEAVING = 3,
-  LEAVED = 4
+  LEAVED = 4,
 }
 
 export type DurationType = 'transitionend' | 'animationend';
@@ -37,18 +37,18 @@ export function getDuration(el: Element): Duration {
   if (dur !== '0s') {
     return {
       type: 'transitionend',
-      time: parseDuration(dur)
+      time: parseDuration(dur),
     };
   }
   dur = cst.getPropertyValue('animation-duration');
   if (dur !== '0s') {
     return {
       type: 'animationend',
-      time: parseDuration(dur)
+      time: parseDuration(dur),
     };
   }
   return {
     type: null,
-    time: 0
+    time: 0,
   };
 }

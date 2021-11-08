@@ -1,9 +1,5 @@
-import {
-  Component, ComponentAttributes, __
-} from '../core/component';
-import {
-  createFragment
-} from '../util';
+import { Component, ComponentAttributes, __ } from '../core/component';
+import { createFragment } from '../util';
 
 function renderHtml(content: string): Node[] {
   const $d = document.createElement('div');
@@ -46,7 +42,7 @@ export class BindHtmlComponent extends Component {
     const $p = oldFirstEl.parentNode;
     const newEls = renderHtml(this._c);
     $p.insertBefore(newEls.length > 1 ? createFragment(newEls) : newEls[0], oldFirstEl);
-    roots.forEach(oldEl => $p.removeChild(oldEl as Node));
+    roots.forEach((oldEl) => $p.removeChild(oldEl as Node));
     this[__].rootNodes = newEls;
   }
 }

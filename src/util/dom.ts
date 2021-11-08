@@ -1,11 +1,5 @@
-import {
-  isString,
-  isUndefined,
-  isObject
-} from './type';
-import {
-  DeregisterFn
-} from './common';
+import { isString, isUndefined, isObject } from './type';
+import { DeregisterFn } from './common';
 
 export function setText($element: Node, text: unknown): void {
   if (!isString(text)) {
@@ -15,21 +9,26 @@ export function setText($element: Node, text: unknown): void {
 }
 
 export function createTextNode(text: unknown = ''): Text {
-  return document.createTextNode(isString(text) ? text as string : JSON.stringify(text));
+  return document.createTextNode(isString(text) ? (text as string) : JSON.stringify(text));
 }
 
 export function createFragment(children?: (Node | string)[]): DocumentFragment {
   const f = document.createDocumentFragment();
-  children && children.forEach(n => {
-    f.appendChild(isString(n) ? document.createTextNode(n as string) : n as Node);
-  });
+  children &&
+    children.forEach((n) => {
+      f.appendChild(isString(n) ? document.createTextNode(n as string) : (n as Node));
+    });
   return f;
 }
 
 export function appendChildren($parent: Node, children: (Node | string)[]): void {
-  $parent.appendChild(children.length > 1 ? createFragment(children) : (
-    isString(children[0]) ? createTextNode(children[0] as string) : children[0] as Node
-  ));
+  $parent.appendChild(
+    children.length > 1
+      ? createFragment(children)
+      : isString(children[0])
+      ? createTextNode(children[0] as string)
+      : (children[0] as Node),
+  );
 }
 
 export function replaceChildren($parent: Node, children: Node[], oldNode: Node): void {
@@ -39,7 +38,7 @@ export function replaceChildren($parent: Node, children: Node[], oldNode: Node):
 export function removeAttribute($ele: Element, attrName: string): void {
   if (!attrName) return;
   if (isObject(attrName)) {
-    for (const attrN in (attrName as unknown as Record<string, unknown>)) {
+    for (const attrN in attrName as unknown as Record<string, unknown>) {
       removeAttribute($ele, attrN);
     }
     return;
@@ -50,7 +49,7 @@ export function removeAttribute($ele: Element, attrName: string): void {
 export function setAttribute($ele: Element, attrName: string, attrValue: unknown): void {
   if (!attrName) return;
   if (isObject(attrName)) {
-    for (const attrN in (attrName as unknown as Record<string, unknown>)) {
+    for (const attrN in attrName as unknown as Record<string, unknown>) {
       setAttribute($ele, attrN, (attrName as unknown as Record<string, unknown>)[attrN]);
     }
     return;
@@ -75,10 +74,7 @@ function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node
 }
 
 export function createElement(tag: string, attrs: Record<string, unknown>, ...children: (Node | string)[]): Element {
-  return _createEl(
-    document.createElement(tag),
-    attrs, children
-  );
+  return _createEl(document.createElement(tag), attrs, children);
 }
 
 export function createElementWithoutAttrs(tag: string, ...children: (Node | string)[]): Element {
@@ -86,10 +82,7 @@ export function createElementWithoutAttrs(tag: string, ...children: (Node | stri
 }
 
 export function createSVGElement(tag: string, attrs: Record<string, unknown>, ...children: Node[]): Element {
-  return _createEl(
-    document.createElementNS('http://www.w3.org/2000/svg', tag),
-    attrs, children
-  );
+  return _createEl(document.createElementNS('http://www.w3.org/2000/svg', tag), attrs, children);
 }
 
 export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]): Element {
@@ -98,7 +91,7 @@ export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]): 
 
 export function createElementWithChild(tag: string, attrs: Record<string, unknown>, child: Node | string): Element {
   const $e = createElement(tag, attrs);
-  $e.appendChild(isString(child) ? createTextNode(child) : child as Node);
+  $e.appendChild(isString(child) ? createTextNode(child) : (child as Node));
   return $e;
 }
 
@@ -111,11 +104,19 @@ export function insertAfter($parent: Node, newNode: Node, referenceNode: Node): 
   }
 }
 
-export function addEvent($element: Element, eventName: string, handler: EventListener, capture?: boolean | AddEventListenerOptions): void {
-  isUndefined(capture) && (capture = eventName.startsWith('touch') ? {
-    capture: false,
-    passive: true
-  } : false);
+export function addEvent(
+  $element: Element,
+  eventName: string,
+  handler: EventListener,
+  capture?: boolean | AddEventListenerOptions,
+): void {
+  isUndefined(capture) &&
+    (capture = eventName.startsWith('touch')
+      ? {
+          capture: false,
+          passive: true,
+        }
+      : false);
   $element.addEventListener(eventName, handler, capture);
 }
 
@@ -129,10 +130,14 @@ export function removeEvent($element: Element, eventName: string, handler: Event
  *
  * @returns {Function} deregister function which will removeEventListener
  */
-export function registerEvent($element: Element, eventName: string, handler: EventListener, capture?: boolean | AddEventListenerOptions): DeregisterFn {
+export function registerEvent(
+  $element: Element,
+  eventName: string,
+  handler: EventListener,
+  capture?: boolean | AddEventListenerOptions,
+): DeregisterFn {
   addEvent($element, eventName, handler, capture);
   return function deregister(): void {
     removeEvent($element, eventName, handler);
   };
 }
-
