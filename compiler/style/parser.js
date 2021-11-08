@@ -5,15 +5,11 @@ const prettify = require('postcss-prettify');
 const CleanCSS = require('clean-css');
 const path = require('path');
 const CWD = process.cwd();
-const {
-  sharedOptions
-} = require('../options');
-const {
-  styleManager
-} = require('./manager');
+const { sharedOptions } = require('../options');
+const { styleManager } = require('./manager');
 
 function checkKeyframes(nodes, styleId, keyframesMap = null) {
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     if (node.type === 'atrule' && node.name === 'keyframes') {
       const name = node.params;
       if (name.startsWith('/deep/')) {
@@ -39,7 +35,7 @@ function parseKeyframes(root, styleId) {
   if (!keyframesMap || keyframesMap.size === 0) {
     return;
   }
-  root.walkDecls(/^animation(?:-name)?$/, decl => {
+  root.walkDecls(/^animation(?:-name)?$/, (decl) => {
     let an = decl.value;
     const idx = an.indexOf(' ');
     if (decl.prop === 'animation') {
@@ -59,15 +55,16 @@ function parseKeyframes(root, styleId) {
 
 function parseNodes(nodes, styleId) {
   function transform(root) {
-    root.each(selector => {
-      selector.each(n => {
+    root.each((selector) => {
+      selector.each((n) => {
         if (n.type === 'class' || n.type === 'id' || n.type === 'class' || n.type === 'tag') {
-          selector.insertAfter(n, parser.attribute({
-            attribute: styleId
-          }));
-        } else if ((n.type === 'combinator' && n.value === '/deep/') ||
-          (n.type === 'pseudo' && n.value === '::deep')
-        ) {
+          selector.insertAfter(
+            n,
+            parser.attribute({
+              attribute: styleId,
+            }),
+          );
+        } else if ((n.type === 'combinator' && n.value === '/deep/') || (n.type === 'pseudo' && n.value === '::deep')) {
           // console.log(n.parent);
           // selector.insertAfter(n, parser.string({
           //   value: ' '
@@ -79,22 +76,21 @@ function parseNodes(nodes, styleId) {
     });
   }
 
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     if (node.type === 'atrule' && node.name === 'media') {
       return parseNodes(node.nodes, styleId);
     }
     if (node.type !== 'rule') {
       return;
     }
-    node.selector = parser(transform)
-      .processSync(node.selector, {
-        updateSelector: true
-      });
+    node.selector = parser(transform).processSync(node.selector, {
+      updateSelector: true,
+    });
   });
 }
 
 const plugin = postcss.plugin('postcss-jinge-component-style', () => {
-  return function(root, result) {
+  return function (root, result) {
     const styleId = result.opts.styleId;
     parseKeyframes(root, styleId);
     parseNodes(root.nodes, styleId);
@@ -107,19 +103,23 @@ class CSSParser {
     const extractInfo = styleManager.extractStyles.get(opts.resourcePath);
     if (extractInfo) {
       const plugs = [discard, prettify];
-      return postcss(plugs).process(code, {
-        from: opts.resourcePath,
-        map: sourceMap ? {
-          inline: false,
-          prev: sourceMap
-        } : false
-      }).then(result => {
-        extractInfo.map = result.map;
-        extractInfo.css = result.css;
-        return {
-          code: `export default "Extract by JingeWebpackPlugin";`
-        };
-      });
+      return postcss(plugs)
+        .process(code, {
+          from: opts.resourcePath,
+          map: sourceMap
+            ? {
+                inline: false,
+                prev: sourceMap,
+              }
+            : false,
+        })
+        .then((result) => {
+          extractInfo.map = result.map;
+          extractInfo.css = result.css;
+          return {
+            code: `export default "Extract by JingeWebpackPlugin";`,
+          };
+        });
     }
     const styleId = styleManager.styles.get(opts.resourcePath).styleId;
     // console.log(opts.resourcePath, styleId);
@@ -127,40 +127,47 @@ class CSSParser {
     if (!sharedOptions.compress) {
       plugins.push(prettify);
     }
-    return postcss(plugins).process(code, {
-      from: opts.resourcePath,
-      styleId,
-      map: sourceMap ? {
-        inline: !needExtract,
-        prev: sourceMap
-      } : false
-    }).then(result => {
-      let css = result.css;
-      let map = result.map;
-      if (css && sharedOptions.compress) {
-        css = new CleanCSS().minify(css).styles;
-        // TODO: generate map
-        map = null;
-      }
-      if (needExtract) {
-        css = `\n/* ${path.relative(CWD, opts.resourcePath)} */\n` + css;
-        const ecs = styleManager.extractComponentStyles.get(opts.resourcePath);
-        if (!ecs) {
-          styleManager.extractComponentStyles.set(opts.resourcePath, {
-            css, map
-          });
-        } else {
-          ecs.css = css;
-          ecs.map = map;
+    return postcss(plugins)
+      .process(code, {
+        from: opts.resourcePath,
+        styleId,
+        map: sourceMap
+          ? {
+              inline: !needExtract,
+              prev: sourceMap,
+            }
+          : false,
+      })
+      .then((result) => {
+        let css = result.css;
+        let map = result.map;
+        if (css && sharedOptions.compress) {
+          css = new CleanCSS().minify(css).styles;
+          // TODO: generate map
+          map = null;
         }
-      }
-      return {
-        code: needExtract ? `export default null; // Extracted by JingeWebpackPlugin` : `export default ${JSON.stringify({
-          css,
-          id: styleId
-        })};`
-      };
-    });
+        if (needExtract) {
+          css = `\n/* ${path.relative(CWD, opts.resourcePath)} */\n` + css;
+          const ecs = styleManager.extractComponentStyles.get(opts.resourcePath);
+          if (!ecs) {
+            styleManager.extractComponentStyles.set(opts.resourcePath, {
+              css,
+              map,
+            });
+          } else {
+            ecs.css = css;
+            ecs.map = map;
+          }
+        }
+        return {
+          code: needExtract
+            ? `export default null; // Extracted by JingeWebpackPlugin`
+            : `export default ${JSON.stringify({
+                css,
+                id: styleId,
+              })};`,
+        };
+      });
   }
 
   static parseInline(code, opts) {
@@ -172,7 +179,7 @@ class CSSParser {
     let css = postcss(plugins).process(code, {
       from: opts.resourcePath,
       styleId: opts.styleId,
-      map: false
+      map: false,
     }).css;
 
     if (css && sharedOptions.compress) {
@@ -186,7 +193,7 @@ class CSSParser {
       const ecs = ecsMap.get(opts.resourcePath);
       if (!ecs) {
         ecsMap.set(opts.resourcePath, {
-          css
+          css,
         });
         result = 'null; // Extracted by JingeWebpackPlugin';
       } else {
@@ -200,15 +207,15 @@ class CSSParser {
     } else {
       result = JSON.stringify({
         css,
-        id: opts.styleId
+        id: opts.styleId,
       });
     }
     return {
-      code: result
+      code: result,
     };
   }
 }
 
 module.exports = {
-  CSSParser
+  CSSParser,
 };

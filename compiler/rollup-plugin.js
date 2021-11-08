@@ -2,7 +2,7 @@
  * This plugin is used only for build pure javascript library.
  * Do not support style(css/scss/less...) files.
  * Use webpack to handle style files.
- * 
+ *
  * 注意！请不要用 rollup 来构建业务项目。rollup 只用于构建 library 项目，并且构建时 jinge 框架必须是 external 模式。
  */
 const fs = require('fs');
@@ -18,13 +18,13 @@ const componentBaseManager = require('./component/base');
 let componentBaseAndAliasInited = false;
 
 function stat(file) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     fs.promises.stat(file).then(resolve, () => resolve(null));
   });
 }
 
 const rp = resolvePlugin({
-  extensions: ['.js']
+  extensions: ['.js'],
 });
 
 async function doResolve(ctx, source) {
@@ -52,13 +52,15 @@ function jingeRollupPlugin(opts) {
     name: 'rollup-jinge-plugin',
     transform(code, id) {
       if (!id.endsWith('.js')) {
-        throw new Error('rollup plugin only support .js file. try use webpack instead.')
+        throw new Error('rollup plugin only support .js file. try use webpack instead.');
       }
       if (id === i18nRenderDepsRegisterFile) {
         // 由于是构建 jinge library 的 dist bundle，所有的模块都会被打包。
         // 因此多语言的依赖也就直接按顺序注册全部依赖。
         return {
-          code: `import {${i18nRenderDeps.join(',')}} from './__export';\n${i18nRenderDeps.map((d, i) => `/**/i18n.__regDep(${i.toString().padEnd(6, ' ')}, ${d});`).join('\n')}`
+          code: `import {${i18nRenderDeps.join(',')}} from './__export';\n${i18nRenderDeps
+            .map((d, i) => `/**/i18n.__regDep(${i.toString().padEnd(6, ' ')}, ${d});`)
+            .join('\n')}`,
         };
       }
       if (!componentBaseAndAliasInited) {
@@ -74,16 +76,16 @@ function jingeRollupPlugin(opts) {
           resolve(ctx, source, callback) {
             // if (source.startsWith('/')) debugger;
             // console.log(source)
-            doResolve(id, source).then(file => {
+            doResolve(id, source).then((file) => {
               callback(null, file);
             }, callback);
-          }
-        }
-      }).then(result => {
+          },
+        },
+      }).then((result) => {
         // console.log(result.code);
         return result;
       });
-    }
+    },
   };
 }
 

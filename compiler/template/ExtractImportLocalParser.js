@@ -1,10 +1,6 @@
 const antlr = require('antlr4');
-const {
-  ImportParser
-} = require('./parser/ImportParser');
-const {
-  ImportLexer
-} = require('./parser/ImportLexer');
+const { ImportParser } = require('./parser/ImportParser');
+const { ImportLexer } = require('./parser/ImportLexer');
 
 class ExtractImportLocalParser extends ImportParser {
   static parse(content) {
@@ -27,18 +23,18 @@ class ExtractImportLocalParser extends ImportParser {
       },
       reportContextSensitivity() {},
       reportAttemptingFullContext() {},
-      reportAmbiguity() {}
+      reportAmbiguity() {},
     });
     parser.buildParseTrees = false;
     parser.stmts();
     // console.log(parser._locals, parser._imports);
     if (!meetErr) {
-      locals.push(...parser.__jingeLocals.map(token => token.text));
+      locals.push(...parser.__jingeLocals.map((token) => token.text));
       imports.push(...parser.__jingeImports);
     }
     return {
       locals,
-      imports
+      imports,
     };
   }
 
@@ -50,5 +46,5 @@ class ExtractImportLocalParser extends ImportParser {
 }
 
 module.exports = {
-  ExtractImportLocalParser
+  ExtractImportLocalParser,
 };

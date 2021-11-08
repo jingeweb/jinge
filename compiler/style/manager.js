@@ -32,10 +32,13 @@ class StyleManager {
     this.chunkTags = new Map();
     compilation.chunks.forEach((chunk) => {
       const tag = new Set();
-      const modules = webpackVersion >= 5 ? compilation.chunkGraph.getChunkModules(chunk).filter(m => {
-        return m.resource;
-      }) : chunk._modules;
-      modules.forEach(mod => {
+      const modules =
+        webpackVersion >= 5
+          ? compilation.chunkGraph.getChunkModules(chunk).filter((m) => {
+              return m.resource;
+            })
+          : chunk._modules;
+      modules.forEach((mod) => {
         tag.add(mod.resource);
       });
       this.chunkTags.set(chunk, tag);
@@ -51,11 +54,11 @@ class StyleManager {
     let entryChunks;
     if (webpackVersion >= 5) {
       const { chunkGraph } = compilation;
-      entryChunks = compilationChunks.filter(chunk => {
+      entryChunks = compilationChunks.filter((chunk) => {
         return chunkGraph.getNumberOfEntryModules(chunk) > 0;
       });
     } else {
-      entryChunks = compilationChunks.filter(chunk => chunk.entryModule);
+      entryChunks = compilationChunks.filter((chunk) => chunk.entryModule);
     }
 
     if (entryChunks.length === 0) {
@@ -69,28 +72,32 @@ class StyleManager {
       if (compilationChunks.size > 1) {
         throw new Error('must set chunk.multiple = true if use webpack code splitting multi-chunk');
       }
-      const filename = Array.from(entryChunks[0].files).find(f => f.endsWith('.js'));
+      const filename = Array.from(entryChunks[0].files).find((f) => f.endsWith('.js'));
       let output = '';
       /**
        * 将没有被关联为 component style 的样式（全局样式）放在前面，
        * 因为这种样式有全局的含义。
        */
-      this.extractStyles.forEach(info => {
+      this.extractStyles.forEach((info) => {
         output += info.css || '';
       });
       /**
        * 将 component style 放在后面。
        */
-      this.extractComponentStyles.forEach(info => {
+      this.extractComponentStyles.forEach((info) => {
         output += info.css || '';
       });
-      this.writeMergedStyle({
-        name: 'main',
-        isEntry: true,
-        isEmpty: false,
-        filename,
-        finalFilename: ''
-      }, output, compilation.assets);
+      this.writeMergedStyle(
+        {
+          name: 'main',
+          isEntry: true,
+          isEmpty: false,
+          filename,
+          finalFilename: '',
+        },
+        output,
+        compilation.assets,
+      );
       return;
     }
 
@@ -109,9 +116,9 @@ class StyleManager {
        * 将没有被关联为 component style 的样式（全局样式）放在前面，
        * 因为这种样式有全局的含义。将 component style 放在全局样式的后面。
        */
-      [ss1, ss2].forEach(ss => {
+      [ss1, ss2].forEach((ss) => {
         if (ss.size === 0 || tag.size === 0) return;
-        tag.forEach(moduleResource => {
+        tag.forEach((moduleResource) => {
           let r = ss.get(moduleResource);
           if (!r) return;
           output += r.css;
@@ -127,15 +134,15 @@ class StyleManager {
         isCommon: sharedOptions.webpackVersion >= 5 ? _util.isCommonChunk_v5(chunk) : _util.isCommonChunk_v4(chunk),
         isEntry: i === 0,
         isEmpty: false,
-        filename: Array.from(chunk.files).find(f => f.endsWith('.js')),
+        filename: Array.from(chunk.files).find((f) => f.endsWith('.js')),
         finalFilename: '',
-        deps: []
-      }
+        deps: [],
+      };
       this.outputChunks.set(chunkInfo.name, chunkInfo);
       if (!chunkInfo.isCommon) {
         // 非公共 chunk 才需要输出到依赖字典。
-        chunk._groups.forEach(chunkGroup => {
-          chunkGroup.chunks.forEach(depChunk => {
+        chunk._groups.forEach((chunkGroup) => {
+          chunkGroup.chunks.forEach((depChunk) => {
             if (depChunk === chunk) return;
             chunkInfo.deps.push(depChunk.name || depChunk.id.toString());
           });
@@ -145,7 +152,9 @@ class StyleManager {
     });
   }
   writeMergedStyle(chunkInfo, output, assets) {
-    if (chunkInfo.isEntry) output = `.jg-hide {
+    if (chunkInfo.isEntry)
+      output =
+        `.jg-hide {
   display: none !important;
 }
 
@@ -153,7 +162,7 @@ class StyleManager {
 .jg-hide.jg-hide-leave {
   display: block !important;
 }\n` + output;
-    
+
     output = output.replace(/@charset "UTF-8";/g, '').trim();
 
     if (!chunkInfo.isEntry && !output) {
@@ -166,7 +175,7 @@ class StyleManager {
       output = new CleanCSS().minify(output).styles;
     }
 
-    const filename = chunkInfo.filename.replace(/\.js$/, '.css').replace(/[a-z0-9]{20}/, m => {
+    const filename = chunkInfo.filename.replace(/\.js$/, '.css').replace(/[a-z0-9]{20}/, () => {
       return crypto.createHash('sha256').update(output).digest('hex').substr(0, 20);
     });
     chunkInfo.finalFilename = filename;
@@ -176,18 +185,21 @@ class StyleManager {
       return;
     }
     this.outputCache.set(filename, output);
-    assets[filename] = sharedOptions.webpackVersion >= 5 ? {
-      source: () => output,
-      // 由于 scss -> css 的 sourcmap 作用不算很大，而生成 css 的sourcemap 的逻辑还有点复杂，暂时没有实现。
-      // TODO: support sourcemap
-      map: () => null
-    } : {
-      source: () => output,
-      size: () => output.length
-    };
+    assets[filename] =
+      sharedOptions.webpackVersion >= 5
+        ? {
+            source: () => output,
+            // 由于 scss -> css 的 sourcmap 作用不算很大，而生成 css 的sourcemap 的逻辑还有点复杂，暂时没有实现。
+            // TODO: support sourcemap
+            map: () => null,
+          }
+        : {
+            source: () => output,
+            size: () => output.length,
+          };
   }
 }
 
 module.exports = {
-  styleManager: new StyleManager()
+  styleManager: new StyleManager(),
 };

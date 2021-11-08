@@ -8,4 +8,3 @@ compiler/template/parser
 lib/
 types/
 **/.DS_Store
-**/*.js

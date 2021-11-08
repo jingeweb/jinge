@@ -1,42 +1,21 @@
-const {
-  Parser
-} = require('acorn');
+const { Parser } = require('acorn');
 const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
-const crypto = require('crypto');
 const path = require('path');
-const {
-  sharedOptions
-} = require('../options');
-const {
-  TemplateParser
-} = require('../template');
-const {
-  CSSParser, styleManager
-} = require('../style');
-const {
-  prependTab,
-  isString,
-  isArray,
-  arrayIsEqual,
-  getJingeBase,
-  KeyGenerator
-} = require('../util');
-const {
-  i18nManager
-} = require('../i18n');
+const { sharedOptions } = require('../options');
+const { TemplateParser } = require('../template');
+const { CSSParser, styleManager } = require('../style');
+const { prependTab, isString, isArray, arrayIsEqual, getJingeBase, KeyGenerator } = require('../util');
+const { i18nManager } = require('../i18n');
 const baseManager = require('./base');
-const {
-  _n_vm,
-  _n_wrap
-} = require('./helper');
+const { _n_vm, _n_wrap } = require('./helper');
 
 // html attribute is case insensitive
 const cstyKeyGenerator = new KeyGenerator('abcdefghijklmnopqrstuvwxyz0123456789', '_');
 
 class ComponentParser {
   static parse(content, sourceMap, options) {
-    return (new ComponentParser(options)).parse(content);
+    return new ComponentParser(options).parse(content);
   }
 
   constructor(options) {
@@ -45,7 +24,7 @@ class ComponentParser {
     this.webpackLoaderContext = options.webpackLoaderContext;
     this._localStore = {
       templates: new Map(),
-      styles: new Map()
+      styles: new Map(),
     };
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
 
@@ -95,7 +74,8 @@ class ComponentParser {
         source = source || (await this._resolve(node));
         if (!styleManager.extractStyles.has(source)) {
           styleManager.extractStyles.set(source, {
-            css: null, map: null
+            css: null,
+            map: null,
           });
         }
       }
@@ -151,14 +131,14 @@ class ComponentParser {
            * import {_t} from 'jinge'  // correct!
            * import {_t as someAlias} from 'jinge'  // wrong!
            */
-          throw new Error('_t is preserve i18n symbol, can\'t have local alias name. see https://todo.');
+          throw new Error("_t is preserve i18n symbol, can't have local alias name. see https://todo.");
         }
         if (local === '_t' && node.source.value === 'jinge') {
           // console.log('found _t', this.resourcePath);
           this._needHandleI18NTranslate = true;
         }
       }
-      if (!needHandleComponent && (imported in baseManager.componentBase)) {
+      if (!needHandleComponent && imported in baseManager.componentBase) {
         if (!source) {
           // console.log(this.webpackLoaderContext.context, node.source.value);
           source = await this._resolve(node);
@@ -201,19 +181,19 @@ class ComponentParser {
     if (styNode) {
       if (this._previousClassWithSty) {
         // 当前版本限定一个文件只能注册一次 component style
-        throw new Error(`A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`);
+        throw new Error(
+          `A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`,
+        );
       }
       this._previousClassWithSty = node.id.name;
       const csm = styleManager.components;
       if (!csm.has(this.resourcePath)) {
         const sid = cstyKeyGenerator.generate(this.resourcePath);
         if (sid.indexOf('_') >= 0) {
-          this.webpackLoaderContext.emitWarning(new Error(
-            `${this.resourcePath} has conflict hashed style id: ${sid}`
-          ));
+          this.webpackLoaderContext.emitWarning(new Error(`${this.resourcePath} has conflict hashed style id: ${sid}`));
         }
         csm.set(this.resourcePath, {
-          id: (sharedOptions.style.attrPrefix || '_') + sid
+          id: (sharedOptions.style.attrPrefix || '_') + sid,
         });
       }
       const sty = this.walkStyle(styNode, csm.get(this.resourcePath));
@@ -221,12 +201,14 @@ class ComponentParser {
         const sts = styleManager.styles;
         styInfo = sts.get(sty.file);
         if (styInfo && styInfo.component !== this.resourcePath) {
-          throw new Error(`style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`);
+          throw new Error(
+            `style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`,
+          );
         }
         if (!styInfo) {
           styInfo = {
             component: this.resourcePath,
-            styleId: sty.id
+            styleId: sty.id,
           };
         }
         // console.log(source, styInfo, '\n---\n');
@@ -255,7 +237,7 @@ class ComponentParser {
     let paths = [];
     let computed = -1;
     let root = null;
-    const walk = node => {
+    const walk = (node) => {
       const objectExpr = node.object;
       const propertyExpr = node.property;
       if (node.computed) {
@@ -297,13 +279,15 @@ class ComponentParser {
       return null;
     }
     if (computed > 0) {
-      console.error('Warning: computed member expression is not supported.');
-      console.error(`  > ${this.resourcePath}, line ${memExpr.loc.start.line}`);
+      // eslint-disable-next-line no-console
+      console.error(
+        `Warning: computed member expression is not supported.\n  > ${this.resourcePath}, line ${memExpr.loc.start.line}`,
+      );
       return null;
     }
 
     paths = paths.slice(1);
-    const privateIdx = paths.findIndex(p => p.startsWith('_'));
+    const privateIdx = paths.findIndex((p) => p.startsWith('_'));
     if (privateIdx >= 0) return null;
     return computed < 0 ? paths.join('.') : paths;
   }
@@ -314,7 +298,7 @@ class ComponentParser {
       this.walkI18NTranslate(node, true);
       this._constructorRanges.push({
         start: node.start,
-        end: node.end
+        end: node.end,
       });
     }
 
@@ -323,13 +307,13 @@ class ComponentParser {
     if (!an) throw new Error(`constructor of ${ClassName} must accept at least one argument.`);
     let foundSupper = false;
     const vm = `__vm${sharedOptions.symbolPostfix}`;
-    const replaceThis = stmt => {
+    const replaceThis = (stmt) => {
       this._walkAcorn(stmt, {
-        ThisExpression: ts => {
+        ThisExpression: (ts) => {
           ts.type = 'Identifier';
           ts.name = vm;
           return false;
-        }
+        },
       });
       return stmt;
     };
@@ -356,26 +340,28 @@ class ComponentParser {
         }
       } else if (expr.type === 'AssignmentExpression') {
         const exprLeft = expr.left;
-        if (exprLeft.type !== 'MemberExpression' ||
+        if (
+          exprLeft.type !== 'MemberExpression' ||
           exprLeft.object.type !== 'ThisExpression' ||
           exprLeft.property.type !== 'Identifier' ||
           exprLeft.property.name.startsWith('_') ||
-          exprLeft.computed) {
+          exprLeft.computed
+        ) {
           newBody.push(replaceThis(stmt));
           return;
         }
-        if (!foundSupper) throw new Error('can\'t use \'this\' before call super().');
+        if (!foundSupper) throw new Error("can't use 'this' before call super().");
         const props = [];
-        const addProp = p => {
+        const addProp = (p) => {
           if (isString(p) && props.indexOf(p) < 0) props.push(p);
-          if (isArray(p) && !props.find(sp => arrayIsEqual(sp, p))) props.push(p);
+          if (isArray(p) && !props.find((sp) => arrayIsEqual(sp, p))) props.push(p);
         };
         this._walkAcorn(expr.right, {
-          MemberExpression: node => {
+          MemberExpression: (node) => {
             const paths = this._parse_mem_path(node, an);
             if (paths) addProp(paths);
             return false;
-          }
+          },
         });
         if (props.length > 0) {
           newBody.push(..._n_vm(i, replaceThis(stmt), an, props, sharedOptions.symbolPostfix));
@@ -388,7 +374,7 @@ class ComponentParser {
     });
     fn.body.body = newBody;
     let newCode = escodegen.generate(fn.body, {
-      indent: ''.padStart(2, ' ')
+      indent: ''.padStart(2, ' '),
     });
     if (node.loc.start.column > 0) {
       const i = newCode.indexOf('\n');
@@ -400,7 +386,7 @@ class ComponentParser {
     this._replaces.push({
       start: fn.body.start,
       end: fn.body.end,
-      code: newCode
+      code: newCode,
     });
   }
 
@@ -417,30 +403,31 @@ class ComponentParser {
       }
       return {
         file: this._localStore.styles.get(arg.name),
-        id: ci.id
+        id: ci.id,
       };
     }
     let css;
     if (arg.type === 'Literal') {
       css = arg.value;
     } else if (arg.type === 'TemplateLiteral') {
-      if (arg.expressions.length > 0) throw new Error('static getter `template` must not return template string with expression.');
+      if (arg.expressions.length > 0)
+        throw new Error('static getter `template` must not return template string with expression.');
       css = arg.quasis[0].value.cooked;
     } else {
       throw new Error('static getter `style` must return css code');
     }
     css = CSSParser.parseInline(css, {
       resourcePath: this.resourcePath,
-      styleId: ci.id
+      styleId: ci.id,
     });
     this._replaces.push({
       start: arg.start,
       end: arg.end,
-      code: css.code
+      code: css.code,
     });
     return {
       file: this.resourcePath,
-      id: ci.id
+      id: ci.id,
     };
   }
 
@@ -462,22 +449,27 @@ class ComponentParser {
       if (!tplInfo) {
         tps.set(source, {
           component: this.resourcePath,
-          styleId: styInfo ? styInfo.styleId : null
+          styleId: styInfo ? styInfo.styleId : null,
         });
         // console.log(source, this.resourcePath, styInfo);
         return;
       }
       if (tplInfo.styleId && this.resourcePath !== tplInfo.component) {
-        throw new Error(`template file '${source}' has been attached by component with scoped style '${tplInfo.component}', can't be used in '${this.resourcePath}'`);
+        throw new Error(
+          `template file '${source}' has been attached by component with scoped style '${tplInfo.component}', can't be used in '${this.resourcePath}'`,
+        );
       }
       if (styInfo && this.resourcePath !== styInfo.component) {
-        throw new Error(`template file '${source}' has been attached by component '${tplInfo.component}', can't be use in '${this.resourcePath}' as this component has scoped style.`);
+        throw new Error(
+          `template file '${source}' has been attached by component '${tplInfo.component}', can't be use in '${this.resourcePath}' as this component has scoped style.`,
+        );
       }
       return;
     } else if (arg.type === 'Literal') {
       tpl = arg.value;
     } else if (arg.type === 'TemplateLiteral') {
-      if (arg.expressions.length > 0) throw new Error('static getter `template` must not return template string with expression.');
+      if (arg.expressions.length > 0)
+        throw new Error('static getter `template` must not return template string with expression.');
       tpl = arg.quasis[0].value.cooked;
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
@@ -488,10 +480,10 @@ class ComponentParser {
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
       webpackLoaderContext: this.webpackLoaderContext,
-      wrapCode: false
+      wrapCode: false,
     });
 
-    result.globalImports.forEach(imp => this._tplGlobalImports.add(imp));
+    result.globalImports.forEach((imp) => this._tplGlobalImports.add(imp));
     result.aliasImports && this._tplCodeOfImports.add(result.aliasImports);
     result.localImports && this._tplCodeOfImports.add(result.localImports);
     result.i18nDeps && this._tplCodeOfImports.add(result.i18nDeps);
@@ -504,22 +496,25 @@ class ComponentParser {
     this._replaces.push({
       start: st.argument.start,
       end: st.argument.end,
-      code
+      code,
     });
   }
 
   walkI18NTranslate(rootNode, inConstructor) {
     this._walkAcorn(rootNode, {
-      CallExpression: node => {
+      CallExpression: (node) => {
         if (node.callee.type === 'Identifier' && node.callee.name === '_t') {
           /**
            * inConstructor 为 false 说明不是从 this.walkConstructor 中进入到此处的逻辑，
            * 这种情况下，不需要再处理出现在组件的构造函数里的 _t 函数，
            * 因为之前在 this.walkConstructor 中已经处理过了。
            */
-          if (!inConstructor && this._constructorRanges.some(r => {
-            return node.start <= r.end && node.end >= r.start;
-          })) {
+          if (
+            !inConstructor &&
+            this._constructorRanges.some((r) => {
+              return node.start <= r.end && node.end >= r.start;
+            })
+          ) {
             return;
           }
           const args = node.arguments;
@@ -536,12 +531,12 @@ class ComponentParser {
             computed: false,
             object: {
               type: 'Identifier',
-              name: `__i18n${sharedOptions.symbolPostfix}`
+              name: `__i18n${sharedOptions.symbolPostfix}`,
             },
             property: {
               type: 'Identifier',
-              name: `__t`
-            }
+              name: `__t`,
+            },
           };
           const key = i18nManager.registerToDict(text.value, this.resourcePath);
           text.value = key;
@@ -554,11 +549,11 @@ class ComponentParser {
             this._replaces.push({
               start: node.start,
               end: node.end,
-              code
+              code,
             });
           }
         }
-      }
+      },
     });
   }
 
@@ -571,7 +566,7 @@ class ComponentParser {
         locations: true,
         ecmaVersion: 2020,
         sourceType: 'module',
-        onComment: comments
+        onComment: comments,
       });
     } catch (ex) {
       throw new Error(ex.message + ' @ ' + this.resourcePath);
@@ -582,19 +577,19 @@ class ComponentParser {
     for (let i = 0; i < tree.body.length; i++) {
       const n = tree.body[i];
       if (n.type === 'ImportDeclaration') {
-        if ((await this.walkImport(n))) {
+        if (await this.walkImport(n)) {
           needHandleComponent = true;
         }
       }
     }
     if (needHandleComponent) {
       this._walkAcorn(tree, {
-        ClassDeclaration: node => {
+        ClassDeclaration: (node) => {
           if (node.superClass) {
             this.walkClass(node);
           }
           return false;
-        }
+        },
       });
     }
 
@@ -604,15 +599,14 @@ class ComponentParser {
     }
     if (this._replaces.length === 0) {
       return {
-        code
+        code,
       };
     }
 
-    this._replaces = this._replaces.sort((a, b) => a.start > b.start ? 1 : -1);
+    this._replaces = this._replaces.sort((a, b) => (a.start > b.start ? 1 : -1));
     let start = 0;
-    let output = this._tplGlobalImports.size > 0 ? `import { ${
-      [...this._tplGlobalImports].join(', ')
-    } } from 'jinge';\n` : '';
+    let output =
+      this._tplGlobalImports.size > 0 ? `import { ${[...this._tplGlobalImports].join(', ')} } from 'jinge';\n` : '';
     output += [...this._tplCodeOfImports].join('\n');
     for (let i = 0; i < this._replaces.length; i++) {
       const r = this._replaces[i];
@@ -626,12 +620,12 @@ class ComponentParser {
       output += code.substring(start);
     }
     return {
-      code: output
+      code: output,
     };
   }
 }
 
 module.exports = {
   ComponentParser,
-  componentBaseManager: baseManager
+  componentBaseManager: baseManager,
 };

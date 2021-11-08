@@ -4,7 +4,7 @@ const EMPTY = 'emptyRenderFn$POSTFIX$';
 
 const PUSH_ROOT_ELE = 'component[__$POSTFIX$].rootNodes.push(el);';
 const PUSH_COM_ELE = 'component[__$POSTFIX$].nonRootCompNodes.push(el);';
-const SET_REF_ELE = 'vm_0.__setRef(\'$NAME$\', el, component)';
+const SET_REF_ELE = "vm_0.__setRef('$NAME$', el, component)";
 
 const TEXT_EXPR = `(() => {
   const el = createTextNode$POSTFIX$();
@@ -104,5 +104,5 @@ module.exports = {
   ATTR_I18N_COMP_CONST_ON,
   ATTR_I18N_COMP_CONST_OFF,
   ATTR_I18N_COMP_EXPR_ON,
-  ATTR_I18N_COMP_EXPR_OFF
+  ATTR_I18N_COMP_EXPR_OFF,
 };

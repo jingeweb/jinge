@@ -1,10 +1,6 @@
 const antlr = require('antlr4');
-const {
-  AttrParser
-} = require('./parser/AttrParser');
-const {
-  AttrLexer
-} = require('./parser/AttrLexer');
+const { AttrParser } = require('./parser/AttrParser');
+const { AttrLexer } = require('./parser/AttrLexer');
 
 class AttributeValueParser extends AttrParser {
   static parse(content) {
@@ -15,11 +11,11 @@ class AttributeValueParser extends AttrParser {
     parser.buildParseTrees = false;
     parser.value();
 
-    return parser._results.map(r => {
+    return parser._results.map((r) => {
       const t = r[1];
       return {
         type: r[0] === 0 ? 'TEXT' : 'VAR',
-        value: r[0] === 0 ? t : t.substring(2, t.length - 1).trim()
+        value: r[0] === 0 ? t : t.substring(2, t.length - 1).trim(),
       };
     });
   }
@@ -31,5 +27,5 @@ class AttributeValueParser extends AttrParser {
 }
 
 module.exports = {
-  AttributeValueParser
+  AttributeValueParser,
 };

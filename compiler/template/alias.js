@@ -36,13 +36,23 @@ class ComponentAliasManager {
   }
 
   getCode(imports) {
-    return Object.keys(imports).map(source => {
-      return `import { ${imports[source].map(c => `${c} as ${this.localMap[source][c]}`).join(', ')} } from '${source}';`;
-    }).join('\n');
+    return Object.keys(imports)
+      .map((source) => {
+        return `import { ${imports[source]
+          .map((c) => `${c} as ${this.localMap[source][c]}`)
+          .join(', ')} } from '${source}';`;
+      })
+      .join('\n');
   }
 
   initialize(componentAlias) {
-    this.aliasPostfix = '_' + crypto.createHmac('sha256', 'component-alias-postfix').update(sharedOptions.symbolPostfix).digest('hex').substr(0, 12);
+    this.aliasPostfix =
+      '_' +
+      crypto
+        .createHmac('sha256', 'component-alias-postfix')
+        .update(sharedOptions.symbolPostfix)
+        .digest('hex')
+        .substr(0, 12);
     if (Array.isArray(componentAlias)) {
       componentAlias = Object.assign({}, ...componentAlias);
     }
@@ -56,8 +66,8 @@ class ComponentAliasManager {
         HideComponent: 'hide',
         BindHtmlComponent: 'bind-html',
         ToggleClassComponent: 'toggle-class',
-        DynamicRenderComponent: 'dynamic'
-      }
+        DynamicRenderComponent: 'dynamic',
+      },
     });
     for (const source in componentAlias) {
       const m = componentAlias[source];
@@ -74,7 +84,7 @@ class ComponentAliasManager {
           this.localMap[source][c] = (c === 'default' ? 'Component_default_' + i : c) + postfix;
         }
         const as = Array.isArray(m[c]) ? m[c] : [m[c]];
-        as.forEach(a => {
+        as.forEach((a) => {
           this.alias[a] = [c, source];
         });
       });
@@ -83,5 +93,5 @@ class ComponentAliasManager {
 }
 
 module.exports = {
-  aliasManager: new ComponentAliasManager()
+  aliasManager: new ComponentAliasManager(),
 };

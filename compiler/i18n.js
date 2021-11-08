@@ -4,32 +4,46 @@ const crypto = require('crypto');
 const csvStringify = require('csv-stringify/lib/sync');
 const csvParse = require('csv-parse/lib/sync');
 const _util = require('./util');
-const {
-  sharedOptions
-} = require('./options');
+const { sharedOptions } = require('./options');
 
 /**
  * 所有 i18n 字典资源文件里渲染函数可能依赖的服务。
  */
 const i18nRenderDeps = [
-  'Component', '__', '$$', 'setText', 'ViewModelCoreImpl', 'attrs', 'vm', 'i18n', 'createElement', 'setAttribute',
-  'createElementWithoutAttrs', 'createTextNode', 'I18nComponent', 'ParameterComponent', 'assertRenderResults',
-  'textRenderFn', 'emptyRenderFn', 'i18nRenderFn', 'errorRenderFn', 'arrayEqual', 'createSVGElement', 'createSVGElementWithoutAttrs'
+  'Component',
+  '__',
+  '$$',
+  'setText',
+  'ViewModelCoreImpl',
+  'attrs',
+  'vm',
+  'i18n',
+  'createElement',
+  'setAttribute',
+  'createElementWithoutAttrs',
+  'createTextNode',
+  'I18nComponent',
+  'ParameterComponent',
+  'assertRenderResults',
+  'textRenderFn',
+  'emptyRenderFn',
+  'i18nRenderFn',
+  'errorRenderFn',
+  'arrayEqual',
+  'createSVGElement',
+  'createSVGElementWithoutAttrs',
 ];
 const i18nRenderDepsRegisterFile = path.resolve(__dirname, '../lib/__register_i18n_render_deps.js');
 
-function _r(s, e) {
-  return new Array(e - s + 1).fill(0).map((n, i) => String.fromCharCode(s + i));
-}
 function key2prop(key) {
   return /^[0-9]/.test(key) || /[^\d\w$_]/.test(key) ? JSON.stringify(key) : key;
 }
 function compare(a, b) {
-  return a.location === b.location ? 0 : (a.location > b.location ? 1 : -1);
+  return a.location === b.location ? 0 : a.location > b.location ? 1 : -1;
 }
 function parseCsvContent(content, defaultLocale, targetLocale, targetMeta) {
   csvParse(content, {
-    columns: true
+    columns: true,
   }).forEach((row, i) => {
     if (!row || !(defaultLocale in row) || !(targetLocale in row)) {
       throw new Error(`Bad format for "translate.${targetLocale}.csv". Wrong line format at ${i}. see https://todo.`);
@@ -39,7 +53,7 @@ function parseCsvContent(content, defaultLocale, targetLocale, targetMeta) {
       translateInfo = {
         allSame: true, // 对于同一个中文文本，是否翻译的文本全部相同
         firstText: row[targetLocale],
-        entries: new Map()
+        entries: new Map(),
       };
       targetMeta.set(row[defaultLocale], translateInfo);
     } else {
@@ -48,12 +62,16 @@ function parseCsvContent(content, defaultLocale, targetLocale, targetMeta) {
       }
     }
     if (translateInfo.entries.has(row.location)) {
-      throw new Error(`dulplicate csv entry at both line ${translateInfo.entries.get(row.location).lineAt} and line ${i} in "translate.${targetLocale}.csv"`);
+      throw new Error(
+        `dulplicate csv entry at both line ${
+          translateInfo.entries.get(row.location).lineAt
+        } and line ${i} in "translate.${targetLocale}.csv"`,
+      );
     }
     translateInfo.entries.set(row.location, {
       lineAt: i, // 在 csv 文件中的行号
       key: null, // 预留字段
-      text: row[targetLocale] // 翻译后的文本
+      text: row[targetLocale], // 翻译后的文本
     });
   });
 }
@@ -64,16 +82,16 @@ class I18nManager {
     this.defaultLocale = null;
     this.targetLocales = null;
     this.autoIncrementKey = 1;
-    this.idGenerators =  {
+    this.idGenerators = {
       dicts: new _util.KeyGenerator(),
       attrs: new _util.KeyGenerator(),
-      renders: new _util.KeyGenerator()
+      renders: new _util.KeyGenerator(),
     };
     this.renderDeps = null;
     this.keysOfResources = {
       dicts: new Map(),
       renders: new Map(),
-      attrs: new Map()
+      attrs: new Map(),
     };
     // 标记 chunk 里面用到的所有 i18n keys
     this.chunkTags = null;
@@ -95,15 +113,15 @@ class I18nManager {
     // 如果 jinge 框架是以 external 的形式引用，则所有依赖都已经在 jinge.min.js 中被注册。这种情况下，i18n 也默认注册好了所有依赖。
     const postfix = sharedOptions.symbolPostfix;
     this.renderDeps = {
-      inner: Object.fromEntries(i18nRenderDeps.map(d => [d, -1])),
-      arr: sharedOptions.i18n.external
-        ? i18nRenderDeps.map(d => d + postfix)
-        : [],
-      map: sharedOptions.i18n.external 
-        ? new Map(i18nRenderDeps.map((d, idx) => {
-          return [d + postfix, idx];
-        }))
-        : new Map()
+      inner: Object.fromEntries(i18nRenderDeps.map((d) => [d, -1])),
+      arr: sharedOptions.i18n.external ? i18nRenderDeps.map((d) => d + postfix) : [],
+      map: sharedOptions.i18n.external
+        ? new Map(
+            i18nRenderDeps.map((d, idx) => {
+              return [d + postfix, idx];
+            }),
+          )
+        : new Map(),
     };
     this.defaultLocale = {
       name: sharedOptions.i18n.defaultLocale,
@@ -113,13 +131,13 @@ class I18nManager {
       meta: {
         dicts: new Map(),
         renders: new Map(),
-        attrs: new Map()
+        attrs: new Map(),
       },
       output: {
         dicts: [],
         renders: [],
-        attrs: []
-      }
+        attrs: [],
+      },
     };
     this.targetLocales = [];
     this.loadTargetCSV();
@@ -151,9 +169,9 @@ class I18nManager {
       }
       this.defaultLocale.nonTranslatedCsv.push({
         location,
-        src: text
+        src: text,
       });
-      this.targetLocales.forEach(targetLocale => {
+      this.targetLocales.forEach((targetLocale) => {
         const targetInfo = targetLocale.meta.dicts.get(text);
         let translateText = null;
         if (targetInfo && targetInfo.entries.has(location)) {
@@ -162,7 +180,7 @@ class I18nManager {
         const csvRow = {
           location,
           src: text,
-          text: translateText
+          text: translateText,
         };
         if (!_util.isString(translateText) || !translateText) {
           targetLocale.nonTranslatedCsv.push(csvRow);
@@ -181,33 +199,34 @@ class I18nManager {
      *
      * 如果已经判断过（info !== null）或者已经输出过(this.written === true)，则不需要再判断。
      */
-    const shouldMerge = info ? info.shouldMerge : (this.written || !this.targetLocales.some(targetLocale => {
-      const targetInfo = targetLocale.meta[type].get(text);
-      return targetInfo && !targetInfo.allSame;
-    }));
+    const shouldMerge = info
+      ? info.shouldMerge
+      : this.written ||
+        !this.targetLocales.some((targetLocale) => {
+          const targetInfo = targetLocale.meta[type].get(text);
+          return targetInfo && !targetInfo.allSame;
+        });
 
     const outputTarget = this.defaultLocale.output[type];
     let pushNew = false;
     let regKey;
     if (!info) {
-      regKey = this.idGenerators[type].generate(
-        shouldMerge ? text : (text + location)
-      );
+      regKey = this.idGenerators[type].generate(shouldMerge ? text : text + location);
       if (regKey.indexOf(':') >= 0) {
         this.webpackCompilationWarnings.push(new Error(`i18n key hash ${regKey} is conflict. \n${location}`));
       }
       info = {
         shouldMerge,
         firstOutput: null,
-        entries: new Map()
+        entries: new Map(),
       };
       info.entries.set(location, {
-        key: regKey
+        key: regKey,
       });
       meta.set(text, info);
       const output = {
         key: regKey,
-        output: renderFnCb ? renderFnCb(this.defaultLocale.name, text) : text
+        output: renderFnCb ? renderFnCb(this.defaultLocale.name, text) : text,
       };
       outputTarget.push(output);
       info.firstOutput = output;
@@ -216,18 +235,16 @@ class I18nManager {
       if (info.entries.has(location)) {
         regKey = info.entries.get(location).key;
       } else if (!shouldMerge) {
-        regKey = this.idGenerators[type].generate(
-          text + location
-        );
+        regKey = this.idGenerators[type].generate(text + location);
         if (regKey.indexOf(':') >= 0) {
           this.webpackCompilationWarnings.push(new Error(`i18n key hash ${regKey} is conflict. \n${location}`));
         }
         info.entries.set(location, {
-          key: regKey
+          key: regKey,
         });
         outputTarget.push({
           ref: info.firstOutput,
-          key: regKey
+          key: regKey,
           // output: JSON.stringify(`${type === 'dicts' ? '«' : ''}${info.firstOutput.key}`)
         });
         if (sharedOptions.chunk.multiple && multiChunkCallback) {
@@ -241,42 +258,43 @@ class I18nManager {
         regKey = info.firstOutput.key;
       }
     }
-    pushNew && this.targetLocales.forEach(targetLocale => {
-      const targetOutputTarget = targetLocale.output[type];
-      const targetInfo = targetLocale.meta[type].get(text);
-      const entry = targetInfo?.entries.get(location);
-      if (!entry || !entry.text) {
-        targetOutputTarget.push({
-          key: regKey,
-          output: renderFnCb ? renderFnCb(targetLocale.name, text) : text
-        });
-        return;
-      }
-      const refEntry = getRefEntry(targetInfo.entries, entry, regKey, text);
-      let output;
-      if (!refEntry) {
-        entry.firstOutput = output = {
-          key: regKey,
-          output: renderFnCb ? renderFnCb(targetLocale.name, entry.text) : entry.text
-        };
-      } else {
-        if (!refEntry.firstOutput) throw new Error('unexpected!');
-        entry.firstOutput = refEntry.firstOutput;
-        output = {
-          key: regKey,
-          ref: entry.firstOutput
-        };
-        if (sharedOptions.chunk.multiple && multiChunkCallback) {
-          multiChunkCallback(entry.firstOutput.output);
+    pushNew &&
+      this.targetLocales.forEach((targetLocale) => {
+        const targetOutputTarget = targetLocale.output[type];
+        const targetInfo = targetLocale.meta[type].get(text);
+        const entry = targetInfo?.entries.get(location);
+        if (!entry || !entry.text) {
+          targetOutputTarget.push({
+            key: regKey,
+            output: renderFnCb ? renderFnCb(targetLocale.name, text) : text,
+          });
+          return;
         }
-      }
-      targetOutputTarget.push(output);
-    });
+        const refEntry = getRefEntry(targetInfo.entries, entry, regKey, text);
+        let output;
+        if (!refEntry) {
+          entry.firstOutput = output = {
+            key: regKey,
+            output: renderFnCb ? renderFnCb(targetLocale.name, entry.text) : entry.text,
+          };
+        } else {
+          if (!refEntry.firstOutput) throw new Error('unexpected!');
+          entry.firstOutput = refEntry.firstOutput;
+          output = {
+            key: regKey,
+            ref: entry.firstOutput,
+          };
+          if (sharedOptions.chunk.multiple && multiChunkCallback) {
+            multiChunkCallback(entry.firstOutput.output);
+          }
+        }
+        targetOutputTarget.push(output);
+      });
 
     /**
      * @param {Map} entries
      */
-    function getRefEntry(entries, entry, srcKey, srcText) {
+    function getRefEntry(entries, entry, srcKey) {
       entry.key = srcKey;
       const iter = entries.entries();
       let it = iter.next();
@@ -293,7 +311,7 @@ class I18nManager {
     if (!this.written && sharedOptions.chunk.multiple) {
       let keySet = this.keysOfResources[type].get(resourcePath);
       if (!keySet) {
-        this.keysOfResources[type].set(resourcePath, keySet = new Set());
+        this.keysOfResources[type].set(resourcePath, (keySet = new Set()));
       }
       keySet.add(regKey);
     }
@@ -336,7 +354,7 @@ class I18nManager {
 
     const postfix = sharedOptions.symbolPostfix;
     if (!depId.endsWith(postfix)) {
-      return (sharedOptions.chunk.multiple || first) ? idx : -1;
+      return sharedOptions.chunk.multiple || first ? idx : -1;
     }
     const dep = depId.substr(0, depId.length - postfix.length);
     if (!(dep in this.renderDeps.inner)) {
@@ -351,32 +369,37 @@ class I18nManager {
     if (!sharedOptions.chunk.multiple) return;
     const { webpackVersion } = sharedOptions;
     this.chunkTags = new Map();
-    compilation.chunks.forEach(chunk => {
+    compilation.chunks.forEach((chunk) => {
       const tag = {
-        dicts: new Map(), renders: new Map(), attrs: new Map()
+        dicts: new Map(),
+        renders: new Map(),
+        attrs: new Map(),
       };
-      const modules = webpackVersion >= 5 ? compilation.chunkGraph.getChunkModules(chunk).filter(m => {
-        return m.resource;
-      }) : chunk._modules;
-      modules.forEach(mod => {
-        ['dicts', 'renders', 'attrs'].forEach(type => {
+      const modules =
+        webpackVersion >= 5
+          ? compilation.chunkGraph.getChunkModules(chunk).filter((m) => {
+              return m.resource;
+            })
+          : chunk._modules;
+      modules.forEach((mod) => {
+        ['dicts', 'renders', 'attrs'].forEach((type) => {
           const keySet = this.keysOfResources[type].get(mod.resource);
           if (!keySet) return;
-          keySet.forEach(k => {
+          keySet.forEach((k) => {
             tag[type].set(k, true);
           });
         });
       });
       this.chunkTags.set(chunk, tag);
-    })
+    });
   }
   handleDepRegisterModule(registerMod) {
     const cnt = registerMod._source._value;
     const inner = this.renderDeps.inner;
-    registerMod._source._value = cnt.replace(/\/\*\*\/i18n\.__regDep\(0     , ([\w\d$_]+)\);/g, (m0, m1) => {
+    registerMod._source._value = cnt.replace(/\/\*\*\/i18n\.__regDep\(0 {5}, ([\w\d$_]+)\);/g, (m0, m1) => {
       const idx = inner[m1];
       // 以下逻辑保证替换后的代码完全不影响 sourcemap
-      const idxStr = idx >= 0 ? (idx.toString()).padEnd(6, ' ') : '0     ';
+      const idxStr = idx >= 0 ? idx.toString().padEnd(6, ' ') : '0     ';
       return `${idx >= 0 ? '/**/' : '////'}i18n.__regDep(${idxStr}, ${m1});`;
     });
   }
@@ -400,7 +423,7 @@ class I18nManager {
     this.written = true;
 
     this.writeTranslateCSV(this.defaultLocale);
-    this.targetLocales.forEach(locale => this.writeTranslateCSV(locale));
+    this.targetLocales.forEach((locale) => this.writeTranslateCSV(locale));
 
     const webpackVersion = sharedOptions.webpackVersion;
     const { assets, additionalChunkAssets } = compilation;
@@ -411,13 +434,13 @@ class I18nManager {
     let entryChunks;
     if (webpackVersion >= 5) {
       const { chunkGraph } = compilation;
-      entryChunks = compilationChunks.filter(chunk => {
+      entryChunks = compilationChunks.filter((chunk) => {
         return chunkGraph.getNumberOfEntryModules(chunk) > 0;
       });
     } else {
-      entryChunks = compilationChunks.filter(chunk => chunk.entryModule);
+      entryChunks = compilationChunks.filter((chunk) => chunk.entryModule);
     }
-    
+
     if (entryChunks.length === 0) {
       throw new Error('Entry chunk not found!');
     }
@@ -429,17 +452,33 @@ class I18nManager {
       if (compilationChunks.length > 1) {
         throw new Error('must set chunk.multiple = true if use webpack code splitting multi-chunk');
       }
-      const filename = Array.from(entryChunks[0].files).find(f => f.endsWith('.js'));
-      this.writeGenerateLocales(this.defaultLocale.name, {
-        isEntry: true, isEmpty: false,
-        filename: filename,
-        finalFilename: ''
-      }, this.defaultLocale.output, assets, additionalChunkAssets);
-      this.targetLocales.forEach(locale => this.writeGenerateLocales(locale.name, {
-        isEntry: true, isEmpty: false,
-        filename: filename,
-        finalFilename: ''
-      }, locale.output, assets, additionalChunkAssets));
+      const filename = Array.from(entryChunks[0].files).find((f) => f.endsWith('.js'));
+      this.writeGenerateLocales(
+        this.defaultLocale.name,
+        {
+          isEntry: true,
+          isEmpty: false,
+          filename: filename,
+          finalFilename: '',
+        },
+        this.defaultLocale.output,
+        assets,
+        additionalChunkAssets,
+      );
+      this.targetLocales.forEach((locale) =>
+        this.writeGenerateLocales(
+          locale.name,
+          {
+            isEntry: true,
+            isEmpty: false,
+            filename: filename,
+            finalFilename: '',
+          },
+          locale.output,
+          assets,
+          additionalChunkAssets,
+        ),
+      );
       this.defaultLocale = null;
       this.targetLocales = null;
       this.keysOfResources = null;
@@ -452,8 +491,8 @@ class I18nManager {
     if (idx !== 0) {
       compilationChunks.unshift(compilationChunks.splice(idx, 1)[0]);
     }
-    const filenames = compilationChunks.map(chunk => {
-      const f = Array.from(chunk.files).find(f => f.endsWith('.js'));
+    const filenames = compilationChunks.map((chunk) => {
+      const f = Array.from(chunk.files).find((f) => f.endsWith('.js'));
       if (!f) {
         throw new Error('output filename must be ends with ".js"');
       }
@@ -466,14 +505,18 @@ class I18nManager {
       let entryOutputResult;
       compilationChunks.forEach((chunk, chunkIdx) => {
         const outputResult = {
-          dicts: [], renders: [], attrs: []
+          dicts: [],
+          renders: [],
+          attrs: [],
         };
         const refMap = {
-          dicts: new Map(), renders: new Map(), attrs: new Map()
+          dicts: new Map(),
+          renders: new Map(),
+          attrs: new Map(),
         };
         const tagMap = this.chunkTags.get(chunk);
         let isEmpty = true;
-        ['dicts', 'renders', 'attrs'].forEach(type => {
+        ['dicts', 'renders', 'attrs'].forEach((type) => {
           localeData.output[type].forEach((it, i) => {
             if (!it) return;
             if (!tagMap[type].has(it.key)) return;
@@ -486,7 +529,7 @@ class I18nManager {
               if (refm.has(it.ref.key)) {
                 it = {
                   key: it.key,
-                  ref: { key: refm.get(it.ref.key) }
+                  ref: { key: refm.get(it.ref.key) },
                 };
               } else {
                 refm.set(it.ref.key, it.key);
@@ -507,12 +550,12 @@ class I18nManager {
           isCommon: sharedOptions.webpackVersion >= 5 ? _util.isCommonChunk_v5(chunk) : _util.isCommonChunk_v4(chunk),
           filename: filenames[chunkIdx],
           finalFilename: '',
-          deps: []
+          deps: [],
         };
         if (!chunkInfo.isCommon) {
           // 非公共 chunk 才需要输出到依赖字典。
-          chunk._groups.forEach(chunkGroup => {
-            chunkGroup.chunks.forEach(depChunk => {
+          chunk._groups.forEach((chunkGroup) => {
+            chunkGroup.chunks.forEach((depChunk) => {
               if (depChunk === chunk) return;
               chunkInfo.deps.push(depChunk.name || depChunk.id.toString());
             });
@@ -530,10 +573,10 @@ class I18nManager {
       });
       this.writeGenerateLocales(localeData.name, entryChunkInfo, entryOutputResult, assets, additionalChunkAssets);
       this.outputChunks.set(localeData.name, chunkInfoMap);
-    }
+    };
 
     _write(this.defaultLocale);
-    this.targetLocales.forEach(locale => {
+    this.targetLocales.forEach((locale) => {
       return _write(locale);
     });
     this.defaultLocale = null;
@@ -543,34 +586,48 @@ class I18nManager {
     this.webpackCompilationWarnings = null;
   }
 
-  writeGenerateLocales(localeName, chunkInfo, output, assets, additionalChunkAssets, subChunkInfoMap) {
+  writeGenerateLocales(localeName, chunkInfo, output, assets, additionalChunkAssets) {
     if (chunkInfo.isEmpty) {
       return;
     }
     const hasRender = output.renders.length > 0 || output.attrs.length > 0;
-    const dictCode = output.dicts.map(r => `    ${key2prop(r.key)}: ${JSON.stringify(r.ref ? '«' + r.ref.key : r.output)}`).join(',\n');
+    const dictCode = output.dicts
+      .map((r) => `    ${key2prop(r.key)}: ${JSON.stringify(r.ref ? '«' + r.ref.key : r.output)}`)
+      .join(',\n');
     if (!hasRender && !dictCode) {
       chunkInfo.isEmpty = true;
       return;
     }
 
-    const code = `(function() {${hasRender ? `
+    const code = `(function() {${
+      hasRender
+        ? `
 function renderFactory(
   ${this.renderDeps.arr.join(', ')}
 ) { return {
 components: {
-${output.renders.map(r => `  ${key2prop(r.key)}: ${r.ref ? JSON.stringify(r.ref.key) : r.output}`).join(',\n')}
+${output.renders.map((r) => `  ${key2prop(r.key)}: ${r.ref ? JSON.stringify(r.ref.key) : r.output}`).join(',\n')}
 },
 attributes: {
-${output.attrs.map(r => `  ${key2prop(r.key)}: ${r.ref ? JSON.stringify(r.ref.key) : r.output}`).join(',\n')}
+${output.attrs.map((r) => `  ${key2prop(r.key)}: ${r.ref ? JSON.stringify(r.ref.key) : r.output}`).join(',\n')}
 }
-}}` : ''}
+}}`
+        : ''
+    }
 const i18nData = {
-  locale: "${localeName}"${dictCode ? `,
+  locale: "${localeName}"${
+      dictCode
+        ? `,
   dictionary: {
 ${dictCode}
-  }`: ''}${hasRender ? `,
-  render: renderFactory` : ''}
+  }`
+        : ''
+    }${
+      hasRender
+        ? `,
+  render: renderFactory`
+        : ''
+    }
 };
 if (typeof jinge !== 'undefined') {
   jinge.i18n.__regLoc(i18nData);
@@ -578,50 +635,61 @@ if (typeof jinge !== 'undefined') {
   window.JINGE_I18N_DATA = i18nData;
 }
 })();`;
-    const filename = chunkInfo.filename.replace(/(\.min)?\.js$/, m => '.' + localeName + m).replace(/[a-z0-9]{20}/, m => {
-      return crypto.createHash('sha256').update(code).digest('hex').substr(0, 20);
-    });
+    const filename = chunkInfo.filename
+      .replace(/(\.min)?\.js$/, (m) => '.' + localeName + m)
+      .replace(/[a-z0-9]{20}/, () => {
+        return crypto.createHash('sha256').update(code).digest('hex').substr(0, 20);
+      });
     if (additionalChunkAssets.indexOf(filename) < 0) {
       additionalChunkAssets.push(filename);
     }
     chunkInfo.finalFilename = filename;
-    assets[filename] = sharedOptions.webpackVersion >= 5 ? {
-      source: () => code,
-      // 多语言资源字典没有 sourcemap 的说法。
-      map: () => null
-    } : {
-      source: () => code,
-      size: () => code.length
-    };
+    assets[filename] =
+      sharedOptions.webpackVersion >= 5
+        ? {
+            source: () => code,
+            // 多语言资源字典没有 sourcemap 的说法。
+            map: () => null,
+          }
+        : {
+            source: () => code,
+            size: () => code.length,
+          };
   }
 
   async writeTranslateCSV(locale) {
     const dn = this.defaultLocale.name;
-    const columns = [{
-      key: 'location'
-    }, {
-      key: 'src'
-    }];
+    const columns = [
+      {
+        key: 'location',
+      },
+      {
+        key: 'src',
+      },
+    ];
     if (locale.name !== dn) {
       columns.push({
-        key: 'text'
+        key: 'text',
       });
     }
     const records = locale.nonTranslatedCsv.sort(compare).concat(locale.translatedCsv.sort(compare));
     const content = csvStringify(records, {
-      columns
+      columns,
     });
     await fs.promises.writeFile(
       path.join(sharedOptions.i18n.translateDir, `translate.${locale.name}.csv`),
-      `location,${dn}${locale.name === dn ? '' : `,${locale.name}`}` + '\n' + content
+      `location,${dn}${locale.name === dn ? '' : `,${locale.name}`}` + '\n' + content,
     );
   }
 
   loadTargetCSV() {
-    fs.readdirSync(sharedOptions.i18n.translateDir).forEach(file => {
+    fs.readdirSync(sharedOptions.i18n.translateDir).forEach((file) => {
       const m = file.match(/^translate\.([\w_-]+)\.csv$/);
       if (!m) {
-        console.error(`Warning: ${file} under translate directory will be ignored as file name not match format "translate.{LOCALE}.csv"`);
+        // eslint-disable-next-line no-console
+        console.error(
+          `Warning: ${file} under translate directory will be ignored as file name not match format "translate.{LOCALE}.csv"`,
+        );
         return;
       }
       const locale = m[1].toLowerCase();
@@ -629,12 +697,14 @@ if (typeof jinge !== 'undefined') {
         const targetMeta = {
           dicts: new Map(),
           renders: new Map(),
-          attrs: new Map()
+          attrs: new Map(),
         };
         try {
           parseCsvContent(
             fs.readFileSync(path.join(sharedOptions.i18n.translateDir, file), 'utf-8'),
-            sharedOptions.i18n.defaultLocale, locale, targetMeta.dicts
+            sharedOptions.i18n.defaultLocale,
+            locale,
+            targetMeta.dicts,
           );
           targetMeta.dicts.forEach((info, text) => {
             targetMeta.renders.set(text, _util.deepClone(info));
@@ -648,10 +718,11 @@ if (typeof jinge !== 'undefined') {
             output: {
               dicts: [],
               renders: [],
-              attrs: []
-            }
+              attrs: [],
+            },
           });
         } catch (ex) {
+          // eslint-disable-next-line no-console
           console.error(ex);
         }
       }
@@ -661,5 +732,6 @@ if (typeof jinge !== 'undefined') {
 
 module.exports = {
   i18nManager: new I18nManager(),
-  i18nRenderDeps, i18nRenderDepsRegisterFile
+  i18nRenderDeps,
+  i18nRenderDepsRegisterFile,
 };

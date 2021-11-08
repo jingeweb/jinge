@@ -1,16 +1,8 @@
 const path = require('path');
 const _util = require('./util');
-const {
-  sharedOptions,
-  checkCompressOption,
-  getWebpackVersion
-} = require('./options');
-const {
-  styleManager
-} = require('./style');
-const {
-  i18nManager, i18nRenderDepsRegisterFile
-} = require('./i18n');
+const { sharedOptions, checkCompressOption, getWebpackVersion } = require('./options');
+const { styleManager } = require('./style');
+const { i18nManager, i18nRenderDepsRegisterFile } = require('./i18n');
 
 const PLUGIN_NAME = 'JINGE_EXTRACT_PLUGIN';
 
@@ -33,32 +25,45 @@ class JingeWebpackPlugin {
       if (!i18nOptions.defaultLocale) {
         throw new Error('JingeWebpackPlugin: i18n options require "defaultLocale" property.');
       }
-      sharedOptions.i18n = Object.assign({
-        idBaseDir: process.cwd(),
-        translateDir: path.join(process.cwd(), 'translate')
-      }, i18nOptions);
+      sharedOptions.i18n = Object.assign(
+        {
+          idBaseDir: process.cwd(),
+          translateDir: path.join(process.cwd(), 'translate'),
+        },
+        i18nOptions,
+      );
     }
 
     const styleOptions = sharedOptions.style;
     if (!styleOptions) {
       sharedOptions.style = {
-        extract: false
+        extract: false,
       };
     } else {
-      sharedOptions.style = Object.assign({
-        extract: true,
-        keepComments: false
-      }, styleOptions);
+      sharedOptions.style = Object.assign(
+        {
+          extract: true,
+          keepComments: false,
+        },
+        styleOptions,
+      );
     }
     const chunkOptions = sharedOptions.chunk;
     if (!chunkOptions) {
       sharedOptions.chunk = {
-        multiple: false, writeInfo: null, includeCommon: false
+        multiple: false,
+        writeInfo: null,
+        includeCommon: false,
       };
     } else {
-      sharedOptions.chunk = Object.assign({
-        multiple: false, writeInfo: null, includeCommon: false
-      }, chunkOptions);
+      sharedOptions.chunk = Object.assign(
+        {
+          multiple: false,
+          writeInfo: null,
+          includeCommon: false,
+        },
+        chunkOptions,
+      );
     }
   }
 
@@ -74,13 +79,17 @@ class JingeWebpackPlugin {
       }
       i18nManager.webpackCompilationWarnings = compilation.warnings;
       if (sharedOptions.i18n) {
-        compilation.hooks.optimizeModules.tap(PLUGIN_NAME, modules => {
+        compilation.hooks.optimizeModules.tap(PLUGIN_NAME, (modules) => {
           if (i18nManager.written) return;
-          const registerMod = Array.from(modules).find(mod => mod.resource === i18nRenderDepsRegisterFile);
+          const registerMod = Array.from(modules).find((mod) => mod.resource === i18nRenderDepsRegisterFile);
           if (!registerMod) {
             // 如果没有找到 i18nRenderDepsRegisterFile 这个文件，说明 jinge 框架是以 external 的模式引入的（即没有编译源码）
             if (!sharedOptions.i18n.external) {
-              compilation.errors.push(new Error('Please set JingeWebpackPlugin option "i18n.external" to `true` if use jinge as external library.'));
+              compilation.errors.push(
+                new Error(
+                  'Please set JingeWebpackPlugin option "i18n.external" to `true` if use jinge as external library.',
+                ),
+              );
             }
           } else {
             i18nManager.handleDepRegisterModule(registerMod);
@@ -89,7 +98,7 @@ class JingeWebpackPlugin {
       }
       if (sharedOptions.chunk.multiple) {
         compilation.hooks.optimizeChunks.tap(PLUGIN_NAME, (chunks) => {
-          chunks.forEach(chunk => {
+          chunks.forEach((chunk) => {
             const name = chunk.name;
             if (!name) {
               compilation.warnings.push(new Error('chunk miss webpackChunkName'));
@@ -104,14 +113,14 @@ class JingeWebpackPlugin {
             }
           });
         });
-        compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, (chunks) => {
+        compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, () => {
           styleManager.handleMultiChunk(compilation);
           if (!i18nManager.written) {
             i18nManager.handleMultiChunk(compilation);
           }
         });
       }
-      
+
       compilation.hooks.additionalAssets.tap(PLUGIN_NAME, () => {
         if (sharedOptions.i18n) {
           i18nManager.writeOutput(compilation);
@@ -130,37 +139,40 @@ class JingeWebpackPlugin {
       public: sharedOptions.publicPath,
       style: { entry: '', chunks: {} },
       script: { entry: '', chunks: {} },
-      locale: {}
+      locale: {},
     };
 
     const chunkGraph = compilation.chunkGraph;
-    compilation.chunks.forEach(chunk => {
+    compilation.chunks.forEach((chunk) => {
       if (webpackVersion >= 5) {
         const files = Array.from(chunk.files);
         const ems = Array.from(chunkGraph.getChunkEntryModulesIterable(chunk));
-        if (ems.length > 1 && ems.filter(em => {
-          return em.resource && em.resource.indexOf('webpack-dev-server/') < 0;
-        }).length > 1) {
+        if (
+          ems.length > 1 &&
+          ems.filter((em) => {
+            return em.resource && em.resource.indexOf('webpack-dev-server/') < 0;
+          }).length > 1
+        ) {
           compilation.warnings.push(new Error('UNEXPECTED: number of entry modules is greater than 1.'));
         }
         if (ems.length > 0) {
-          info.script.entry = files.find(f => f.endsWith('.js'));
+          info.script.entry = files.find((f) => f.endsWith('.js'));
         } else if (!isCommonChunk(chunk) || sharedOptions.chunk.includeCommon) {
           const name = chunk.name || chunk.id.toString();
-          info.script.chunks[name] = files.find(f => f.endsWith('.js'));
+          info.script.chunks[name] = files.find((f) => f.endsWith('.js'));
         }
       } else {
         if (chunk.entryModule) {
-          info.script.entry = chunk.files.find(f => f.endsWith('.js'));
+          info.script.entry = chunk.files.find((f) => f.endsWith('.js'));
         } else if (!isCommonChunk(chunk) || sharedOptions.chunk.includeCommon) {
           const name = chunk.name || chunk.id.toString();
-          info.script.chunks[name] = chunk.files.find(f => f.endsWith('.js'));
+          info.script.chunks[name] = chunk.files.find((f) => f.endsWith('.js'));
         }
       }
     });
 
     function handleChunkMap(chunksMap, out) {
-      chunksMap.forEach(chunkInfo => {
+      chunksMap.forEach((chunkInfo) => {
         if (chunkInfo.isEntry) {
           out.entry = chunkInfo.finalFilename;
           return;
@@ -171,17 +183,18 @@ class JingeWebpackPlugin {
           }
           return;
         }
-        const cns = chunkInfo.deps.map(cn => {
-          return chunksMap.get(cn);
-        }).filter(ck => {
-          return ck && !ck.isEmpty;
-        });
+        const cns = chunkInfo.deps
+          .map((cn) => {
+            return chunksMap.get(cn);
+          })
+          .filter((ck) => {
+            return ck && !ck.isEmpty;
+          });
         if (!chunkInfo.isEmpty) {
           cns.push(chunkInfo);
         }
-        out.chunks[chunkInfo.name] = cns.length === 0 ? null : (
-          cns.length === 1 ? cns[0].finalFilename : cns.map(ck => ck.finalFilename)
-        );
+        out.chunks[chunkInfo.name] =
+          cns.length === 0 ? null : cns.length === 1 ? cns[0].finalFilename : cns.map((ck) => ck.finalFilename);
       });
     }
 
@@ -192,17 +205,20 @@ class JingeWebpackPlugin {
     });
 
     const output = sharedOptions.compress ? JSON.stringify(info) : JSON.stringify(info, null, 2);
-    compilation.assets[sharedOptions.chunk.writeInfo] = webpackVersion >= 5 ? {
-      source: () => output,
-      map: () => null
-    } : {
-      source: () => output,
-      size: () => output.length
-    };
+    compilation.assets[sharedOptions.chunk.writeInfo] =
+      webpackVersion >= 5
+        ? {
+            source: () => output,
+            map: () => null,
+          }
+        : {
+            source: () => output,
+            size: () => output.length,
+          };
   }
 }
 
 module.exports = {
   checkCompressOption,
-  JingeWebpackPlugin
+  JingeWebpackPlugin,
 };

@@ -1,7 +1,4 @@
-const {
-  isObject,
-  isUndefined
-} = require('./util');
+const { isObject, isUndefined } = require('./util');
 
 const sharedOptions = {};
 
@@ -22,5 +19,5 @@ function getWebpackVersion(compiler) {
 module.exports = {
   sharedOptions,
   getWebpackVersion,
-  checkCompressOption
+  checkCompressOption,
 };

@@ -1,35 +1,36 @@
-const path = require('path');
 const { isArray } = require('../util');
 
 function _n_wrap(postfix) {
   return {
     type: 'VariableDeclaration',
-    declarations: [{
-      type: 'VariableDeclarator',
-      id: {
-        type: 'Identifier',
-        name: `__vm${postfix}`,
-      },
-      init: {
-        type: 'MemberExpression',
-        object: {
+    declarations: [
+      {
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: `__vm${postfix}`,
+        },
+        init: {
           type: 'MemberExpression',
           object: {
-            type: 'ThisExpression',
+            type: 'MemberExpression',
+            object: {
+              type: 'ThisExpression',
+            },
+            property: {
+              type: 'Identifier',
+              name: `__$$${postfix}`,
+            },
+            computed: true,
           },
           property: {
             type: 'Identifier',
-            name: `__$$${postfix}`,
+            name: 'proxy',
           },
-          computed: true,
+          computed: false,
         },
-        property: {
-          type: 'Identifier',
-          name: 'proxy',
-        },
-        computed: false,
       },
-    }],
+    ],
     kind: 'const',
   };
 }
@@ -51,9 +52,7 @@ function _n_vm(idx, stmt, an, props, postfix) {
             params: [],
             body: {
               type: 'BlockStatement',
-              body: [
-                stmt,
-              ],
+              body: [stmt],
             },
             generator: false,
             expression: false,
@@ -103,18 +102,18 @@ function _n_vm(idx, stmt, an, props, postfix) {
           arguments: [
             isArray(prop)
               ? {
-                type: 'ArrayExpression',
-                elements: prop.map((p) => ({
-                  type: 'Literal',
-                  value: p,
-                  raw: JSON.stringify(p),
-                })),
-              }
+                  type: 'ArrayExpression',
+                  elements: prop.map((p) => ({
+                    type: 'Literal',
+                    value: p,
+                    raw: JSON.stringify(p),
+                  })),
+                }
               : {
-                type: 'Literal',
-                value: prop,
-                raw: JSON.stringify(prop),
-              },
+                  type: 'Literal',
+                  value: prop,
+                  raw: JSON.stringify(prop),
+                },
             {
               type: 'Identifier',
               name: `fn_${idx}${postfix}`,
@@ -122,7 +121,7 @@ function _n_vm(idx, stmt, an, props, postfix) {
           ],
         },
       };
-    })
+    }),
   );
 }
 

@@ -1,13 +1,6 @@
 const antlr = require('antlr4/index');
-const {
-  getUniquePostfix
-} = require('../util');
-const {
-  TemplateParser
-} = require('./parser/TemplateParser');
-const {
-  TemplateLexer
-} = require('./parser/TemplateLexer');
+const { TemplateParser } = require('./parser/TemplateParser');
+const { TemplateLexer } = require('./parser/TemplateLexer');
 
 function parse(source) {
   const lexer = new TemplateLexer(new antlr.InputStream(source));
@@ -22,21 +15,23 @@ function parse(source) {
   parser.removeErrorListeners();
   parser.addErrorListener({
     syntaxError(recognizer, offendingSymbol, line, column, ...args) {
+      // eslint-disable-next-line no-console
       console.error(...args);
       if (!meetErr) {
         meetErr = {
-          line, column
+          line,
+          column,
         };
       }
     },
     reportContextSensitivity() {},
     reportAttemptingFullContext() {},
-    reportAmbiguity() {}
+    reportAmbiguity() {},
   });
   const tree = parser.html();
   return [meetErr, tree];
 }
 
 module.exports = {
-  parse
+  parse,
 };

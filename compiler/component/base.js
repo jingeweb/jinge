@@ -11,8 +11,8 @@ class ComponentBaseManager {
       Component: [
         path.resolve(__dirname, '../../lib/index.js'),
         path.resolve(__dirname, '../../lib/core/component.js'),
-        path.resolve(__dirname, '../../lib/core/index.js')
-      ]
+        path.resolve(__dirname, '../../lib/core/index.js'),
+      ],
     };
     if (Array.isArray(componentBase)) {
       componentBase = Object.assign({}, ...componentBase);
