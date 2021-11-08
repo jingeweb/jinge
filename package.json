@@ -3,11 +3,10 @@
   "version": "3.0.0",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
   "main": "lib/index.js",
-  "types": "types/index.d.ts",
   "scripts": {
+    "parse_g4": "node ./compiler/template/parse_g4.js",
     "watch": "tsc -w",
     "ts": "rm -rf ./lib && tsc",
-    "build": "npm run ts && npm run rollup && COMPRESS=true npm run rollup",
     "lint": "eslint './{src,compiler}/**/*.{js,ts}' --fix",
     "lint-staged": "lint-staged",
     "prepare": "husky install"

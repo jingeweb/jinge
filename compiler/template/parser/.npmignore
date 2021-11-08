@@ -1,3 +1,4 @@
 *.g4
 *.tokens
+*.interp
 .antlr

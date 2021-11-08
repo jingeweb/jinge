@@ -1,6 +1,6 @@
-const antlr = require('antlr4/index');
-const { TemplateParser } = require('./parser/TemplateParser');
-const { TemplateLexer } = require('./parser/TemplateLexer');
+const antlr = require('antlr4');
+const TemplateParser = require('./parser/TemplateParser');
+const TemplateLexer = require('./parser/TemplateLexer');
 
 function parse(source) {
   const lexer = new TemplateLexer(new antlr.InputStream(source));

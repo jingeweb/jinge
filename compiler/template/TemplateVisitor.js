@@ -5,14 +5,14 @@ const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
 const SVGTags = require('svg-tags');
-const HTMLEntities = new (require('html-entities').AllHtmlEntities)();
+const { decode } = require('html-entities');
 const { i18nManager } = require('../i18n');
 const { sharedOptions } = require('../options');
 const { replaceTplStr, prependTab, attrN, isSimpleProp } = require('../util');
 const { aliasManager } = require('./alias');
 const { parse } = require('./helper');
-const { TemplateParserVisitor } = require('./parser/TemplateParserVisitor');
-const { TemplateParser } = require('./parser/TemplateParser');
+const TemplateParserVisitor = require('./parser/TemplateParserVisitor');
+const TemplateParser = require('./parser/TemplateParser');
 const { AttributeValueParser } = require('./AttributeValueParser');
 const { HTML_BOOL_IDL_ATTRS, HTML_COMMON_IDL_ATTRS } = require('./const');
 const TPL = require('./tpl');
@@ -140,7 +140,9 @@ class TemplateVisitor extends TemplateParserVisitor {
   }
 
   _parse_listener(str, mode, tag) {
-    const tree = acorn.Parser.parse(`function _() {\n ${str} \n}`);
+    const tree = acorn.Parser.parse(`function _() {\n ${str} \n}`, {
+      ecmaVersion: 2020,
+    });
     const block = tree.body[0].body;
     if (block.type !== 'BlockStatement') throw new Error('unimpossible?!');
 
@@ -1823,6 +1825,7 @@ function _notify_${lv_id}() {
     try {
       expr = acorn.Parser.parse(txt, {
         locations: true,
+        ecmaVersion: 2020,
       });
     } catch (ex) {
       this._throwParseError(ctx.start, 'expression grammar error.');
@@ -1900,7 +1903,7 @@ ${body}
       if (cn.ruleIndex === TemplateParser.RULE_htmlText) {
         if (!txt.trim()) return;
         try {
-          txt = HTMLEntities.decode(txt);
+          txt = decode(txt);
         } catch (ex) {
           this._throwParseError(ctx.start, ex.message);
         }
@@ -1998,6 +2001,7 @@ ${body}
       tree = acorn.Parser.parse(code, {
         locations: true,
         sourceType: 'module',
+        ecmaVersion: 2020,
       });
     } catch (ex) {
       this._webpackLoaderContext.emitError(
