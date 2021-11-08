@@ -150,7 +150,7 @@ class JingeWebpackPlugin {
         if (
           ems.length > 1 &&
           ems.filter((em) => {
-            return em.resource && em.resource.indexOf('webpack-dev-server/') < 0;
+            return em.resource && em.resource.indexOf('/node_modules/') < 0;
           }).length > 1
         ) {
           compilation.warnings.push(new Error('UNEXPECTED: number of entry modules is greater than 1.'));
