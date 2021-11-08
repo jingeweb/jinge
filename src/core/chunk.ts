@@ -19,7 +19,7 @@ export interface ResourceMeta {
 const fileCache = new Map();
 
 function loadLink(href: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     if (fileCache.has(href)) {
       return resolve();
     }

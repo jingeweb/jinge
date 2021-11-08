@@ -438,13 +438,13 @@ export function createViewModel<T>(target: T): T & ViewModelObject {
     const isArr = isArray(target);
     const rtn = wrapProxy(target, isArr) as T & ViewModelObject;
     if (isArr) {
-      for (let i = 0; i < (target as ViewModelObject[]).length; i++) {
-        wrapProp(target as ViewModelObject, (target as ViewModelObject[])[i], i);
+      for (let i = 0; i < (target as unknown as ViewModelObject[]).length; i++) {
+        wrapProp(target as unknown as ViewModelObject, (target as unknown as ViewModelObject[])[i], i);
       }
     } else {
       for (const k in target) {
         if (isPublicProperty(k)) {
-          wrapProp(target as ViewModelObject, (target as Record<string, ViewModelObject>)[k], k);
+          wrapProp(target as unknown as ViewModelObject, (target as unknown as Record<string, ViewModelObject>)[k], k);
         }
       }
     }
@@ -463,7 +463,7 @@ export function createAttributes<T>(attributes: T): T & ViewModelObject {
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
   vmCore.__notifiable = false;
   // eslint-disable-next-line @typescript-eslint/ban-types
-  return (vmCore.proxy = new Proxy(attributes as object, {
+  return (vmCore.proxy = new Proxy(attributes as unknown as object, {
     set: attrsPropSetHandler,
   })) as T & ViewModelObject;
 }
@@ -498,9 +498,9 @@ export function createComponent<T>(component: T): T {
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
   vmCore.__notifiable = false;
   // eslint-disable-next-line @typescript-eslint/ban-types
-  return (vmCore.proxy = new Proxy(component as object, {
+  return (vmCore.proxy = new Proxy(component as unknown as object, {
     set: componentPropSetHandler,
-  }) as T);
+  }) as unknown as T);
 }
 
 export function vm<T>(target: T): T & ViewModelObject {
