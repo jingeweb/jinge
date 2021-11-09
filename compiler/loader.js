@@ -49,8 +49,8 @@ function jingeLoader(source, sourceMap) {
   const opts = this.query || {};
 
   if (!inited) {
-    if (!resourcePath.endsWith('.js')) {
-      return callback(new Error('Entry must be .js file'));
+    if (!/\.(ts|js)$/.test(resourcePath)) {
+      return callback(new Error('Entry must be .js or .ts file'));
     }
     if (!('webpackVersion' in sharedOptions)) {
       sharedOptions.webpackVersion = getWebpackVersion(this._compiler);
@@ -83,8 +83,8 @@ function jingeLoader(source, sourceMap) {
       resourcePath,
     };
   } else {
-    if (!/\.(js|html)$/.test(resourcePath)) {
-      return callback(new Error('jingeLoader only support .js,.html,.css,.less,.scss file'));
+    if (!/\.(ts|js|html)$/.test(resourcePath)) {
+      return callback(new Error('jingeLoader only support .ts,.js,.html,.css,.less,.scss file'));
     }
 
     parseOpts = {
