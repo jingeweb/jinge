@@ -339,7 +339,7 @@ const ArrayFns = {
     return el;
   },
   push(target: ViewModelArray, ...args: ViewModelArray): number {
-    if (args.length === 0) return target.push();
+    if (args.length === 0) return 0;
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'push')) {
         addParent(arg[$$], target[$$], target.length + i);
@@ -347,7 +347,7 @@ const ArrayFns = {
     });
     const rtn = target.push(...args);
     notifyPropChanged(target, 'length');
-    for (let i = target.length - 1 - args.length; i < target.length; i++) {
+    for (let i = target.length - args.length; i < target.length; i++) {
       notifyPropChanged(target, i);
     }
     return rtn;
