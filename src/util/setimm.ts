@@ -47,17 +47,14 @@ function runIfPresent(handle: number): void {
   }
 }
 
-declare global {
-  interface Window {
-    setImmediate: (callback: () => void) => number;
-    clearImmediate: (immediate: number) => void;
-  }
-}
-
-if (isUndefined(window.setImmediate)) {
+const win = (typeof window === 'undefined' ? globalThis : window) as unknown as Window & {
+  setImmediate: (callback: () => void) => number;
+  clearImmediate: (immediate: number) => void;
+};
+if (isUndefined(win.setImmediate)) {
   tasksByHandle = new Map();
   const messagePrefix = 'setImmediate$' + (autoIncrement++).toString(32) + '$';
-  window.addEventListener(
+  win.addEventListener(
     'message',
     (event) => {
       if (event.source === window && isString(event.data) && event.data.startsWith(messagePrefix)) {
@@ -68,9 +65,9 @@ if (isUndefined(window.setImmediate)) {
   );
 
   registerImmediate = function (handle: number): void {
-    window.postMessage(messagePrefix + handle, '*');
+    win.postMessage(messagePrefix + handle, '*');
   };
 }
 
-export const setImmediate = window.setImmediate || setImmediateFallback;
-export const clearImmediate = window.clearImmediate || clearImmediateFallback;
+export const setImmediate = win.setImmediate || setImmediateFallback;
+export const clearImmediate = win.clearImmediate || clearImmediateFallback;
