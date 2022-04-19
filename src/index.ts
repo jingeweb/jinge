@@ -1,2 +1,4 @@
-import './__register_i18n_render_deps';
-export * from './__export';
+export * from './components';
+export * from './core';
+export * from './util';
+export * from './vm';

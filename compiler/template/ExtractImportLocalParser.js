@@ -1,4 +1,4 @@
-const antlr = require('antlr4');
+const antlr = require('antlr4-build');
 const ImportParser = require('./parser/ImportParser');
 const ImportLexer = require('./parser/ImportLexer');
 
@@ -21,9 +21,9 @@ class ExtractImportLocalParser extends ImportParser {
         // console.log(args.length);
         meetErr = true;
       },
-      reportContextSensitivity() {},
-      reportAttemptingFullContext() {},
-      reportAmbiguity() {},
+      // reportContextSensitivity() {},
+      // reportAttemptingFullContext() {},
+      // reportAmbiguity() {},
     });
     parser.buildParseTrees = false;
     parser.stmts();

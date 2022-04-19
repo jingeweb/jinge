@@ -1,7 +1,6 @@
 const path = require('path');
 const _util = require('./util');
 const { sharedOptions, checkCompressOption, getWebpackVersion } = require('./options');
-const { styleManager } = require('./style');
 const { i18nManager, i18nRenderDepsRegisterFile } = require('./i18n');
 
 const PLUGIN_NAME = 'JINGE_EXTRACT_PLUGIN';
@@ -34,20 +33,6 @@ class JingeWebpackPlugin {
       );
     }
 
-    const styleOptions = sharedOptions.style;
-    if (!styleOptions) {
-      sharedOptions.style = {
-        extract: false,
-      };
-    } else {
-      sharedOptions.style = Object.assign(
-        {
-          extract: true,
-          keepComments: false,
-        },
-        styleOptions,
-      );
-    }
     const chunkOptions = sharedOptions.chunk;
     if (!chunkOptions) {
       sharedOptions.chunk = {
@@ -114,7 +99,7 @@ class JingeWebpackPlugin {
           });
         });
         compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, () => {
-          styleManager.handleMultiChunk(compilation);
+          // styleManager.handleMultiChunk(compilation);
           if (!i18nManager.written) {
             i18nManager.handleMultiChunk(compilation);
           }
@@ -125,7 +110,7 @@ class JingeWebpackPlugin {
         if (sharedOptions.i18n) {
           i18nManager.writeOutput(compilation);
         }
-        styleManager.writeOutput(compilation);
+        // styleManager.writeOutput(compilation);
         if (sharedOptions.chunk.writeInfo) {
           this._writeChunkInfo(compilation);
         }
@@ -198,7 +183,7 @@ class JingeWebpackPlugin {
       });
     }
 
-    handleChunkMap(styleManager.outputChunks, info.style);
+    // handleChunkMap(styleManager.outputChunks, info.style);
     i18nManager.outputChunks.forEach((chunksMap, locale) => {
       if (!info.locale[locale]) info.locale[locale] = { entry: '', chunks: {} };
       handleChunkMap(chunksMap, info.locale[locale]);

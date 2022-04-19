@@ -6,19 +6,17 @@ import { $$ } from '../vm/common';
 export class I18nComponent extends Component {
   _key: string;
   _vms: unknown[];
-  _sty: string;
 
-  constructor(attrs: ComponentAttributes, renderKey: string, cstyId: string, renderVms: unknown[]) {
+  constructor(attrs: ComponentAttributes, renderKey: string, renderVms: unknown[]) {
     super(attrs);
     this._key = renderKey;
-    this._sty = cstyId;
     this._vms = renderVms;
     this.__i18nWatch(this._onchange);
   }
 
   __render(): Node[] {
     const renderFn = i18nService.__r(this._key, 'components');
-    return renderFn(this, this._sty, ...this._vms);
+    return renderFn(this, ...this._vms);
   }
 
   _onchange(): void {

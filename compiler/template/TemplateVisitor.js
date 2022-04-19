@@ -1,6 +1,6 @@
-const escodegen = require('escodegen');
 const path = require('path');
 const crypto = require('crypto');
+const escodegen = require('escodegen');
 const acorn = require('acorn');
 const acornWalk = require('acorn-walk');
 const HTMLTags = require('html-tags');
@@ -37,14 +37,6 @@ const KNOWN_ATTR_TYPES = [
   '_t',
 ];
 
-function genCstylePid(pid, sid, underI18n) {
-  if (!pid && !sid) return '';
-  else if (pid && sid)
-    return `compStyle: {...${pid}, [cstyId${underI18n ? ' || ""' : ''}]: ${underI18n ? 'cstyId || null' : '""'}},`;
-  else if (pid) return `compStyle: ${pid} ? { ...${pid} } : null,`;
-  else return `compStyle: {[cstyId${underI18n ? ' || ""' : ''}]: ${underI18n ? 'cstyId || null' : '""'}},`;
-}
-
 let cachedImportPostfix = '';
 
 class TemplateVisitor extends TemplateParserVisitor {
@@ -71,7 +63,6 @@ class TemplateVisitor extends TemplateParserVisitor {
     };
     this._aliasImports = {};
     this._needHandleComment = true;
-    this._cstyId = opts.componentStyleId;
     this._parent = {
       type: 'component',
       sub: 'root',
@@ -765,110 +756,15 @@ class TemplateVisitor extends TemplateParserVisitor {
       : '';
     const pushEleCode = this._parent.type === 'component' ? this._replace_tpl(TPL.PUSH_ROOT_ELE) : '';
 
-    /**
-     * 在某个组件（假设为 A 组件）的模板文件（假设为 a.html）里，任意一个 html 元素（假设为 x 元素）只会有以下四种情况：
-     *
-     * 1：x 是模板文件里的根节点，或某个 html 元素的根子节点。x 没有 slot-use: 或 slot-pass: 类型的属性。例如：
-     *
-     * ````html
-     * <!-- a.html -->
-     * <x/> <!-- 模板文件的根节点 -->
-     * <div><x/></div> <!-- 某个 html 元素的根子节点- -->
-     * <B><span><x/></span></B> <!-- 某个 html 元素的根子节点 -->
-     * ````
-     *
-     * 这种情况下， x 会被添加 A 组件的 component style。同时，如果 x 是 a.html 文件的根子节点，还会继承 A 组件继承下来的 component style。
-     *
-     * 2：x 是 <_slot slot-use:? /> 的根子节点，或等价的情况， x 有 slot-use: 类型的属性。例如：
-     *
-     * ````html
-     * <!-- a.html -->
-     * <_slot slot-use:default><x/></_slot>
-     * <div><x slot-use:default/></div>
-     * ````
-     *
-     * 这种情况下，x 会被添加 A 组件的 component style。如果 <_slot> 是 a.html 的根子节点，则 x 需要继承  <_slot> 继承的 component style，而 <_slot> 是根子节点会继承  A，因此 x 最终实际继承 A 组件继承的 component style。
-     * 为了简化代码逻辑，实际的代码逻辑，不论 _slot 是否是根子节点 ，x 始终继承 <_slot/> 继承的 component style。
-     *
-     * 3：x 是 <_slot slot-pass:/> 的根子节点，或等价的，x 有 slot-pass: 类型的属性。例如：
-     *
-     * ````html
-     * <!-- a.html -->
-     * <B><_slot slot-pass:default><x/></_slot></B>
-     * <div><B><x slot-pass:default/><x/></B></div>
-     * ````
-     *
-     * 这种情况下，x 元素实际会被作为 slot 传递给另一个组件（假设为 B 组件）。因此，x 除了会被添加 A 组件的 component style 外，还需要继承 B 组件的 component style，但不需要继承 A 组件继承的 component style。（有个特例是，如果 B 组件在 a.html 模板里是根子节点，则它会继承 A 组件的 component style，这种情况下 x 最终也会继承下来 A 的 component style）。
-     *
-     * 4：x 是另一个组件（假设为 B 组件）的根子节点，或 x 是多语言 <_t> 元素的根子节点。例如：
-     *
-     * ````html
-     * <!-- a.html -->
-     * <B><x/><span>hello</span></B>
-     * <_t><x/></_t>
-     * ````
-     *
-     * 这种情况下，本质等价于：
-     *
-     * ````html
-     * <!-- a.html -->
-     * <B><_slot slot-pass:default><x/><span>hello</span></_slot></B>
-     * <I18nComponent><_slot slot-pass:default><x/></_slot></I18nComponent>
-     * ````
-     *
-     * 因此，只需要按上述第 3 点的情况处理 component style 即可。
-     *
-     */
-    // 综合上述逻辑，只要 html 元素上有 slot-pass: 类型的属性，或者 html 元素是
-    // component（包括 _slot 和组件元素） 的根子节点，都需要继承上下文父元素的 component style。
-    const needAddParentStyId = result.argPass || this._parent.type === 'component';
-    /**
-     * 如果当前模板有 component style，则需要将该 style 添加到 html 元素上。
-     * 但需要注意，在多语言环境下，不同的模板文件可能复用局部的 <_t> 代码。比如：
-     *
-     * ````html
-     * <!-- A 组件： a.html -->
-     * <_t><p>Hello</_t>
-     * ````
-     *
-     * 和：
-     *
-     * ````html
-     * <!-- B 组件： b.html -->
-     * <_t><p>Hello</_t>
-     * ````
-     *
-     * 这两个组件，会复用 <p>Hello</p> 这个多语言资源，这个元素的渲染代码实际会被
-     * 抽取到多语言资源包文件里，这种情况下，是无法在编译的时候就知道 p 元素是否需要
-     * 添加模板的 component style 以及该添加哪个模板（a.html 还是 b.html）的 component style。
-     *
-     * 因此在多语言的情况下，编译时生成的代码始终添加 component style，但实际运行时
-     * 判断 component style id 是否存在。
-     */
-    const needTplStyId = this._cstyId || this._underMode_T;
-
     const ceFn = `create${this._parent.isSVG || etag === 'svg' ? 'SVG' : ''}Element${
-      result.constAttrs.length > 0 || needTplStyId || needAddParentStyId ? '' : 'WithoutAttrs'
+      result.constAttrs.length > 0 ? '' : 'WithoutAttrs'
     }`;
     const ce = `${ceFn}${sharedOptions.symbolPostfix}`;
     const arr = [`"${etag}"`];
-    if (result.constAttrs.length > 0 || needTplStyId) {
+    if (result.constAttrs.length > 0) {
       const attrsArr = result.constAttrs.map((at) => `  ${attrN(at[0])}: ${JSON.stringify(at[1])}`);
-      if (needTplStyId) {
-        if (this._underMode_T) {
-          attrsArr.push(`[cstyId || ""]: cstyId ? "" : null`);
-        } else {
-          attrsArr.push(`[cstyId]: ""`);
-        }
-      }
       const attrsCode = `{\n${attrsArr.join(',\n')}\n}`;
-      if (needAddParentStyId) {
-        arr.push(`Object.assign(${attrsCode}, component[__${sharedOptions.symbolPostfix}].compStyle)`);
-      } else {
-        arr.push(attrsCode);
-      }
-    } else if (needAddParentStyId) {
-      arr.push(`component[__${sharedOptions.symbolPostfix}].compStyle`);
+      arr.push(attrsCode);
     }
     arr.push(this._join_elements(elements));
     let code;
@@ -925,10 +821,8 @@ ${result.translateAttrs
 ${result.listeners
   .map((lt) => {
     return `addEvent${sharedOptions.symbolPostfix}(el, '${lt[0]}', function(...args) {${lt[1].code}${
-      lt[1].tag && lt[1].tag.stop ? ';args[0].stopPropagation()' : ''
-    }${lt[1].tag && lt[1].tag.prevent ? ';args[0].preventDefault()' : ''}}${
-      lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''
-    })`;
+      lt[1].tag?.stop ? ';args[0].stopPropagation()' : ''
+    }${lt[1].tag?.prevent ? ';args[0].preventDefault()' : ''}}${lt[1].tag ? `, ${JSON.stringify(lt[1].tag)}` : ''})`;
   })
   .join('\n')}
 ${setRefCode}
@@ -1057,11 +951,6 @@ return el;`,
           this._replace_tpl(this._parent.type === 'component' ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE),
         ),
         ARG_USE: argUse.fn,
-        CSTYLE_PID: genCstylePid(
-          this._parent.type === 'component' ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '',
-          this._cstyId,
-          this._underMode_T,
-        ),
         DEFAULT: elements.length > 0 ? this._prependTab(this._gen_render(elements, vmLevel)) : 'null',
       }),
     };
@@ -1181,7 +1070,7 @@ return el;`,
       };
     }
 
-    const args = ['component', 'cstyId', 'vm_0', ...this._vms.map((vm, i) => `vm_${i + 1}`)];
+    const args = ['component', 'vm_0', ...this._vms.map((vm, i) => `vm_${i + 1}`)];
     const registerI18N = (renderOfContentNodes) => {
       [
         new RegExp(`[\\w\\d$_]+${sharedOptions.symbolPostfix}`, 'g'),
@@ -1248,15 +1137,6 @@ ${prependTab(renderOfContentNodes, true, 4)}
       PUSH_ELE: this._replace_tpl(isParentComponent ? TPL.PUSH_ROOT_ELE : TPL.PUSH_COM_ELE),
       RENDER_KEY: JSON.stringify(key),
       VMS: args.slice(2).join(', '),
-      CSTYLE_PID: genCstylePid(
-        isParentComponent ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '',
-        // _t 对应的 I18n 组件，只需要处理从父组件继承的 component style，
-        // 不需要添加模板的 cstyId。
-        false,
-        false,
-      ),
-      // 模板的 cstyId 单独传递给组件作特殊处理。
-      CSTYID: this._cstyId ? `cstyId` : 'null',
     });
 
     return {
@@ -1326,16 +1206,9 @@ ${prependTab(renderOfContentNodes, true, 4)}
     result.constAttrs.length > 0 &&
       attrs.push(...result.constAttrs.map((at) => `${attrN(at[0])}: ${JSON.stringify(at[1])}`));
 
-    const needAddParentStyId = result.argPass || this._parent.type === 'component';
-    const cstyle = genCstylePid(
-      needAddParentStyId ? `component[__${sharedOptions.symbolPostfix}].compStyle` : '',
-      this._underMode_T ? true : this._cstyId,
-      this._underMode_T,
-    );
     const vmAttrs = `const attrs = attrs${sharedOptions.symbolPostfix}({
   [__${sharedOptions.symbolPostfix}]: {
 ${!this._isProdMode ? `    debugName: "attrs_of_<${tag}>",` : ''}
-${cstyle ? '    ' + cstyle : ''}
 ${this._prependTab(`  context: component[__${sharedOptions.symbolPostfix}].context,`)}
 ${
   result.listeners.length > 0
@@ -1853,12 +1726,7 @@ function _notify_${lv_id}() {
   }
 
   _gen_render(elements, vmLevel = -1) {
-    const body = this._prependTab(`${
-      vmLevel >= 0
-        ? `const vm_${vmLevel} = component;
-${this._cstyId ? `const cstyId = "${this._cstyId}";` : ''}`
-        : ''
-    }
+    const body = this._prependTab(`${vmLevel >= 0 ? `const vm_${vmLevel} = component;` : ''}
 return [
 ${this._join_elements(elements)}
 ];`);

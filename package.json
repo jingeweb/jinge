@@ -1,15 +1,17 @@
 {
   "name": "jinge",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
   "main": "lib/index.js",
+  "types": "src/index.ts",
   "scripts": {
-    "parse_g4": "node ./compiler/template/parse_g4.js",
-    "watch": "tsc -w",
-    "ts": "rm -rf ./lib && tsc",
-    "lint": "eslint './{src,compiler}/**/*.{js,ts}' --fix",
+    "g4": "node ./scripts/parse_g4.js",
+    "lib": "node ./scripts/gen_lib.js",
+    "build": "npm run g4 && npm run lib",
+    "lint": "tsc --noEmit && eslint './{src,compiler}/**/*.{js,ts}' --fix",
     "lint-staged": "lint-staged",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "prepublish": "npm run build"
   },
   "lint-staged": {
     "*.{js,ts}": "eslint --fix"
@@ -29,31 +31,30 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "dependencies": {
-    "acorn": "^8.6.0",
+    "acorn": "^8.7.0",
     "acorn-walk": "^8.2.0",
-    "antlr4": "^4.9.3",
-    "clean-css": "^5.2.2",
-    "csv-parse": "^5.0.3",
-    "csv-stringify": "^6.0.4",
+    "antlr4-build": "4.10.1-beta.9",
+    "clean-css": "^5.3.0",
+    "csv-parse": "^5.0.4",
+    "csv-stringify": "^6.0.5",
     "escodegen": "^2.0.0",
-    "html-entities": "^2.3.2",
-    "html-tags": "^3.1.0",
-    "postcss": "^7.0.39",
-    "postcss-discard-comments": "^4.0.2",
-    "postcss-prettify": "^0.3.4",
-    "postcss-selector-parser": "^6.0.6",
+    "html-entities": "^2.3.3",
+    "html-tags": "^3.2.0",
     "svg-tags": "^1.0.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.4.0",
-    "@typescript-eslint/parser": "^5.4.0",
-    "eslint": "^8.3.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-import": "^2.25.3",
+    "@typescript-eslint/eslint-plugin": "^5.20.0",
+    "@typescript-eslint/parser": "^5.20.0",
+    "esbuild": "^0.14.38",
+    "eslint": "^8.13.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-import-resolver-typescript": "^2.7.1",
+    "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-prettier": "^4.0.0",
+    "glob": "^8.0.1",
     "husky": "^7.0.4",
-    "lint-staged": "^12.1.2",
-    "prettier": "^2.4.1",
-    "typescript": "^4.5.2"
+    "lint-staged": "^12.4.0",
+    "prettier": "^2.6.2",
+    "typescript": "^4.6.3"
   }
 }

@@ -1,17 +1,13 @@
+const path = require('path');
 const { Parser } = require('acorn');
 const acornWalk = require('acorn-walk');
 const escodegen = require('escodegen');
-const path = require('path');
 const { sharedOptions } = require('../options');
 const { TemplateParser } = require('../template');
-const { CSSParser, styleManager } = require('../style');
-const { prependTab, isString, isArray, arrayIsEqual, getJingeBase, KeyGenerator } = require('../util');
+const { prependTab, isString, isArray, arrayIsEqual, getJingeBase } = require('../util');
 const { i18nManager } = require('../i18n');
 const baseManager = require('./base');
 const { _n_vm, _n_wrap } = require('./helper');
-
-// html attribute is case insensitive
-const cstyKeyGenerator = new KeyGenerator('abcdefghijklmnopqrstuvwxyz0123456789', '_');
 
 class ComponentParser {
   static parse(content, sourceMap, options) {
@@ -24,11 +20,9 @@ class ComponentParser {
     this.webpackLoaderContext = options.webpackLoaderContext;
     this._localStore = {
       templates: new Map(),
-      styles: new Map(),
     };
     if (!this.webpackLoaderContext) throw new Error('unimpossible?!');
 
-    this.styleRequireScoped = !!options.styleRequireScoped;
     this._constructorRanges = [];
     this._replaces = null;
     this._needHandleI18NTranslate = false;
@@ -61,6 +55,9 @@ class ComponentParser {
   }
 
   async walkImport(node) {
+    if (node.specifiers.length === 0) {
+      return false;
+    }
     let source = null;
     let testSource = node.source.value;
     if (!/\.\w+$/.test(testSource)) {
@@ -68,19 +65,6 @@ class ComponentParser {
       testSource = source;
     }
     const _isHtml = /\.htm(?:l)?$/.test(testSource);
-    const _isStyle = !_isHtml && /\.(css|less|scss|sass)$/.test(testSource);
-    if (node.specifiers.length === 0) {
-      if (_isStyle) {
-        source = source || (await this._resolve(node));
-        if (!styleManager.extractStyles.has(source)) {
-          styleManager.extractStyles.set(source, {
-            css: null,
-            map: null,
-          });
-        }
-      }
-      return false;
-    }
     let needHandleComponent = false;
     for (let i = 0; i < node.specifiers.length; i++) {
       const spec = node.specifiers[i];
@@ -101,15 +85,12 @@ class ComponentParser {
         continue;
       }
 
-      if (_isHtml || _isStyle) {
+      if (_isHtml) {
         if (!source) {
           source = await this._resolve(node);
         }
         if (_isHtml) {
           this._localStore.templates.set(local, source);
-        } else {
-          // debugger;
-          this._localStore.styles.set(local, source);
         }
         return false;
       }
@@ -160,7 +141,6 @@ class ComponentParser {
     }
 
     let tplNode;
-    let styNode;
 
     for (let i = 0; i < node.body.body.length; i++) {
       const mem = node.body.body[i];
@@ -171,66 +151,29 @@ class ComponentParser {
         if (mem.key.name === 'template') {
           // this.walkTemplate(mem);
           tplNode = mem;
-        } else if (mem.key.name === 'style') {
-          styNode = mem;
         }
-      }
-    }
-
-    let styInfo;
-    if (styNode) {
-      if (this._previousClassWithSty) {
-        // 当前版本限定一个文件只能注册一次 component style
-        throw new Error(
-          `A file can only have one class with component style. But both ${this._previousClassWithSty} and ${node.id.name} have component style in ${this.resourcePath}. see https://todo.`,
-        );
-      }
-      this._previousClassWithSty = node.id.name;
-      const csm = styleManager.components;
-      if (!csm.has(this.resourcePath)) {
-        const sid = cstyKeyGenerator.generate(this.resourcePath);
-        if (sid.indexOf('_') >= 0) {
-          this.webpackLoaderContext.emitWarning(new Error(`${this.resourcePath} has conflict hashed style id: ${sid}`));
-        }
-        csm.set(this.resourcePath, {
-          id: (sharedOptions.style.attrPrefix || '_') + sid,
-        });
-      }
-      const sty = this.walkStyle(styNode, csm.get(this.resourcePath));
-      if (sty) {
-        const sts = styleManager.styles;
-        styInfo = sts.get(sty.file);
-        if (styInfo && styInfo.component !== this.resourcePath) {
-          throw new Error(
-            `style file '${sty.file}' has been attached by component '${styInfo.component}', can't be used in '${this.resourcePath}'`,
-          );
-        }
-        if (!styInfo) {
-          styInfo = {
-            component: this.resourcePath,
-            styleId: sty.id,
-          };
-        }
-        // console.log(source, styInfo, '\n---\n');
-        sts.set(sty.file, styInfo);
       }
     }
 
     if (tplNode) {
-      this.walkTemplate(tplNode, styInfo);
+      this.walkTemplate(tplNode);
     }
   }
 
   _addI18nImports() {
-    this._tplCodeOfImports.add(`import {
-  i18n as __i18n${sharedOptions.symbolPostfix}
-} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'core')}';`);
+    this._tplCodeOfImports.add(
+      `import { i18n as __i18n${sharedOptions.symbolPostfix} } from '${
+        this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'core')
+      }';`,
+    );
   }
 
   _addConstructorImports() {
-    this._tplCodeOfImports.add(`import {
-  $$ as __$$${sharedOptions.symbolPostfix}
-} from '${this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'vm/common')}';`);
+    this._tplCodeOfImports.add(
+      `import { $$ as __$$${sharedOptions.symbolPostfix} } from '${
+        this.jingeBase === 'jinge' ? 'jinge' : path.join(this.jingeBase, 'vm/common')
+      }';`,
+    );
   }
 
   _parse_mem_path(memExpr, attrsName) {
@@ -390,48 +333,7 @@ class ComponentParser {
     });
   }
 
-  walkStyle(node, ci) {
-    if (node.value.body.body.length === 0) throw new Error('static getter `style` must return.');
-    const st = node.value.body.body[0];
-    if (st.type !== 'ReturnStatement') {
-      throw new Error('static getter `style` must return directly.');
-    }
-    const arg = st.argument;
-    if (arg.type === 'Identifier') {
-      if (!this._localStore.styles.has(arg.name)) {
-        throw new Error('static getter `style` must return variable imported on file topest level.');
-      }
-      return {
-        file: this._localStore.styles.get(arg.name),
-        id: ci.id,
-      };
-    }
-    let css;
-    if (arg.type === 'Literal') {
-      css = arg.value;
-    } else if (arg.type === 'TemplateLiteral') {
-      if (arg.expressions.length > 0)
-        throw new Error('static getter `template` must not return template string with expression.');
-      css = arg.quasis[0].value.cooked;
-    } else {
-      throw new Error('static getter `style` must return css code');
-    }
-    css = CSSParser.parseInline(css, {
-      resourcePath: this.resourcePath,
-      styleId: ci.id,
-    });
-    this._replaces.push({
-      start: arg.start,
-      end: arg.end,
-      code: css.code,
-    });
-    return {
-      file: this.resourcePath,
-      id: ci.id,
-    };
-  }
-
-  walkTemplate(node, styInfo) {
+  walkTemplate(node) {
     if (node.value.body.body.length === 0) throw new Error('static getter `template` must return.');
     const st = node.value.body.body[0];
     if (st.type !== 'ReturnStatement') {
@@ -443,27 +345,6 @@ class ComponentParser {
       if (!this._localStore.templates.has(arg.name)) {
         throw new Error('static getter `template` must return variable imported on file topest level.');
       }
-      const source = this._localStore.templates.get(arg.name);
-      const tps = styleManager.templates;
-      const tplInfo = tps.get(source);
-      if (!tplInfo) {
-        tps.set(source, {
-          component: this.resourcePath,
-          styleId: styInfo ? styInfo.styleId : null,
-        });
-        // console.log(source, this.resourcePath, styInfo);
-        return;
-      }
-      if (tplInfo.styleId && this.resourcePath !== tplInfo.component) {
-        throw new Error(
-          `template file '${source}' has been attached by component with scoped style '${tplInfo.component}', can't be used in '${this.resourcePath}'`,
-        );
-      }
-      if (styInfo && this.resourcePath !== styInfo.component) {
-        throw new Error(
-          `template file '${source}' has been attached by component '${tplInfo.component}', can't be use in '${this.resourcePath}' as this component has scoped style.`,
-        );
-      }
       return;
     } else if (arg.type === 'Literal') {
       tpl = arg.value;
@@ -474,9 +355,7 @@ class ComponentParser {
     } else {
       throw new Error(`Type '${arg.type}' of return in static getter 'template' is not support.`);
     }
-
     const result = TemplateParser._parse(tpl, {
-      componentStyleId: styInfo ? styInfo.styleId : null,
       baseLinePosition: arg.loc.start.line,
       resourcePath: this.resourcePath,
       webpackLoaderContext: this.webpackLoaderContext,

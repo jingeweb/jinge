@@ -14,10 +14,9 @@ export function createTextNode(text: unknown = ''): Text {
 
 export function createFragment(children?: (Node | string)[]): DocumentFragment {
   const f = document.createDocumentFragment();
-  children &&
-    children.forEach((n) => {
-      f.appendChild(isString(n) ? document.createTextNode(n as string) : (n as Node));
-    });
+  children?.forEach((n) => {
+    f.appendChild(isString(n) ? document.createTextNode(n as string) : (n as Node));
+  });
   return f;
 }
 

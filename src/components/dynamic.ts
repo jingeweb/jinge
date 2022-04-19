@@ -17,7 +17,6 @@ function createEl(component: DynamicRenderComponent): Component {
     [__]: {
       slots: null,
       context: component[__].context,
-      compStyle: component[__].compStyle,
     },
   });
   if (!Clazz) {

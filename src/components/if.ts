@@ -10,16 +10,11 @@ import {
 import { TransitionStates, getDurationType } from '../core/transition';
 import { createFragment, addEvent, setImmediate, removeEvent } from '../util';
 
-function createEl(
-  renderFn: RenderFn,
-  context: Record<string | symbol, unknown>,
-  parentComponentStyles: Record<string, string>,
-): Component {
+function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>): Component {
   return Component.create(
     attrs({
       [__]: {
         context,
-        compStyle: parentComponentStyles,
         slots: {
           default: renderFn,
         },
@@ -48,7 +43,7 @@ function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
     roots.push(document.createComment('empty'));
     return roots as Node[];
   }
-  const el = createEl(renderFn, component[__].context, component[__].compStyle);
+  const el = createEl(renderFn, component[__].context);
   roots.push(el);
   return el.__render();
 }
@@ -61,7 +56,7 @@ function doUpdate(component: IfComponent | SwitchComponent): void {
   const parentDOM = (isComp ? firstDOM : (el as Node)).parentNode;
   const renderFn = component[__].slots?.[component._currentValue];
   if (renderFn) {
-    const newEl = createEl(renderFn, component[__].context, component[__].compStyle);
+    const newEl = createEl(renderFn, component[__].context);
     const nodes = assertRenderResults((newEl as Component).__render());
     parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
     roots[0] = newEl;

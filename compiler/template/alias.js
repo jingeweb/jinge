@@ -52,7 +52,7 @@ class ComponentAliasManager {
         .createHmac('sha256', 'component-alias-postfix')
         .update(sharedOptions.symbolPostfix)
         .digest('hex')
-        .substr(0, 12);
+        .slice(0, 12);
     if (Array.isArray(componentAlias)) {
       componentAlias = Object.assign({}, ...componentAlias);
     }
@@ -78,7 +78,7 @@ class ComponentAliasManager {
         throw new Error('component base source must be absolute path or package under node_modules');
       }
       const hash = crypto.createHash('md5');
-      const postfix = '_' + hash.update(source).digest('hex').substr(0, 12) + this.aliasPostfix;
+      const postfix = '_' + hash.update(source).digest('hex').slice(0, 12) + this.aliasPostfix;
       Object.keys(m).map((c, i) => {
         if (!(c in this.localMap[source])) {
           this.localMap[source][c] = (c === 'default' ? 'Component_default_' + i : c) + postfix;

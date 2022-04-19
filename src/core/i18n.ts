@@ -110,6 +110,7 @@ class I18nService extends Messenger {
    * This method will be called by compiler generated code, don't call it manully.
    */
   __regDep(idx: number, depent: unknown): void {
+    debugger;
     const deps = this.__deps || (this.__deps = []);
     if (deps[idx]) {
       if (deps[idx] !== depent) throw new Error(`conflict at ${idx}`);

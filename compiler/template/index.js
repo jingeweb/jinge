@@ -1,6 +1,5 @@
 const { replaceTplStr } = require('../util');
 const { sharedOptions } = require('../options');
-const { styleManager } = require('../style');
 const { parse } = require('./helper');
 const { aliasManager } = require('./alias');
 const { TemplateVisitor } = require('./TemplateVisitor');
@@ -53,8 +52,6 @@ class JingeTemplateParser {
   constructor(options) {
     this.resourcePath = options.resourcePath;
     this.baseLinePosition = options.baseLinePosition || 1;
-    const info = styleManager.templates.get(this.resourcePath);
-    this.componentStyleId = options.componentStyleId || (info ? info.styleId : null);
     this.webpackLoaderContext = options.webpackLoaderContext;
   }
 
@@ -84,7 +81,6 @@ class JingeTemplateParser {
       webpackLoaderContext: this.webpackLoaderContext,
       baseLinePosition: this.baseLinePosition,
       resourcePath: this.resourcePath,
-      componentStyleId: this.componentStyleId,
     });
     try {
       return visitor.visit(tree);

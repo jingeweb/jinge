@@ -41,7 +41,7 @@ function getSetterFnIfPropIsSetter(obj: ViewModelObject, prop: string | symbol):
     }
     // lookup to check parent classes
     clazz = Object.getPrototypeOf(clazz) as Constructor;
-    while (clazz && clazz.prototype) {
+    while (clazz?.prototype) {
       desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
       if (desc) {
         fn = isFunction(desc.set) ? desc.set : null;

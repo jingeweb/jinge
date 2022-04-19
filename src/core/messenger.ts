@@ -36,7 +36,7 @@ export class Messenger {
     if (!listeners) return;
     listeners.forEach((opts, handler) => {
       handler(...args);
-      if (opts && opts.once) {
+      if (opts?.once) {
         listeners.delete(handler);
       }
     });

@@ -148,16 +148,15 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
       loopNotify(this, propertyPath, immediate);
     }
     const parents = this.__parents;
-    parents &&
-      parents.forEach((ps) => {
-        const vm = ps.core;
-        if (!vm) {
-          // eslint-disable-next-line no-console
-          console.error('dev-warn-unexpected: parent of ViewModelCore has been destroied but not unlink.');
-          return;
-        }
-        vm.__notify([ps.prop].concat(propertyPath), immediate);
-      });
+    parents?.forEach((ps) => {
+      const vm = ps.core;
+      if (!vm) {
+        // eslint-disable-next-line no-console
+        console.error('dev-warn-unexpected: parent of ViewModelCore has been destroied but not unlink.');
+        return;
+      }
+      vm.__notify([ps.prop].concat(propertyPath), immediate);
+    });
   }
 
   __destroy(): void {

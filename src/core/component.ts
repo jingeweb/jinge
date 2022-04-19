@@ -14,8 +14,10 @@ import {
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
 import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
-import { manager as StyleManager, ComponentStyle } from './style';
+import { initStyle } from './style';
 import { i18n as i18nService } from './i18n';
+
+initStyle();
 
 export enum ComponentStates {
   INITIALIZE = 0,
@@ -35,10 +37,6 @@ export type RenderFn = (comp: Component) => Node[];
 
 interface CompilerAttributes {
   context?: Record<string, unknown>;
-  /**
-   * parent inherit component styles
-   */
-  compStyle?: Record<string, string>;
   slots?: Record<string, RenderFn>;
   listeners?: Record<string, MessengerHandler>;
 }
@@ -115,10 +113,6 @@ export interface ComponentProperties {
     node?: Node;
   }[];
   /**
-   * component styles, include styles inherits from parent.
-   */
-  compStyle: Record<string, string>;
-  /**
    * update-next-map
    */
   upNextMap: Map<(() => void) | number, number>;
@@ -165,20 +159,6 @@ export class Component extends Messenger {
    * ````
    */
   static readonly template: string;
-  /**
-   * 指定组件的样式。务必使用 getter 的形式指定，例如：
-   * ````js
-   * class SomeComponent extends Component {
-   *   static get style() {
-   *     return `
-   * .some-class {
-   *   color: red;
-   * }`;
-   *   }
-   * }
-   * ````
-   */
-  static readonly style: string;
 
   /**
    * 某些情况下，需要判断一个函数是否是组件的构造函数。添加一个静态成员属性符号用于进行该判断。
@@ -237,7 +217,6 @@ export class Component extends Messenger {
       refs: null,
       relatedRefs: null,
       upNextMap: null,
-      compStyle: compilerAttrs.compStyle || null,
       deregFns: null,
     };
   }
@@ -387,7 +366,6 @@ export class Component extends Messenger {
     if (!isFunction(renderFn)) {
       throw new Error(`Template of ${Clazz.name} not found. Forget static getter "template"?`);
     }
-    StyleManager.add(Clazz.style as unknown as ComponentStyle); // jinge-loader 已经将 string 转成了 ComponentStyle，此处强制转换类型以绕开 typescript.
     return renderFn(this);
   }
 
@@ -405,7 +383,6 @@ export class Component extends Messenger {
       throw new Error('component has already been rendered.');
     }
     const rr = assertRenderResults(this.__render());
-    StyleManager.attch();
     if (replaceMode) {
       replaceChildren(targetEl.parentNode, rr, targetEl);
     } else {
@@ -435,8 +412,6 @@ export class Component extends Messenger {
     this.__handleBeforeDestroy(removeDOM);
     // clear messenger listeners.
     super.__off();
-    // remove component style
-    StyleManager.remove((this.constructor as typeof Component).style as unknown as ComponentStyle);
     // destroy attrs passed to constructor
     comp.passedAttrs[$$].__destroy();
     comp.passedAttrs = null;

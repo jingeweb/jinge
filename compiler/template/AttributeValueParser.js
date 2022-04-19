@@ -1,4 +1,4 @@
-const antlr = require('antlr4');
+const antlr = require('antlr4-build');
 const AttrParser = require('./parser/AttrParser');
 const AttrLexer = require('./parser/AttrLexer');
 

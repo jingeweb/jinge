@@ -1,4 +1,5 @@
-const antlr = require('antlr4');
+/* eslint-disable @typescript-eslint/no-empty-function */
+const antlr = require('antlr4-build');
 const TemplateParser = require('./parser/TemplateParser');
 const TemplateLexer = require('./parser/TemplateLexer');
 

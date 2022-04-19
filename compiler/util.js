@@ -3,14 +3,14 @@ const fs = require('fs').promises;
 const crypto = require('crypto');
 
 let cachedSymbolPostfix;
-function getSymbolPostfix() {
+function getSymbolPostfix(len = 12) {
   if (cachedSymbolPostfix) {
     return cachedSymbolPostfix;
   }
   const buf = crypto
     .createHash('sha256')
     .update('jinge-mvvm-framework-by-yuhangge-https://github.com/jinge-design/jinge');
-  cachedSymbolPostfix = '_' + buf.digest('hex').substr(0, 12);
+  cachedSymbolPostfix = '_' + buf.digest('hex').slice(0, len);
   return cachedSymbolPostfix;
 }
 

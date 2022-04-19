@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const csvStringify = require('csv-stringify/lib/sync');
-const csvParse = require('csv-parse/lib/sync');
+const { stringify: csvStringify } = require('csv-stringify/sync');
+const { parse: csvParse } = require('csv-parse/sync');
 const _util = require('./util');
 const { sharedOptions } = require('./options');
+const { getSymbolPostfix } = require('./util');
 
 /**
  * 所有 i18n 字典资源文件里渲染函数可能依赖的服务。
@@ -33,7 +34,7 @@ const i18nRenderDeps = [
   'createSVGElement',
   'createSVGElementWithoutAttrs',
 ];
-const i18nRenderDepsRegisterFile = path.resolve(__dirname, '../lib/__register_i18n_render_deps.js');
+const i18nRenderDepsRegisterFile = `register_i18n_render_deps_${getSymbolPostfix(16)}.js`; // path.resolve(__dirname, '../lib/__register_i18n_render_deps.js');
 
 function key2prop(key) {
   return /^[0-9]/.test(key) || /[^\d\w$_]/.test(key) ? JSON.stringify(key) : key;
@@ -174,7 +175,7 @@ class I18nManager {
       this.targetLocales.forEach((targetLocale) => {
         const targetInfo = targetLocale.meta.dicts.get(text);
         let translateText = null;
-        if (targetInfo && targetInfo.entries.has(location)) {
+        if (targetInfo?.entries.has(location)) {
           translateText = targetInfo.entries.get(location).text;
         }
         const csvRow = {
@@ -356,7 +357,7 @@ class I18nManager {
     if (!depId.endsWith(postfix)) {
       return sharedOptions.chunk.multiple || first ? idx : -1;
     }
-    const dep = depId.substr(0, depId.length - postfix.length);
+    const dep = depId.substring(0, depId.length - postfix.length);
     if (!(dep in this.renderDeps.inner)) {
       throw new Error('unknown dep:' + dep);
     }
@@ -604,7 +605,9 @@ class I18nManager {
         ? `
 function renderFactory(
   ${this.renderDeps.arr.join(', ')}
-) { return {
+) {
+  debugger;
+  return {
 components: {
 ${output.renders.map((r) => `  ${key2prop(r.key)}: ${r.ref ? JSON.stringify(r.ref.key) : r.output}`).join(',\n')}
 },

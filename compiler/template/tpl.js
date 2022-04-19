@@ -58,10 +58,9 @@ component.__on('before-destroy', () => rls_$ROOT_INDEX$.__destroy());`;
 const I18N = `...(() => {
   const el = new I18nComponent$POSTFIX$(attrs$POSTFIX$({
     [__$POSTFIX$]: {
-      $CSTYLE_PID$
       context: component[__$POSTFIX$].context
     }
-  }), $RENDER_KEY$, $CSTYID$, [$VMS$]);
+  }), $RENDER_KEY$, [$VMS$]);
   $PUSH_ELE$
   return assertRenderResults$POSTFIX$(el.__render());
 })()`;
@@ -73,7 +72,6 @@ const PARAMETER = `...(() => {
     $VM_PASS_INIT$
     [__$POSTFIX$]: {
       $VM_DEBUG_NAME$
-      $CSTYLE_PID$
       context: component[__$POSTFIX$].context,
       slots: {
         default: renderFn || emptyRenderFn$POSTFIX$

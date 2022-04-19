@@ -46,19 +46,17 @@ export function handleOnce(handler: ViewModelWatchHandler, propertyPath: Propert
  */
 export function loopHandle(propertyPath: PropertyPathItem[], node: ViewModelNode, immediate: boolean): void {
   const handlers = node.__handlers;
-  handlers &&
-    handlers.forEach((handler) => {
-      if (immediate) {
-        handler(propertyPath);
-      } else {
-        handleOnce(handler, propertyPath);
-      }
-    });
+  handlers?.forEach((handler) => {
+    if (immediate) {
+      handler(propertyPath);
+    } else {
+      handleOnce(handler, propertyPath);
+    }
+  });
   const listeners = node.__listeners;
-  listeners &&
-    listeners.forEach((c) => {
-      loopHandle(propertyPath, c, immediate);
-    });
+  listeners?.forEach((c) => {
+    loopHandle(propertyPath, c, immediate);
+  });
 }
 
 /**

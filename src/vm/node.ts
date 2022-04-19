@@ -49,7 +49,7 @@ export function loopGetNode(parentNode: ViewModelNode, propertyPath: PropertyPat
  * @internal
  */
 export function deleteNode(node: ViewModelNode): ViewModelNode {
-  if ((node && node.__handlers && node.__handlers.length > 0) || (node.__listeners && node.__listeners.size > 0)) {
+  if ((node?.__handlers && node.__handlers.length > 0) || (node.__listeners && node.__listeners.size > 0)) {
     return null;
   }
   /**
