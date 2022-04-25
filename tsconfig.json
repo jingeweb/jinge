@@ -12,6 +12,7 @@
     "declaration": true,
     "sourceMap": true,
     "outDir": "lib",
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       

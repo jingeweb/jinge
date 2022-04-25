@@ -13,9 +13,9 @@ import {
 } from '../util';
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
+// import { i18n } from './i18n';
 import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
 import { initStyle } from './style';
-import { i18n as i18nService } from './i18n';
 
 initStyle();
 
@@ -236,14 +236,14 @@ export class Component extends Messenger {
    * Helper function to add i18n change listener.
    * The listener will be auto removed when component is destroied.
    */
-  __i18nWatch(listener: (locale: string) => void, immediate = false): void {
-    this.__addDeregisterFn(
-      i18nService.watch((locale) => {
-        // bind component to listener's function context.
-        listener.call(this, locale);
-      }, immediate),
-    );
-  }
+  // __i18nWatch(listener: (locale: string) => void, immediate = false): void {
+  //   this.__addDeregisterFn(
+  //     i18n.watch((locale) => {
+  //       // bind component to listener's function context.
+  //       listener.call(this, locale);
+  //     }, immediate),
+  //   );
+  // }
 
   /**
    * Helper function to add dom event listener.

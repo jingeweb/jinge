@@ -5,56 +5,47 @@
   "main": "lib/index.js",
   "types": "src/index.ts",
   "scripts": {
-    "g4": "node ./scripts/parse_g4.js",
-    "lib": "node ./scripts/gen_lib.js",
-    "build": "npm run g4 && npm run lib",
-    "lint": "tsc --noEmit && eslint './{src,compiler}/**/*.{js,ts}' --fix",
+    "dev": "WATCH=true npm run build",
+    "build": "rm -rf ./lib && node ./scripts/esbuild.js",
+    "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,ts}' --fix",
     "lint-staged": "lint-staged",
-    "prepare": "husky install",
-    "prepublish": "npm run build"
+    "prepare": "husky install"
   },
   "lint-staged": {
     "*.{js,ts}": "eslint --fix"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jinge-design/jinge.git"
+    "url": "git+https://github.com/jingeweb/jinge.git"
   },
   "license": "ISC",
-  "homepage": "https://github.com/jinge-design/jinge#readme",
+  "homepage": "https://github.com/jingeweb/jinge#readme",
   "bugs": {
-    "url": "https://github.com/jinge-design/jinge/issues"
+    "url": "https://github.com/jingeweb/jinge/issues"
   },
   "keywords": [
     "mvvm",
     "spa"
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
-  "dependencies": {
-    "acorn": "^8.7.0",
-    "acorn-walk": "^8.2.0",
-    "antlr4-build": "4.10.1-beta.9",
-    "clean-css": "^5.3.0",
-    "csv-parse": "^5.0.4",
-    "csv-stringify": "^6.0.5",
-    "escodegen": "^2.0.0",
-    "html-entities": "^2.3.3",
-    "html-tags": "^3.2.0",
-    "svg-tags": "^1.0.0"
-  },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.20.0",
-    "@typescript-eslint/parser": "^5.20.0",
-    "esbuild": "^0.14.38",
-    "eslint": "^8.13.0",
+    "@typescript-eslint/eslint-plugin": "^5.27.0",
+    "@typescript-eslint/parser": "^5.27.0",
+    "chokidar": "^3.5.3",
+    "convert-source-map": "^1.8.0",
+    "esbuild": "^0.14.42",
+    "eslint": "^8.16.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-import-resolver-typescript": "^2.7.1",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-prettier": "^4.0.0",
-    "glob": "^8.0.1",
-    "husky": "^7.0.4",
-    "lint-staged": "^12.4.0",
+    "husky": "^8.0.1",
+    "jinge-compiler": "^3.1.2",
+    "lint-staged": "^13.0.0",
     "prettier": "^2.6.2",
-    "typescript": "^4.6.3"
+    "typescript": "^4.7.2"
+  },
+  "peerDependencies": {
+    "jinge-compiler": "^3.1.2"
   }
 }

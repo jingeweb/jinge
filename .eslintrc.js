@@ -30,9 +30,6 @@ module.exports = {
     sourceType: 'module',
   },
   rules: {
-    'import/no-named-as-default': 'off',
-    'import/default': 'off',
-    'react-hooks/exhaustive-deps': 'off',
     'import/order': 'error',
     '@typescript-eslint/no-unused-vars': 'error',
     '@typescript-eslint/no-non-null-assertion': 'error',
@@ -44,7 +41,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['scripts/**/*.js', 'compiler/**/*.js', '.eslintrc.js'],
+      files: ['scripts/**/*.js', '*.js'],
       env: {
         node: true,
         browser: false,
@@ -53,6 +50,9 @@ module.exports = {
       rules: {
         'no-console': 'off',
         '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/explicit-module-boundary-types': 'off',
+        '@typescript-eslint/prefer-optional-chain': 'off',
       },
     },
   ],
