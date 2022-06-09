@@ -57,10 +57,12 @@ export type RelatedListenersMap = Map<
   }[]
 >;
 
-export interface ViewModelObject extends Record<string | number | symbol, unknown> {
+type Obj = Record<string | number | symbol, unknown>;
+export interface ViewModel {
   [$$]: ViewModelCore;
 }
-export type ViewModelArray = ViewModelObject & ViewModelObject[];
+export type ViewModelObject = ViewModel & Obj;
+export type ViewModelArray<Item = unknown> = ViewModel & Item[];
 export type ViewModelParent = {
   core: ViewModelCore;
   prop: string | number;
@@ -75,7 +77,7 @@ export function isInnerObj(v: unknown): boolean {
   return clazz === RegExp || clazz === Date || clazz === Boolean;
 }
 
-export function isViewModel(v: unknown): boolean {
+export function isViewModel(v: unknown): v is ViewModelObject {
   return isObject(v) && $$ in (v as Record<symbol, unknown>);
 }
 
@@ -83,9 +85,6 @@ export function isPublicProperty(v: unknown): boolean {
   return isString(v) && (v as string).charCodeAt(0) !== 95;
 }
 
-/**
- * @internal
- */
 export function getPropertyName(v: PropertyPathItem): string {
   if (isString(v)) {
     return v as unknown as string;
@@ -99,9 +98,6 @@ export function getPropertyName(v: PropertyPathItem): string {
   return v.toString();
 }
 
-/**
- * @internal
- */
 export function parsePropertyPath(propertyPath: string | PropertyPathItem | PropertyPathItem[]): PropertyPathItem[] {
   return isString(propertyPath as unknown)
     ? (propertyPath as unknown as string).indexOf('.') > 0
@@ -112,9 +108,6 @@ export function parsePropertyPath(propertyPath: string | PropertyPathItem | Prop
     : [propertyPath as PropertyPathItem];
 }
 
-/**
- * @internal
- */
 export function addParent(child: ViewModelCore, parent: ViewModelCore, property: string | number): void {
   if (!child.__parents) {
     child.__parents = [];
@@ -125,9 +118,6 @@ export function addParent(child: ViewModelCore, parent: ViewModelCore, property:
   });
 }
 
-/**
- * @internal
- */
 export function removeParent(child: ViewModelCore, parent: ViewModelCore, property: string | number): void {
   if (!child.__parents) {
     return;
@@ -140,9 +130,6 @@ export function removeParent(child: ViewModelCore, parent: ViewModelCore, proper
   }
 }
 
-/**
- * @internal
- */
 export function shiftParent(
   child: ViewModelCore,
   parent: ViewModelCore,

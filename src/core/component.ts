@@ -31,6 +31,7 @@ export enum ContextStates {
   UNTOUCH_FREEZED = 2,
   TOUCHED_FREEZED = 3,
 }
+
 export const __ = Symbol('__');
 
 export type RenderFn = (comp: Component) => Node[];
@@ -40,9 +41,12 @@ interface CompilerAttributes {
   slots?: Record<string, RenderFn>;
   listeners?: Record<string, MessengerHandler>;
 }
+
 export type ComponentAttributes = ViewModelObject & {
   [__]?: CompilerAttributes;
 };
+
+export type Attributes<Props> = ComponentAttributes & Props;
 
 export interface ComponentProperties {
   /**
@@ -135,15 +139,15 @@ export function assertRenderResults(renderResults: Node[]): Node[] {
   return renderResults;
 }
 
-function wrapAttrs<
-  T extends {
+function wrapAttrs<Props extends Record<string, unknown>>(
+  target: Props & {
     [__]?: CompilerAttributes;
   },
->(target: T): T & ViewModelObject {
+): ViewModelObject & Props {
   if (!isObject(target) || isArray(target)) {
     throw new Error('attrs() traget must be plain object.');
   }
-  return createAttributes<T>(target);
+  return createAttributes(target);
 }
 export { wrapAttrs as attrs };
 
@@ -177,15 +181,10 @@ export class Component extends Messenger {
    */
   static readonly [__] = true;
 
-  static create<T extends Component>(
-    this: { new (attrs: ComponentAttributes): T },
-    attrs?: Record<string, unknown> | ComponentAttributes,
-  ): T {
-    attrs = attrs || wrapAttrs({});
-    if (!isObject(attrs) || !($$ in attrs)) {
-      attrs = wrapAttrs(attrs || {});
-    }
-    return new this(attrs as ComponentAttributes)[$$].proxy as T;
+  static create<Props, T extends Component>(this: { new (attrs: ComponentAttributes): T }, attrs?: Props): T {
+    const isObj = isObject(attrs);
+    const vmAttrs = isObj && $$ in attrs ? attrs : wrapAttrs(isObj ? attrs : {});
+    return new this(vmAttrs as ComponentAttributes)[$$].proxy as T;
   }
 
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */

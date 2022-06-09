@@ -3,7 +3,7 @@
     "module": "esnext",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2019",
+    "target": "es2020",
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "stripInternal": true,
@@ -11,8 +11,7 @@
     "moduleResolution": "node",
     "declaration": true,
     "sourceMap": true,
-    "outDir": "lib",
-    "noEmit": true,
+    "outDir": "types",
     "baseUrl": ".",
     "paths": {
       

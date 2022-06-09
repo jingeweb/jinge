@@ -1,9 +1,6 @@
 import { ViewModelNode, PropertyPathItem, getPropertyName } from './common';
 import { handleCancel } from './notify';
 
-/**
- * @internal
- */
 export function loopCreateNode(parentNode: ViewModelNode, propertyPath: PropertyPathItem[], level = 0): ViewModelNode {
   const propertyName = getPropertyName(propertyPath[level]);
   if (!parentNode.__listeners) {
@@ -26,9 +23,6 @@ export function loopCreateNode(parentNode: ViewModelNode, propertyPath: Property
   }
 }
 
-/**
- * @internal
- */
 export function loopGetNode(parentNode: ViewModelNode, propertyPath: PropertyPathItem[], level = 0): ViewModelNode {
   const propertyName = getPropertyName(propertyPath[level]);
   if (!propertyName) {
@@ -45,9 +39,6 @@ export function loopGetNode(parentNode: ViewModelNode, propertyPath: PropertyPat
   }
 }
 
-/**
- * @internal
- */
 export function deleteNode(node: ViewModelNode): ViewModelNode {
   if ((node?.__handlers && node.__handlers.length > 0) || (node.__listeners && node.__listeners.size > 0)) {
     return null;
@@ -62,9 +53,6 @@ export function deleteNode(node: ViewModelNode): ViewModelNode {
   return parent;
 }
 
-/**
- * @internal
- */
 export function loopClearNode(node: ViewModelNode): void {
   const listeners = node.__listeners;
   if (listeners) {

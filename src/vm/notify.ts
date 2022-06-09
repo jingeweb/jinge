@@ -9,9 +9,6 @@ const handleTasks: Map<
   }
 > = new Map();
 
-/**
- * @internal
- */
 export function handleCancel(handler: ViewModelWatchHandler): void {
   const t = handleTasks.get(handler);
   if (t) {
@@ -20,9 +17,6 @@ export function handleCancel(handler: ViewModelWatchHandler): void {
   }
 }
 
-/**
- * @internal
- */
 export function handleOnce(handler: ViewModelWatchHandler, propertyPath: PropertyPathItem[]): void {
   if (handleTasks.has(handler)) {
     return;
@@ -41,9 +35,6 @@ export function handleOnce(handler: ViewModelWatchHandler, propertyPath: Propert
   });
 }
 
-/**
- * @internal
- */
 export function loopHandle(propertyPath: PropertyPathItem[], node: ViewModelNode, immediate: boolean): void {
   const handlers = node.__handlers;
   handlers?.forEach((handler) => {
@@ -59,9 +50,6 @@ export function loopHandle(propertyPath: PropertyPathItem[], node: ViewModelNode
   });
 }
 
-/**
- * @internal
- */
 export function loopNotify(vm: ViewModelNode, propertyPath: PropertyPathItem[], immediate: boolean, level = 0): void {
   const listeners = vm.__listeners;
   if (!listeners) {

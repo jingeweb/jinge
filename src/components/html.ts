@@ -1,4 +1,4 @@
-import { Component, ComponentAttributes, __ } from '../core/component';
+import { Attributes, Component, __ } from '../core/component';
 import { createFragment } from '../util';
 
 function renderHtml(content: string): Node[] {
@@ -13,30 +13,33 @@ function renderHtml(content: string): Node[] {
   return cn;
 }
 
+export interface BindHtmlComponentAttrs {
+  content: string;
+}
 export class BindHtmlComponent extends Component {
   _c: string;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: Attributes<BindHtmlComponentAttrs>) {
     if (!('content' in attrs)) throw new Error('<bind-html/> require "content" attribute');
     super(attrs);
-    this.content = attrs.content as string;
+    this.content = attrs.content;
   }
 
-  get content(): string {
+  get content() {
     return this._c;
   }
 
-  set content(v: string) {
+  set content(v) {
     if (this._c === v) return;
     this._c = v;
     this.__updateIfNeed();
   }
 
-  __render(): Node[] {
-    return (this[__].rootNodes = renderHtml(this._c)) as Node[];
+  __render() {
+    return (this[__].rootNodes = renderHtml(this._c));
   }
 
-  __update(): void {
+  __update() {
     const roots = this[__].rootNodes;
     const oldFirstEl = roots[0] as Node;
     const $p = oldFirstEl.parentNode;

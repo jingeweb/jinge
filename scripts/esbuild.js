@@ -28,25 +28,33 @@ async function glob(dir) {
 
 async function transformFile(file) {
   const src = await fs.readFile(file, 'utf-8');
+  const rf = path.relative(SRC_DIR, file);
   let { code, map, warnings } = await esbuild.transform(src, {
     target: 'es2020',
     format: 'esm',
     loader: path.extname(file).slice(1),
     sourcemap: true,
+    sourcefile: `${path.relative(file, SRC_DIR)}/src/${rf}`,
+    sourcesContent: false,
   });
   if (warnings?.length) console.error(warnings);
   if (!code) return; // ignore empty file
   if (file.startsWith(COMP_DIR)) {
-    const result = await ComponentParser.parse(code, map, {
+    const result = await ComponentParser.parse(code, null, {
       resourcePath: file,
       _innerLib: true,
     });
     code = result.code;
-    map = JSON.stringify(result.map);
   }
-  const rf = path.relative(SRC_DIR, file).replace(/\.ts$/, '.js');
-  execSync(`mkdir -p ${path.dirname(path.join(DIST_DIR, rf))}`);
-  await Promise.all([fs.writeFile(path.join(DIST_DIR, rf), code), fs.writeFile(path.join(DIST_DIR, rf + '.map'), map)]);
+  const distfile = path.join(DIST_DIR, rf.replace(/\.ts$/, '.js'));
+  execSync(`mkdir -p ${path.dirname(distfile)}`);
+  await Promise.all([
+    fs.writeFile(distfile, code + `\n//# sourceMappingURL=${path.basename(distfile) + '.map'}`),
+    fs.writeFile(
+      distfile + '.map',
+      map.replace('"version": 3', `"version": 3,\n  "sourceRoot": "",\n  "file": "${path.basename(distfile)}"`),
+    ),
+  ]);
 }
 
 async function handleChange(file) {

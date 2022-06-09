@@ -1,4 +1,4 @@
-import { Component, __, ComponentAttributes, isComponent } from '../core/component';
+import { Component, __, isComponent, Attributes } from '../core/component';
 import { isObject, removeEvent, addEvent, setImmediate } from '../util';
 import { $$ } from '../vm/common';
 import { TransitionStates, getDurationType } from '../core/transition';
@@ -13,18 +13,22 @@ function loopOperateClass(el: Component | Node, isAddOperate: boolean, domClass:
   }
 }
 
+export interface ToggleClassComponentAttrs {
+  class: Record<string, boolean>;
+  transition?: boolean;
+}
 export class ToggleClassComponent extends Component {
   domClass: Record<string, boolean>;
   transition: boolean;
   _t: Map<string, [TransitionStates, EventListener]>;
   _i: number;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: Attributes<ToggleClassComponentAttrs>) {
     if (!attrs || !isObject(attrs.class)) {
       throw new Error('<toggle-class> component require "class" attribute to be Object.');
     }
     super(attrs);
-    this.domClass = attrs.class as Record<string, boolean>;
+    this.domClass = attrs.class;
     this.transition = !!attrs.transition;
 
     this._t = null;
@@ -34,17 +38,17 @@ export class ToggleClassComponent extends Component {
     });
   }
 
-  __render(): Node[] {
+  __render() {
     const rr = super.__render();
     this.__update(true);
     return rr;
   }
 
-  __beforeDestroy(): void {
+  __beforeDestroy() {
     this._t = null; // maybe unnecessary
   }
 
-  __update(first: boolean): void {
+  __update(first: boolean) {
     const el = this.transition ? (this.__transitionDOM as HTMLElement) : null;
     if (el && el.nodeType !== Node.ELEMENT_NODE) {
       // ignore comment or text-node

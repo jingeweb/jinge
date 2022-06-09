@@ -1,26 +1,25 @@
 import {
   __,
   isComponent,
-  attrs,
+  attrs as wrapAttrs,
   RenderFn,
   Component,
-  ComponentAttributes,
   assertRenderResults,
+  Attributes,
 } from '../core/component';
 import { TransitionStates, getDurationType } from '../core/transition';
 import { createFragment, addEvent, setImmediate, removeEvent } from '../util';
 
-function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>): Component {
-  return Component.create(
-    attrs({
-      [__]: {
-        context,
-        slots: {
-          default: renderFn,
-        },
+function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>) {
+  const attrs = wrapAttrs({
+    [__]: {
+      context,
+      slots: {
+        default: renderFn,
       },
-    }),
-  );
+    },
+  });
+  return Component.create(attrs);
 }
 
 function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
@@ -48,7 +47,7 @@ function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
   return el.__render();
 }
 
-function doUpdate(component: IfComponent | SwitchComponent): void {
+function doUpdate(component: IfComponent | SwitchComponent) {
   const roots = component[__].rootNodes;
   const el = roots[0];
   const isComp = isComponent(el);
@@ -209,6 +208,10 @@ function destroySwitch(component: IfComponent | SwitchComponent): void {
   }
 }
 
+export interface IfComponentAttrs {
+  expect: boolean;
+  transition: string;
+}
 export class IfComponent extends Component {
   _transitionMap: Map<string, [TransitionStates, Node]>;
   _previousValue: string;
@@ -217,7 +220,7 @@ export class IfComponent extends Component {
 
   transition: string;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: Attributes<IfComponentAttrs>) {
     super(attrs);
 
     this._currentValue = 'default';
@@ -225,8 +228,8 @@ export class IfComponent extends Component {
     this._transitionMap = null;
     this._previousValue = null;
 
-    this.expect = attrs.expect as boolean;
-    this.transition = attrs.transition as string;
+    this.expect = attrs.expect;
+    this.transition = attrs.transition;
   }
 
   get expect(): boolean {
@@ -261,6 +264,10 @@ export class IfComponent extends Component {
   }
 }
 
+export interface SwitchComponentAttrs {
+  test: string;
+  transition: string;
+}
 export class SwitchComponent extends Component {
   _transitionMap: Map<string, [TransitionStates, Node]>;
   _previousValue: string;
@@ -269,7 +276,7 @@ export class SwitchComponent extends Component {
 
   transition: string;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: Attributes<SwitchComponentAttrs>) {
     super(attrs);
 
     this._onEndHandler = null;
@@ -277,8 +284,8 @@ export class SwitchComponent extends Component {
     this._previousValue = null;
     this._currentValue = null;
 
-    this.test = attrs.test as string;
-    this.transition = attrs.transition as string;
+    this.test = attrs.test;
+    this.transition = attrs.transition;
   }
 
   get test(): string {

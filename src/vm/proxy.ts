@@ -11,6 +11,7 @@ import {
   isInnerObj,
   ViewModelArray,
   $$,
+  ViewModel,
 } from './common';
 import { ViewModelCoreImpl } from './core';
 
@@ -57,7 +58,7 @@ function getSetterFnIfPropIsSetter(obj: ViewModelObject, prop: string | symbol):
   }
 }
 
-function notifyPropChanged(vm: ViewModelObject, prop: string | number): void {
+function notifyPropChanged(vm: ViewModel, prop: string | number): void {
   vm[$$].__notify(prop);
 }
 
@@ -213,13 +214,20 @@ const PromiseProxyHandler = {
   set: objectPropSetHandler,
 };
 
-function _arrayReverseSort(target: ViewModelArray, fn: string, arg?: (...args: unknown[]) => unknown): ViewModelArray {
+function _arrayReverseSort(
+  target: ViewModelArray,
+  fn: () => void,
+  // fn: 'sort' | 'reverse',
+  // arg?: (...args: unknown[]) => unknown,
+): ViewModelArray {
   target.forEach((it, i) => {
     if (isViewModel(it)) {
       addParent((it as ViewModelObject)[$$], target[$$], i);
     }
   });
-  (target as Record<string, (...args: unknown[]) => unknown>)[fn](arg);
+  fn();
+  // const xx = (target as unknown[])[fn];
+  // xx(arg);
   target.forEach((it, i) => {
     if (isViewModel(it)) {
       removeParent((it as ViewModelObject)[$$], target[$$], i);
@@ -230,7 +238,7 @@ function _arrayReverseSort(target: ViewModelArray, fn: string, arg?: (...args: u
   return target[$$].proxy as ViewModelArray;
 }
 
-function wrapSubArray(arr: ViewModelObject[], wrapEachItem = false): ViewModelArray {
+function wrapSubArray(arr: unknown[], wrapEachItem = false): ViewModelArray {
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
   const rtn = wrapProxy(arr, true);
   // handleVMDebug(arr);
@@ -252,7 +260,7 @@ function _arrayShiftOrUnshiftProp(arr: ViewModelArray, delta: number): void {
   });
 }
 
-function _argAssert(arg: unknown, fn: string): boolean {
+function _argAssert(arg: unknown, fn: string): arg is ViewModel {
   if (isObject(arg)) {
     if (!($$ in (arg as Record<symbol, unknown>))) {
       throw new Error(`argument passed to Array.${fn} must be ViewModel if the array is ViewModel`);
@@ -265,7 +273,7 @@ function _argAssert(arg: unknown, fn: string): boolean {
 }
 
 const ArrayFns = {
-  splice(target: ViewModelArray, idx: number, delCount: number, ...args: ViewModelObject[]): ViewModelObject[] {
+  splice(target: ViewModelArray, idx: number, delCount: number, ...args: ViewModelObject[]): ViewModelArray {
     if (idx < 0) idx = 0;
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'splice')) {
@@ -298,10 +306,10 @@ const ArrayFns = {
     }
     return rtn;
   },
-  shift(target: ViewModelArray): ViewModelObject {
-    if (target.length === 0) return target.shift();
+  shift(target: ViewModelArray): ViewModel {
+    if (target.length === 0) return target.shift() as ViewModel;
     _arrayShiftOrUnshiftProp(target, -1);
-    const el = target.shift();
+    const el = target.shift() as ViewModel;
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], -1);
     }
@@ -326,7 +334,7 @@ const ArrayFns = {
     }
     return rtn;
   },
-  pop(target: ViewModelArray): ViewModelObject {
+  pop(target: ViewModelArray): unknown {
     if (target.length === 0) {
       return target.pop();
     }
@@ -338,7 +346,7 @@ const ArrayFns = {
     notifyPropChanged(target, target.length);
     return el;
   },
-  push(target: ViewModelArray, ...args: ViewModelArray): number {
+  push(target: ViewModelArray, ...args: ViewModel[]): number {
     if (args.length === 0) return 0;
     args.forEach((arg, i) => {
       if (_argAssert(arg, 'push')) {
@@ -370,10 +378,10 @@ const ArrayFns = {
     return target[$$].proxy as ViewModelArray;
   },
   reverse(target: ViewModelArray): ViewModelArray {
-    return _arrayReverseSort(target, 'reverse');
+    return _arrayReverseSort(target, () => target.reverse());
   },
-  sort(target: ViewModelArray, fn: (...args: unknown[]) => unknown): ViewModelArray {
-    return _arrayReverseSort(target, 'sort', fn);
+  sort(target: ViewModelArray, fn: (...args: unknown[]) => number): ViewModelArray {
+    return _arrayReverseSort(target, () => target.sort(fn));
   },
   concat(target: ViewModelArray, arr: ViewModelArray): ViewModelArray {
     _argAssert(arr, 'concat');
@@ -425,18 +433,15 @@ function wrapProp(parent: ViewModelObject, child: ViewModelObject, property: str
   addParent(child[$$], parent[$$], property);
 }
 
-/**
- * @internal
- */
-export function createViewModel<T>(target: T): T & ViewModelObject {
+export function createViewModel<T>(target: T): ViewModelObject & T {
   if (isObject(target)) {
     // directly return if alreay is ViewModel or inner object(Date/RegExp/Boolean).
     if (isInnerObj(target) || $$ in target) {
-      return target as T & ViewModelObject;
+      return target as ViewModelObject & T;
     }
 
     const isArr = isArray(target);
-    const rtn = wrapProxy(target, isArr) as T & ViewModelObject;
+    const rtn = wrapProxy(target, isArr) as ViewModelObject & T;
     if (isArr) {
       for (let i = 0; i < (target as unknown as ViewModelObject[]).length; i++) {
         wrapProp(target as unknown as ViewModelObject, (target as unknown as ViewModelObject[])[i], i);
@@ -450,14 +455,11 @@ export function createViewModel<T>(target: T): T & ViewModelObject {
     }
     return rtn;
   } else {
-    return target as T & ViewModelObject;
+    return target as ViewModelObject & T;
   }
 }
 
-/**
- * @internal
- */
-export function createAttributes<T>(attributes: T): T & ViewModelObject {
+export function createAttributes<T>(attributes: T) {
   const vmCore = new ViewModelCoreImpl(attributes);
   // 初始化时默认的 notifiable 为 false，
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
@@ -465,7 +467,7 @@ export function createAttributes<T>(attributes: T): T & ViewModelObject {
   // eslint-disable-next-line @typescript-eslint/ban-types
   return (vmCore.proxy = new Proxy(attributes as unknown as object, {
     set: attrsPropSetHandler,
-  })) as T & ViewModelObject;
+  })) as ViewModelObject & T;
 }
 
 // function handleVMDebug(vm) {
@@ -485,9 +487,6 @@ export function createAttributes<T>(attributes: T): T & ViewModelObject {
 //   _di.vms.push(vm);
 // }
 
-/**
- * @internal
- */
 export function createComponent<T>(component: T): T {
   if ($$ in component) {
     throw new Error('component has alreay been wrapped.');
@@ -503,7 +502,7 @@ export function createComponent<T>(component: T): T {
   }) as unknown as T);
 }
 
-export function vm<T>(target: T): T & ViewModelObject {
+export function vm<T>(target: T): ViewModelObject {
   if (!isObject(target)) {
     throw new Error('vm() target must be object or array.');
   }

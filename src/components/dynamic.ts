@@ -1,17 +1,20 @@
-import { Component, ComponentAttributes, __, attrs as wrapAttrs, RenderFn } from '../core/component';
+import { Component, ComponentAttributes, __, attrs as wrapAttrs, RenderFn, Attributes } from '../core/component';
 import { $$ } from '../vm/common';
 import { createFragment } from '../util';
 import { emptyRenderFn } from '../core/render_fns';
 
 interface Render {
-  _component?: {
+  component?: {
     create(attrs: ComponentAttributes): Component;
   };
-  _renderFn?: RenderFn;
+  renderFn?: RenderFn;
+}
+export interface DynamicRenderComponentAttrs {
+  render: Render;
 }
 
 function createEl(component: DynamicRenderComponent): Component {
-  let Clazz = component._r?._component;
+  let Clazz = component._r?.component;
   const pAttrs = component[__].passedAttrs;
   const attrs = wrapAttrs({
     [__]: {
@@ -21,7 +24,7 @@ function createEl(component: DynamicRenderComponent): Component {
   });
   if (!Clazz) {
     attrs[__].slots = {
-      default: component._r?._renderFn || emptyRenderFn,
+      default: component._r?.renderFn || emptyRenderFn,
     };
     Clazz = Component;
   }
@@ -82,7 +85,7 @@ export class DynamicRenderComponent extends Component {
    */
   _w: boolean;
 
-  constructor(attrs: ComponentAttributes & { render: Render }) {
+  constructor(attrs: Attributes<DynamicRenderComponentAttrs>) {
     super(attrs);
     this._ca = null;
     this._w = false;
@@ -94,20 +97,20 @@ export class DynamicRenderComponent extends Component {
   }
 
   set render(v: Render) {
-    if (this._r?._component === v?._component && this._r?._renderFn === v?._renderFn) {
+    if (this._r?.component === v?.component && this._r?.renderFn === v?.renderFn) {
       return;
     }
     this._r = v;
     this.__updateIfNeed();
   }
 
-  __render(): Node[] {
+  __render() {
     const el = createEl(this);
     this[__].rootNodes.push(el);
     return el.__render();
   }
 
-  __update(): void {
+  __update() {
     const roots = this[__].rootNodes;
     const el = roots[0] as Component;
     const fd = el.__firstDOM;

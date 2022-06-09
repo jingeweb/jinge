@@ -1,12 +1,12 @@
 import { Component, ComponentAttributes } from '../core/component';
 
-/**
- * This component is only for development purpose
- */
+export interface LogComponentAttrs {
+  msg: unknown;
+}
 export class LogComponent extends Component {
   _msg: unknown;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: ComponentAttributes & LogComponentAttrs) {
     super(attrs);
     this.msg = attrs.msg;
   }

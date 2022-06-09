@@ -7,6 +7,7 @@ import {
   isComponent,
   ComponentStates,
   assertRenderResults,
+  Attributes,
 } from '../core/component';
 import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/common';
 import { isString, isNumber, isArray, createFragment, insertAfter } from '../util';
@@ -74,7 +75,7 @@ function appendRenderEach(
   itemRenderFn: RenderFn,
   roots: (Component | Node)[],
   context: Record<string | symbol, unknown>,
-): Node[] {
+) {
   const el = createEl(item, i, isLast, itemRenderFn, context);
   roots.push(el);
   return el.__render();
@@ -107,7 +108,7 @@ function renderItems(
   keys: unknown[],
   keyName: ForKeyName,
   context: Record<string | symbol, unknown>,
-): Node[] {
+) {
   const result: Node[] = [];
   const tmpKeyMap = new Map();
   items.forEach((item, i) => {
@@ -120,7 +121,7 @@ function renderItems(
   return result;
 }
 
-function loopAppend($parent: Node, el: Component): void {
+function loopAppend($parent: Node, el: Component) {
   el[__].rootNodes.forEach((node) => {
     if (isComponent(node)) {
       loopAppend($parent, node as Component);
@@ -130,7 +131,7 @@ function loopAppend($parent: Node, el: Component): void {
   });
 }
 
-function updateEl(el: ForEachComponent, i: number, items: unknown[]): void {
+function updateEl(el: ForEachComponent, i: number, items: unknown[]) {
   if (el.isFirst !== (i === 0)) {
     el.isFirst = i === 0;
   }
@@ -149,6 +150,9 @@ function _parseIndexPath(p: string | number): string | number {
   return isString(p) && p !== 'length' && /^\d+$/.test(p as string) ? Number(p) : p;
 }
 
+export interface ForComponentAttrs {
+  loop: ViewModelArray;
+}
 export class ForComponent extends Component {
   _l: ViewModelArray;
   _keyName: ForKeyName;
@@ -156,31 +160,18 @@ export class ForComponent extends Component {
   _keys: unknown[];
   _waitingUpdate: boolean;
 
-  constructor(attrs: ComponentAttributes) {
+  constructor(attrs: Attributes<ForComponentAttrs>) {
     if (attrs.key && !/^(index|each(.[\w\d$_]+)*)$/.test(attrs.key as string)) {
       throw new Error('Value of "key" attribute of <for> component is invalidate. See https://[todo]');
     }
     super(attrs);
 
-    /**
-     * <for> 组件的 loop 属性可以支持不是 ViewModel 的数组，因此直接通过
-     * this._l = attrs.loop 的形式初始化赋值。
-     */
-    if (isViewModel(attrs.loop)) {
-      this.loop = attrs.loop as ViewModelArray;
-    } else {
-      this._l = attrs.loop as ViewModelArray;
+    if (!isViewModel(attrs.loop)) {
+      throw new Error('require ViewModelArray');
     }
-    /**
-     * 上面的写法，编译器将不会自动生成对 attrs 的 VM_ON('loop') 代码。
-     * 只有直接在构造函数体里最顶部的 this.xxx = attrs.xxx 的赋值形式才会，
-     * 而上面的 this.loop = attrs.loop 写在了 if 的条件内部，需要手动添加监听代码。
-     */
-    attrs[$$].__watch('loop', () => {
-      this.loop = attrs.loop as ViewModelArray;
-    });
+    this.loop = attrs.loop;
 
-    const kn = (attrs.key as string) || 'index';
+    const kn = (attrs.key as string) || 'index'; // TODO: support handle attrs.key change
     this._keyName = kn;
     this._length = 0;
     this._keys = null;
@@ -208,7 +199,7 @@ export class ForComponent extends Component {
           return;
         }
         // console.log('update item key:', p);
-        this._keys[p as number] = (this._keyName as ForKeyNameFn)(items[p]);
+        this._keys[p as number] = (this._keyName as ForKeyNameFn)(items[p as number]);
       });
     }
     this[$$].__watch('loop.*', (propPath: (string | number)[]) => {
@@ -240,7 +231,7 @@ export class ForComponent extends Component {
     this.__updateIfNeed();
   }
 
-  __render(): Node[] {
+  __render() {
     const roots = this[__].rootNodes;
     const itemRenderFn = this[__].slots?.default;
     if (!itemRenderFn) {
@@ -258,7 +249,7 @@ export class ForComponent extends Component {
     return renderItems(items, itemRenderFn, roots, this._keys, keyName, this[__].context);
   }
 
-  _updateItem(index: number): void {
+  _updateItem(index: number) {
     const items = this.loop;
     const roots = this[__].rootNodes;
     if (!isArray(items) || index >= roots.length) return;
@@ -286,14 +277,14 @@ export class ForComponent extends Component {
         newEl.__handleAfterRender();
         // console.log('update item render:', index);
       } else {
-        oldEl.each = item;
+        oldEl.each = item as ViewModelObject;
       }
     } else {
-      oldEl.each = item;
+      oldEl.each = item as ViewModelObject;
     }
   }
 
-  __update(): void {
+  __update() {
     this._waitingUpdate = false;
     // console.log('for update');
     const itemRenderFn = this[__].slots?.default;
