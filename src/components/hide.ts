@@ -4,7 +4,7 @@ import { Attributes } from '../core/component';
 import { ToggleClassComponent, ToggleClassComponentAttrs } from './class';
 
 export interface HideComponentAttrs {
-  hide: boolean;
+  test: boolean;
 }
 export class HideComponent extends ToggleClassComponent {
   constructor(attrs: Attributes<HideComponentAttrs>) {
@@ -12,7 +12,7 @@ export class HideComponent extends ToggleClassComponent {
       'jg-hide': attrs.test as boolean,
     });
     attrs[$$].__watch('test', () => {
-      (attrs.class as { 'jg-hide': boolean })['jg-hide'] = attrs.hide;
+      (attrs.class as { 'jg-hide': boolean })['jg-hide'] = attrs.test;
     });
     super(attrs as unknown as Attributes<ToggleClassComponentAttrs>);
   }

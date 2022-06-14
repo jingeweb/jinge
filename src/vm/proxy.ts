@@ -502,7 +502,7 @@ export function createComponent<T>(component: T): T {
   }) as unknown as T);
 }
 
-export function vm<T>(target: T): ViewModelObject {
+export function vm<T>(target: T) {
   if (!isObject(target)) {
     throw new Error('vm() target must be object or array.');
   }
