@@ -46,7 +46,7 @@ export type ComponentAttributes = ViewModelObject & {
   [__]?: CompilerAttributes;
 };
 
-export type Attributes<Props> = ComponentAttributes & Props;
+export type Attributes<Props = Record<string, unknown>> = ComponentAttributes & Props;
 
 export interface ComponentProperties {
   /**
@@ -128,7 +128,7 @@ export interface ComponentProperties {
 
 /** Bellow is utility functions **/
 
-export function isComponent(v: unknown): boolean {
+export function isComponent(v: unknown): v is Component {
   return __ in (v as Record<symbol, unknown>);
 }
 
@@ -482,10 +482,10 @@ export class Component extends Messenger {
     this[$$].__notifiable = true;
 
     this[__].rootNodes.forEach((n) => {
-      if (isComponent(n)) (n as Component).__handleAfterRender();
+      if (isComponent(n)) n.__handleAfterRender();
     });
     this[__].nonRootCompNodes.forEach((n) => {
-      if (isComponent(n)) (n as Component).__handleAfterRender();
+      n.__handleAfterRender();
     });
     this[__].state = ComponentStates.RENDERED;
     this[__].contextState =
