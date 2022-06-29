@@ -29,25 +29,23 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.28.0",
-    "@typescript-eslint/parser": "^5.28.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
     "chokidar": "^3.5.3",
     "convert-source-map": "^1.8.0",
-    "esbuild": "^0.14.44",
-    "eslint": "^8.17.0",
+    "esbuild": "^0.14.47",
+    "eslint": "^8.18.0",
     "eslint-config-prettier": "^8.5.0",
-    "eslint-import-resolver-typescript": "^2.7.1",
+    "eslint-import-resolver-typescript": "^3.1.1",
     "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-prettier": "^4.1.0",
     "husky": "^8.0.1",
-    "lint-staged": "^13.0.1",
-    "prettier": "^2.7.0",
-    "typescript": "^4.7.3"
+    "jinge-compiler": "^3.2.1",
+    "lint-staged": "^13.0.3",
+    "prettier": "^2.7.1",
+    "typescript": "^4.7.4"
   },
   "peerDependencies": {
     "jinge-compiler": ">= 3.2.1"
-  },
-  "dependencies": {
-    "jinge-compiler": "^3.2.1"
   }
 }
