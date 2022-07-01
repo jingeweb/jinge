@@ -1,4 +1,4 @@
-import { isString, isUndefined, isObject } from './type';
+import { isString, isUndefined, isObject, isArray, isNumber } from './type';
 import { DeregisterFn } from './common';
 
 export function setText($element: Node, text: unknown): void {
@@ -45,7 +45,7 @@ export function removeAttribute($ele: Element, attrName: string): void {
   return $ele.removeAttribute(attrName);
 }
 
-export function setAttribute($ele: Element, attrName: string, attrValue: unknown): void {
+export function setAttribute($ele: Element, attrName: string, attrValue: unknown) {
   if (!attrName) return;
   if (isObject(attrName)) {
     for (const attrN in attrName as unknown as Record<string, unknown>) {
@@ -60,7 +60,7 @@ export function setAttribute($ele: Element, attrName: string, attrValue: unknown
   }
 }
 
-function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node | string)[]): Element {
+function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node | string)[]) {
   if (attrs) {
     for (const an in attrs) {
       if (an && !isUndefined(attrs[an])) {
@@ -72,23 +72,23 @@ function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node
   return $el;
 }
 
-export function createElement(tag: string, attrs: Record<string, unknown>, ...children: (Node | string)[]): Element {
+export function createElement(tag: string, attrs: Record<string, unknown>, ...children: (Node | string)[]) {
   return _createEl(document.createElement(tag), attrs, children);
 }
 
-export function createElementWithoutAttrs(tag: string, ...children: (Node | string)[]): Element {
+export function createElementWithoutAttrs(tag: string, ...children: (Node | string)[]) {
   return createElement(tag, null, ...children);
 }
 
-export function createSVGElement(tag: string, attrs: Record<string, unknown>, ...children: Node[]): Element {
+export function createSVGElement(tag: string, attrs: Record<string, unknown>, ...children: Node[]) {
   return _createEl(document.createElementNS('http://www.w3.org/2000/svg', tag), attrs, children);
 }
 
-export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]): Element {
+export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]) {
   return createSVGElement(tag, null, ...children);
 }
 
-export function createElementWithChild(tag: string, attrs: Record<string, unknown>, child: Node | string): Element {
+export function createElementWithChild(tag: string, attrs: Record<string, unknown>, child: Node | string) {
   const $e = createElement(tag, attrs);
   $e.appendChild(isString(child) ? createTextNode(child) : (child as Node));
   return $e;
@@ -104,7 +104,7 @@ export function insertAfter($parent: Node, newNode: Node, referenceNode: Node): 
 }
 
 export function addEvent(
-  $element: Element,
+  $element: Element | Window | Document,
   eventName: string,
   handler: EventListener,
   capture?: boolean | AddEventListenerOptions,
@@ -119,7 +119,7 @@ export function addEvent(
   $element.addEventListener(eventName, handler, capture);
 }
 
-export function removeEvent($element: Element, eventName: string, handler: EventListener): void {
+export function removeEvent($element: Element | Window | Document, eventName: string, handler: EventListener): void {
   $element.removeEventListener(eventName, handler);
 }
 
@@ -130,7 +130,7 @@ export function removeEvent($element: Element, eventName: string, handler: Event
  * @returns {Function} deregister function which will removeEventListener
  */
 export function registerEvent(
-  $element: Element,
+  $element: Element | Window | Document,
   eventName: string,
   handler: EventListener,
   capture?: boolean | AddEventListenerOptions,
@@ -139,4 +139,79 @@ export function registerEvent(
   return function deregister(): void {
     removeEvent($element, eventName, handler);
   };
+}
+
+export type CLASSNAME = string | Record<string, boolean> | CLASSNAME[];
+
+export function class2str(className: CLASSNAME) {
+  if (!className) return className as string;
+  if (isString(className)) {
+    return className.trim();
+  }
+  if (isArray(className)) {
+    const clist: string[] = [];
+    className.forEach((cn) => {
+      const seg = class2str(cn);
+      seg && clist.push(seg);
+    });
+    return clist.join(' ').trim();
+  }
+  return Object.keys(className)
+    .filter((k) => !!className[k])
+    .join(' ')
+    .trim();
+}
+
+export function setClassAttribute($ele: Element, className: CLASSNAME) {
+  className = class2str(className);
+  if (!className) $ele.removeAttribute('class');
+  else $ele.setAttribute('class', className);
+}
+
+const UNITLESS = new Set([
+  'box-flex',
+  'box-flex-group',
+  'column-count',
+  'flex',
+  'flex-grow',
+  'flex-positive',
+  'flex-shrink',
+  'flex-negative',
+  'font-weight',
+  'line-clamp',
+  'line-height',
+  'opacity',
+  'order',
+  'orphans',
+  'tab-size',
+  'widows',
+  'z-index',
+  'zoom',
+  'fill-opacity',
+  'stroke-dashoffset',
+  'stroke-opacity',
+  'stroke-width',
+]);
+export function style2str(style: string | Record<string, string | number>) {
+  if (!style) return style as string;
+  if (isString(style)) return style.trim();
+  const segs: string[] = [];
+  Object.keys(style).forEach((k) => {
+    let v = style[k] as string | number;
+    if (isUndefined(v) || k === null) return;
+    k = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+    if (isNumber(v) && !UNITLESS.has(k)) {
+      v = `${v}px`;
+    } else {
+      v = v.toString();
+    }
+    segs.push(`${k}: ${v};`);
+  });
+  return segs.join(' ').trim();
+}
+
+export function setStyleAttribute($ele: Element, style: string | Record<string, string | number>) {
+  style = style2str(style);
+  if (!style) $ele.removeAttribute('style');
+  else $ele.setAttribute('style', style);
 }

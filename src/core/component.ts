@@ -10,6 +10,7 @@ import {
   replaceChildren,
   warn,
   DeregisterFn,
+  CLASSNAME,
 } from '../util';
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
@@ -43,6 +44,8 @@ interface CompilerAttributes {
 }
 
 export type ComponentAttributes = ViewModelObject & {
+  class?: CLASSNAME;
+  style?: string | Record<string, string | number>;
   [__]?: CompilerAttributes;
 };
 
@@ -192,6 +195,10 @@ export class Component extends Messenger {
   [__]: ComponentProperties;
   [$$]: ViewModelCore;
 
+  /* 预定义好的常用的传递样式控制的属性 */
+  class: ComponentAttributes['class'];
+  style: ComponentAttributes['style'];
+
   /**
    * ATTENTION!!!
    *
@@ -218,6 +225,15 @@ export class Component extends Messenger {
       upNextMap: null,
       deregFns: null,
     };
+
+    /** class 和 style 两个最常用的属性，默认从 attributes 中取出并监听。 */
+    const $proxy = this[$$].proxy as Record<string, unknown>;
+    ['class', 'style'].forEach((attrN) => {
+      if (!(attrN in attrs)) return;
+      const f = () => ($proxy[attrN] = attrs[attrN]);
+      f();
+      attrs[$$].__watch(attrN, f);
+    });
   }
 
   /**
@@ -251,7 +267,7 @@ export class Component extends Messenger {
    * @returns {Function} deregister function to remove listener
    */
   __domAddListener(
-    $el: HTMLElement,
+    $el: Element | Window | Document,
     eventName: string,
     listener: EventListener,
     capture?: boolean | AddEventListenerOptions,
