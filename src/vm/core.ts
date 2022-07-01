@@ -70,7 +70,7 @@ export class ViewModelCoreImpl implements ViewModelNode, ViewModelCore {
     if (related && related !== this) {
       /**
        * If some child of this component is passed as argument(ie.
-       * use arg:pass attribute) like ng-tranclude in angular 1.x,
+       * use slot-pass: attribute) like ng-tranclude in angular 1.x,
        * the child may contain some messenger listeners not belong to
        * this component but belong to outer parent.
        *

@@ -2,14 +2,14 @@ import { isString, isUndefined, isObject, isArray, isNumber } from './type';
 import { DeregisterFn } from './common';
 
 export function setText($element: Node, text: unknown): void {
-  if (!isString(text)) {
+  if (isObject(text)) {
     text = JSON.stringify(text);
   }
   $element.textContent = text as string;
 }
 
 export function createTextNode(text: unknown = ''): Text {
-  return document.createTextNode(isString(text) ? (text as string) : JSON.stringify(text));
+  return document.createTextNode(isObject(text) ? JSON.stringify(text) : (text as string));
 }
 
 export function createFragment(children?: (Node | string)[]): DocumentFragment {
@@ -192,22 +192,30 @@ const UNITLESS = new Set([
   'stroke-opacity',
   'stroke-width',
 ]);
-export function style2str(style: string | Record<string, string | number>) {
+export function style2str(style: string | Record<string, string | number | boolean>) {
   if (!style) return style as string;
   if (isString(style)) return style.trim();
+  if (Array.isArray(style)) {
+    const slist: string[] = [];
+    style.forEach((sty) => {
+      const seg = style2str(sty);
+      seg && slist.push(seg);
+    });
+    return slist.join('').trim();
+  }
   const segs: string[] = [];
   Object.keys(style).forEach((k) => {
-    let v = style[k] as string | number;
-    if (isUndefined(v) || k === null) return;
+    let v = style[k];
+    if (!v && v !== 0) return;
     k = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
     if (isNumber(v) && !UNITLESS.has(k)) {
       v = `${v}px`;
     } else {
       v = v.toString();
     }
-    segs.push(`${k}: ${v};`);
+    segs.push(`${k}:${v};`);
   });
-  return segs.join(' ').trim();
+  return segs.join('').trim();
 }
 
 export function setStyleAttribute($ele: Element, style: string | Record<string, string | number>) {

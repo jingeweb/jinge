@@ -8,13 +8,13 @@ export function emptyRenderFn(component: Component): Node[] {
   return [el];
 }
 
-export function errorRenderFn(component: Component): Node {
+export function errorRenderFn(component: Component): Node[] {
   const el = createElement('span', {
     style: 'color: red !important;',
   });
   el.textContent = 'template parsing failed! please check webpack log.';
   component[__].rootNodes.push(el);
-  return el;
+  return [el];
 }
 
 export function textRenderFn(component: Component, txtContent: unknown): Node {
