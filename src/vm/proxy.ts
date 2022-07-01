@@ -1,4 +1,6 @@
 import { isNumber, isArray, isObject, isFunction, isPromise, isUndefined, warn } from '../util';
+import { Component } from '../core/component';
+
 import {
   ViewModelObject,
   ViewModelWatchHandler,
@@ -509,27 +511,47 @@ export function vm<T>(target: T) {
   return createViewModel<T>(target);
 }
 
-export function watch(vm: ViewModelObject, property: PropertyPathItem, handler: ViewModelWatchHandler): void;
-export function watch(vm: ViewModelObject, propertyStringPath: string, handler: ViewModelWatchHandler): void;
-export function watch(vm: ViewModelObject, propertyArrayPath: PropertyPathItem[], handler: ViewModelWatchHandler): void;
 export function watch(
-  vm: ViewModelObject,
+  vm: ViewModelObject | Component,
+  property: PropertyPathItem,
+  handler: ViewModelWatchHandler,
+): void;
+export function watch(
+  vm: ViewModelObject | Component,
+  propertyStringPath: string,
+  handler: ViewModelWatchHandler,
+): void;
+export function watch(
+  vm: ViewModelObject | Component,
+  propertyArrayPath: PropertyPathItem[],
+  handler: ViewModelWatchHandler,
+): void;
+export function watch(
+  vm: ViewModelObject | Component,
   propertyPath?: string | PropertyPathItem | PropertyPathItem[],
   handler?: ViewModelWatchHandler,
 ): void {
   vm[$$].__watch(propertyPath, handler);
 }
 
-export function unwatch(vm: ViewModelObject): void;
-export function unwatch(vm: ViewModelObject, property: PropertyPathItem, handler?: ViewModelWatchHandler): void;
-export function unwatch(vm: ViewModelObject, propertyStringPath: string, handler?: ViewModelWatchHandler): void;
+export function unwatch(vm: ViewModelObject | Component): void;
 export function unwatch(
-  vm: ViewModelObject,
+  vm: ViewModelObject | Component,
+  property: PropertyPathItem,
+  handler?: ViewModelWatchHandler,
+): void;
+export function unwatch(
+  vm: ViewModelObject | Component,
+  propertyStringPath: string,
+  handler?: ViewModelWatchHandler,
+): void;
+export function unwatch(
+  vm: ViewModelObject | Component,
   propertyArrayPath: PropertyPathItem[],
   handler?: ViewModelWatchHandler,
 ): void;
 export function unwatch(
-  vm: ViewModelObject,
+  vm: ViewModelObject | Component,
   propertyPath?: string | PropertyPathItem | PropertyPathItem[],
   handler?: ViewModelWatchHandler,
 ): void {
