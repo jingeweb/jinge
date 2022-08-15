@@ -166,10 +166,22 @@ export class ForComponent extends Component {
     }
     super(attrs);
 
-    if (!isViewModel(attrs.loop)) {
-      throw new Error('require ViewModelArray');
+    /**
+     * <for> 组件的 loop 属性可以支持不是 ViewModel 的数组，因此直接通过
+     * this._l = attrs.loop 的形式初始化赋值。
+     */
+    if (isViewModel(attrs.loop)) {
+      this.loop = attrs.loop as ViewModelArray;
+      /**
+       * 编译器只对直接在构造函数体里最顶部的 this.xxx = attrs.xxx 的赋值形式才会进行监听。
+       * 这里的 this.loop = attrs.loop 写在了 if 的条件内部，需要手动添加监听代码。
+       */
+      attrs[$$].__watch('loop', () => {
+        this.loop = attrs.loop as ViewModelArray;
+      });
+    } else {
+      this._l = attrs.loop as ViewModelArray;
     }
-    this.loop = attrs.loop;
 
     const kn = (attrs.key as string) || 'index'; // TODO: support handle attrs.key change
     this._keyName = kn;

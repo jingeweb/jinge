@@ -1,39 +1,35 @@
-import { Component, __, isComponent, Attributes } from '../core/component';
-import { isObject, removeEvent, addEvent, setImmediate } from '../util';
-import { $$ } from '../vm/common';
+import { Component, Attributes } from '../core/component';
+import { removeEvent, addEvent, setImmediate, setAttribute } from '../util';
 import { TransitionStates, getDurationType } from '../core/transition';
+import { $$ } from '../vm';
 
-function loopOperateClass(el: Component | Node, isAddOperate: boolean, domClass: string): void {
-  if (isComponent(el)) {
-    (el as Component)[__].rootNodes.forEach((ce) => loopOperateClass(ce, isAddOperate, domClass));
-  } else if (isAddOperate) {
-    (el as HTMLElement).classList.add(domClass);
-  } else {
-    (el as HTMLElement).classList.remove(domClass);
-  }
+enum ClassOpType {
+  ADD,
+  DEL,
 }
 
 export interface ToggleClassComponentAttrs {
-  class: Record<string, boolean>;
+  /** 是否开启动画切换，默认为 true。
+   * 通常不需要指定为 false，因为如果不需要动画能力，则不需要使用 toggle-class 组件包裹，
+   * 直接配置 dom 元素的 :class 属性即可。
+   */
   transition?: boolean;
 }
+
+/**
+ * 带有 transition 能力的切换 dom class 的组件。
+ */
 export class ToggleClassComponent extends Component {
-  domClass: Record<string, boolean>;
+  _ts: Map<string, [TransitionStates, EventListener]>;
+  /** old class list set */
+  _cs: Set<string>;
+  /** enable transition */
   transition: boolean;
-  _t: Map<string, [TransitionStates, EventListener]>;
-  _i: number;
 
   constructor(attrs: Attributes<ToggleClassComponentAttrs>) {
-    if (!attrs || !isObject(attrs.class)) {
-      throw new Error('<toggle-class> component require "class" attribute to be Object.');
-    }
     super(attrs);
-    this.domClass = attrs.class;
-    this.transition = !!attrs.transition;
-
-    this._t = null;
-    this._i = -1; // update immediate
-    this[$$].__watch('domClass.**', () => {
+    this.transition = attrs.transition !== false;
+    this[$$].__watch('class', () => {
       this.__updateIfNeed();
     });
   }
@@ -45,61 +41,79 @@ export class ToggleClassComponent extends Component {
   }
 
   __beforeDestroy() {
-    this._t = null; // maybe unnecessary
+    this._ts = null; // maybe unnecessary
   }
 
   __update(first: boolean) {
-    const el = this.transition ? (this.__transitionDOM as HTMLElement) : null;
+    const el = this.__transitionDOM as HTMLElement;
     if (el && el.nodeType !== Node.ELEMENT_NODE) {
       // ignore comment or text-node
       return;
     }
-    if (this.transition && !this._t) {
-      this._t = new Map();
+
+    if (!this.transition) {
+      setAttribute(el, 'class', this.class);
+      return;
     }
-    const cs = this.domClass;
-    Object.keys(cs).forEach((k) => {
-      const v = cs[k];
-      if (!this.transition) {
-        loopOperateClass(this as unknown as Component, !!v, k);
-        return;
-      }
 
-      if (first) {
-        this._t.set(k, [
-          v ? TransitionStates.ENTERED : TransitionStates.LEAVED, // state
-          null, // saved onEnd callback
-        ]);
-        if (v) {
-          el.classList.add(k);
-        } else {
-          el.classList.remove(k);
-        }
-        return;
-      }
+    if (!this._ts) {
+      this._ts = new Map();
+    }
 
-      const t = this._t.get(k);
+    const newClassList = new Set(this.class ? (this.class as string).split(' ') : []);
+    if (first) {
+      // 初始化首次渲染，暂不支持 transition 动画。TODO: 支持页面初始渲染时的切入动画。
+      newClassList.forEach((clz) => {
+        this._ts.set(clz, [TransitionStates.ENTERED, null]);
+        el.classList.add(clz);
+      });
+      this._cs = newClassList;
+      return;
+    }
+
+    const preClassList = this._cs;
+    const diffClassList: {
+      className: string;
+      type: ClassOpType;
+    }[] = [];
+    newClassList.forEach((clz) => {
+      if (preClassList.has(clz)) {
+        preClassList.delete(clz); // 删除已经存在的，剩下的就是待从原来的 classList 中移除的 className
+      } else {
+        diffClassList.push({ className: clz, type: ClassOpType.ADD });
+      }
+    });
+    preClassList.forEach((clz) => {
+      diffClassList.push({ className: clz, type: ClassOpType.DEL });
+    });
+    this._cs = newClassList;
+
+    if (diffClassList.length === 0) {
+      return;
+    }
+
+    diffClassList.forEach(({ className, type }) => {
+      const isAdd = type === ClassOpType.ADD;
+      let t = this._ts.get(className);
       if (!t) {
-        // eslint-disable-next-line no-console
-        console.error('Unsupport <toogle-class> attribute. see https://todo');
-        return;
+        t = [isAdd ? TransitionStates.LEAVED : TransitionStates.ENTERED, null];
+        this._ts.set(className, t);
       }
-      const s = t[0];
-      if ((v && s <= TransitionStates.ENTERED) || (!v && s >= TransitionStates.LEAVING)) {
+      if ((isAdd && t[0] <= TransitionStates.ENTERED) || (!isAdd && t[0] >= TransitionStates.LEAVING)) {
         return;
       }
 
-      if (s === (v ? TransitionStates.LEAVING : TransitionStates.ENTERING)) {
-        el.classList.remove(k + (v ? '-leave-active' : '-enter-active'));
-        el.classList.remove(k + (v ? '-leave' : '-enter'));
+      if (t && t[0] === (isAdd ? TransitionStates.LEAVING : TransitionStates.ENTERING)) {
+        el.classList.remove(className + (isAdd ? '-leave-active' : '-enter-active'));
+        el.classList.remove(className + (isAdd ? '-leave' : '-enter'));
 
         removeEvent(el, 'transitionend', t[1]);
         removeEvent(el, 'animationend', t[1]);
         t[1] = null;
-        this.__notify('transition', v ? 'leave-cancelled' : 'enter-cancelled', k, el);
+        this.__notify('transition', isAdd ? 'leave-cancelled' : 'enter-cancelled', className, el);
       }
-      const classOfStart = k + (v ? '-enter' : '-leave');
-      const classOfActive = k + (v ? '-enter-active' : '-leave-active');
+      const classOfStart = className + (isAdd ? '-enter' : '-leave');
+      const classOfActive = className + (isAdd ? '-enter-active' : '-leave-active');
       el.classList.add(classOfStart);
       // force render by calling getComputedStyle
       getDurationType(el);
@@ -108,11 +122,11 @@ export class ToggleClassComponent extends Component {
       if (!tsEndName) {
         el.classList.remove(classOfStart);
         el.classList.remove(classOfActive);
-        t[0] = v ? TransitionStates.ENTERED : TransitionStates.LEAVED;
-        if (v) {
-          el.classList.add(k);
+        t[0] = isAdd ? TransitionStates.ENTERED : TransitionStates.LEAVED;
+        if (isAdd) {
+          el.classList.add(className);
         } else {
-          el.classList.remove(k);
+          el.classList.remove(className);
         }
         return;
       }
@@ -122,20 +136,20 @@ export class ToggleClassComponent extends Component {
         el.classList.remove(classOfStart);
         el.classList.remove(classOfActive);
         t[1] = null;
-        t[0] = v ? TransitionStates.ENTERED : TransitionStates.LEAVED;
-        if (v) {
-          el.classList.add(k);
+        t[0] = isAdd ? TransitionStates.ENTERED : TransitionStates.LEAVED;
+        if (isAdd) {
+          el.classList.add(className);
         } else {
-          el.classList.remove(k);
+          el.classList.remove(className);
         }
-        this.__notify('transition', v ? 'after-enter' : 'after-leave', k, el);
+        this.__notify('transition', isAdd ? 'after-enter' : 'after-leave', className, el);
       };
-      t[0] = v ? TransitionStates.ENTERING : TransitionStates.LEAVING;
+      t[0] = isAdd ? TransitionStates.ENTERING : TransitionStates.LEAVING;
       t[1] = onEnd;
       addEvent(el, tsEndName, onEnd);
-      this.__notify('transition', v ? 'before-enter' : 'before-leave', k, el);
+      this.__notify('transition', isAdd ? 'before-enter' : 'before-leave', className, el);
       setImmediate(() => {
-        this.__notify('transition', v ? 'enter' : 'leave', k, el);
+        this.__notify('transition', isAdd ? 'enter' : 'leave', className, el);
       });
     });
   }

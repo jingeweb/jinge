@@ -1,19 +1,21 @@
-import { $$ } from '../vm/common';
-import { vm } from '../vm/index';
+import { $$ } from '../vm';
 import { Attributes } from '../core/component';
-import { ToggleClassComponent, ToggleClassComponentAttrs } from './class';
+import { ToggleClassComponent } from './class';
 
 export interface HideComponentAttrs {
   test: boolean;
+  transition: boolean;
 }
 export class HideComponent extends ToggleClassComponent {
+  test: boolean;
+  transition: boolean;
+
   constructor(attrs: Attributes<HideComponentAttrs>) {
-    attrs.class = vm({
-      'jg-hide': attrs.test as boolean,
-    });
-    attrs[$$].__watch('test', () => {
-      (attrs.class as { 'jg-hide': boolean })['jg-hide'] = attrs.test;
-    });
-    super(attrs as unknown as Attributes<ToggleClassComponentAttrs>);
+    const fn = () => {
+      attrs.class = attrs.test ? 'jg-hide' : null;
+    };
+    fn();
+    attrs[$$].__watch('test', fn);
+    super(attrs);
   }
 }

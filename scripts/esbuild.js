@@ -40,7 +40,7 @@ async function transformFile(file) {
   if (warnings?.length) console.error(warnings);
   if (!code) return; // ignore empty file
   if (file.startsWith(COMP_DIR)) {
-    const result = await ComponentParser.parse(code, null, {
+    const result = ComponentParser.parse(code, null, {
       resourcePath: file,
       _innerLib: true,
     });
@@ -59,11 +59,12 @@ async function transformFile(file) {
 
 async function handleChange(file) {
   if (!/\.(ts)$/.test(file)) return;
+  const rf = path.relative(SRC_DIR, file);
   try {
     await transformFile(file);
-    console.log(fn, 'compiled.');
+    console.log(rf, 'compiled.');
   } catch (ex) {
-    console.error(fn, 'failed.');
+    console.error(rf, 'failed.');
     console.error(ex);
   }
 }

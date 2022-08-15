@@ -10,12 +10,10 @@
     "alwaysStrict": true,
     "moduleResolution": "node",
     "declaration": true,
+    "declarationDir": "lib",
     "sourceMap": true,
-    "outDir": "types",
-    "baseUrl": ".",
-    "paths": {
-      
-    }
+    "outDir": ".tmp",
+    "baseUrl": "."
   },
   "include": [
     "src/**/*"

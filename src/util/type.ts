@@ -30,6 +30,6 @@ export function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
   return typeOf(v) === 'function';
 }
 
-export function isPromise(obj: { then?: unknown }): obj is Promise<unknown> {
+export function isPromise(obj: unknown): obj is Promise<unknown> {
   return isObject(obj) && isFunction(obj.then);
 }

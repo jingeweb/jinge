@@ -340,7 +340,7 @@ export class Component extends Messenger {
   /**
    * Get rendered DOM Node which should be apply transition.
    *
-   * 返回在 transition 动画时应该被应用到的 DOM 节点。
+   * 返回在 transition 动画时应该被应用到的 DOM 节点。默认返回第 0 个 html dom 节点，也可以通过覆盖该属性为特定业务组件指定动画节点。
    */
   get __transitionDOM(): Node {
     const el = this[__].rootNodes[0];
@@ -576,8 +576,8 @@ export class Component extends Messenger {
     this[__].context[key as string] = value;
   }
 
-  __getContext(key: string | symbol): unknown {
-    return this[__].context ? this[__].context[key as string] : null;
+  __getContext<T = unknown>(key: string | symbol): T {
+    return this[__].context?.[key as string] as T;
   }
 
   /**
@@ -622,13 +622,13 @@ export class Component extends Messenger {
   /**
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
-  __getRef(ref: string): Component | Node | (Component | Node)[] {
+  __getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string): T {
     if (this[__].state !== ComponentStates.RENDERED) {
       warn(
         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing. see https://[TODO]`,
       );
     }
-    return this[__].refs ? this[__].refs.get(ref) : null;
+    return this[__].refs?.get(ref) as T;
   }
   /**
    * lifecycle hook, called after rendered.
