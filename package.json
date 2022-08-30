@@ -1,37 +1,55 @@
 {
   "name": "jinge",
-  "version": "0.0.0",
+  "version": "3.2.2",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
-  "main": "src/index.js",
+  "main": "lib/index.js",
+  "types": "src/index.ts",
   "scripts": {
-    "lint": "eslint --fix .",
-    "validate": "npm ls"
+    "dev": "WATCH=true npm run build",
+    "build": "rm -rf ./lib && tsc && rm -rf .tmp && node ./scripts/esbuild.js && rollup -c ./scripts/rollup.config.js",
+    "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,ts}' --fix",
+    "lint-staged": "lint-staged",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{js,ts}": "eslint --fix"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YuhangGe/jinge.git"
+    "url": "git+https://github.com/jingeweb/jinge.git"
   },
-  "license": "ISC",
-  "homepage": "https://github.com/YuhangGe/jinge#readme",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/jingeweb/jinge#readme",
   "bugs": {
-    "url": "https://github.com/YuhangGe/jinge/issues"
+    "url": "https://github.com/jingeweb/jinge/issues"
   },
   "keywords": [
     "mvvm",
-    "jinge",
     "spa"
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
-  "dependencies": {},
   "devDependencies": {
-    "acorn": "^6.1.0",
-    "acorn-walk": "^6.1.1",
-    "antlr4": "^4.7.2",
-    "escodegen": "^1.11.0",
-    "eslint": "^5.14.0",
-    "precommit-hook": "^3.0.0"
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "@typescript-eslint/eslint-plugin": "^5.36.0",
+    "@typescript-eslint/parser": "^5.36.0",
+    "chokidar": "^3.5.3",
+    "convert-source-map": "^1.8.0",
+    "esbuild": "^0.15.6",
+    "eslint": "^8.23.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-import-resolver-typescript": "^3.5.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "husky": "^8.0.1",
+    "jinge-compiler": "^3.2.2",
+    "lint-staged": "^13.0.3",
+    "prettier": "^2.7.1",
+    "rollup": "^2.78.1",
+    "rollup-plugin-sourcemaps": "^0.6.3",
+    "rollup-plugin-terser": "^7.0.2",
+    "typescript": "^4.8.2"
   },
-  "pre-commit": [
-    "lint"
-  ]
+  "peerDependencies": {
+    "jinge-compiler": ">= 3.2.2"
+  }
 }

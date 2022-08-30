@@ -4,4 +4,7 @@ node_modules
 /.vscode
 /.git
 dist
-/compiler/template/parser
+compiler/template/parser
+lib/
+types/
+**/.DS_Store

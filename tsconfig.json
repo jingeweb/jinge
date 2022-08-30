@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2020",
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "stripInternal": true,
+    "alwaysStrict": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationDir": "lib",
+    "sourceMap": true,
+    "outDir": ".tmp",
+    "baseUrl": "."
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
