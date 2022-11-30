@@ -1,12 +1,13 @@
 {
   "name": "jinge",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "A Messenger, Proxy and Compiler based MVVM framework",
   "main": "lib/index.js",
   "types": "src/index.ts",
   "scripts": {
     "dev": "WATCH=true npm run build",
-    "build": "rm -rf ./lib && tsc && rm -rf .tmp && node ./scripts/esbuild.js && rollup -c ./scripts/rollup.config.js",
+    "build": "rm -rf {lib,.tmp,dist} && tsc && node ./scripts/esbuild.js && rollup -c ./scripts/rollup.config.mjs",
+    "rollup": "rollup -c ./scripts/rollup.config.mjs",
     "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,ts}' --fix",
     "lint-staged": "lint-staged",
     "prepare": "husky install"
@@ -29,27 +30,25 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^13.3.0",
-    "@typescript-eslint/eslint-plugin": "^5.36.0",
-    "@typescript-eslint/parser": "^5.36.0",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-terser": "^0.1.0",
+    "@typescript-eslint/eslint-plugin": "^5.46.0",
+    "@typescript-eslint/parser": "^5.46.0",
     "chokidar": "^3.5.3",
-    "convert-source-map": "^1.8.0",
-    "esbuild": "^0.15.6",
-    "eslint": "^8.23.0",
+    "esbuild": "^0.16.4",
+    "eslint": "^8.29.0",
     "eslint-config-prettier": "^8.5.0",
-    "eslint-import-resolver-typescript": "^3.5.0",
+    "eslint-import-resolver-typescript": "^3.5.2",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-prettier": "^4.2.1",
-    "husky": "^8.0.1",
-    "jinge-compiler": "^3.2.2",
-    "lint-staged": "^13.0.3",
-    "prettier": "^2.7.1",
-    "rollup": "^2.78.1",
-    "rollup-plugin-sourcemaps": "^0.6.3",
-    "rollup-plugin-terser": "^7.0.2",
-    "typescript": "^4.8.2"
+    "husky": "^8.0.2",
+    "lint-staged": "^13.1.0",
+    "prettier": "^2.8.1",
+    "rollup": "^3.7.3",
+    "rollup-plugin-esbuild": "^5.0.0",
+    "typescript": "^4.9.4"
   },
   "peerDependencies": {
-    "jinge-compiler": ">= 3.2.2"
+    "jinge-compiler": "^3.2.3"
   }
 }

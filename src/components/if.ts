@@ -143,10 +143,7 @@ function updateSwitchWithTransition(component: IfComponent | SwitchComponent): v
 }
 
 function updateSwitch(component: IfComponent | SwitchComponent): void {
-  if (
-    !isComponent(component[__].rootNodes[0]) &&
-    (!component[__].slots || !component[__].slots[component._currentValue])
-  ) {
+  if (!isComponent(component[__].rootNodes[0]) && !component[__].slots?.[component._currentValue]) {
     return;
   }
 
