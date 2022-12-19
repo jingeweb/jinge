@@ -10,7 +10,7 @@ import {
   Attributes,
 } from '../core/component';
 import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/common';
-import { isString, isNumber, isArray, createFragment, insertAfter } from '../util';
+import { isString, isNumber, isArray, createFragment, insertAfter, isUndefined } from '../util';
 
 type ForKeyNameFn = (v: unknown) => string;
 type ForKeyName = string | ForKeyNameFn;
@@ -170,7 +170,7 @@ export class ForComponent extends Component {
      * <for> 组件的 loop 属性可以支持不是 ViewModel 的数组，因此直接通过
      * this._l = attrs.loop 的形式初始化赋值。
      */
-    if (isViewModel(attrs.loop)) {
+    if (isUndefined(attrs.loop) || attrs.loop === null || isViewModel(attrs.loop)) {
       this.loop = attrs.loop as ViewModelArray;
       /**
        * 编译器只对直接在构造函数体里最顶部的 this.xxx = attrs.xxx 的赋值形式才会进行监听。
