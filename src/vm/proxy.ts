@@ -489,7 +489,7 @@ export function createAttributes<T>(attributes: T) {
 //   _di.vms.push(vm);
 // }
 
-export function createComponent<T>(component: T): T {
+export function createComponent<T extends object>(component: T): T {
   if ($$ in component) {
     throw new Error('component has alreay been wrapped.');
   }
