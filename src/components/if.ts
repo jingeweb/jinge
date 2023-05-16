@@ -1,14 +1,5 @@
-import {
-  __,
-  isComponent,
-  attrs as wrapAttrs,
-  RenderFn,
-  Component,
-  assertRenderResults,
-  Attributes,
-} from '../core/component';
-import { TransitionStates, getDurationType } from '../core/transition';
-import { createFragment, addEvent, setImmediate, removeEvent } from '../util';
+import { __, isComponent, attrs as wrapAttrs, RenderFn, Component, Attributes } from '../core/component';
+import { createFragment } from '../util';
 
 function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>) {
   const attrs = wrapAttrs({
@@ -22,21 +13,9 @@ function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>)
   return Component.create(attrs);
 }
 
-function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
-  const value = component._currentValue;
-  const acs = component[__].slots;
-  if (component.transition && acs) {
-    component._transitionMap = new Map();
-    for (const k in acs) {
-      component._transitionMap.set(k, [
-        k === value ? TransitionStates.ENTERED : TransitionStates.LEAVED,
-        null, // element
-      ]);
-    }
-    component._previousValue = value;
-    component._onEndHandler = component.onTransitionEnd.bind(component);
-  }
-  const renderFn = acs ? acs[value] : null;
+function renderSwitch(component: Component, slot: string) {
+  const slots = component[__].slots;
+  const renderFn = slots ? slots[slot] : null;
   const roots = component[__].rootNodes;
   if (!renderFn) {
     roots.push(document.createComment('empty'));
@@ -47,16 +26,16 @@ function renderSwitch(component: IfComponent | SwitchComponent): Node[] {
   return el.__render();
 }
 
-function doUpdate(component: IfComponent | SwitchComponent) {
+async function doUpdate(component: Component, slot: string) {
   const roots = component[__].rootNodes;
   const el = roots[0];
   const isComp = isComponent(el);
   const firstDOM = (isComp ? (el as Component).__firstDOM : el) as Node;
   const parentDOM = (isComp ? firstDOM : (el as Node)).parentNode;
-  const renderFn = component[__].slots?.[component._currentValue];
+  const renderFn = component[__].slots?.[slot];
   if (renderFn) {
     const newEl = createEl(renderFn, component[__].context);
-    const nodes = assertRenderResults((newEl as Component).__render());
+    const nodes = await (newEl as Component).__render();
     parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
     roots[0] = newEl;
   } else {
@@ -64,258 +43,132 @@ function doUpdate(component: IfComponent | SwitchComponent) {
     parentDOM.insertBefore(roots[0], firstDOM);
   }
   if (isComp) {
-    (el as Component).__destroy();
+    await (el as Component).__destroy();
   } else {
     parentDOM.removeChild(firstDOM);
   }
-  renderFn && (roots[0] as Component).__handleAfterRender();
-  component.__notify('branch-switched', component._branch);
-}
-
-function cancelTs(t: [TransitionStates, Node], tn: string, e: boolean, component: IfComponent | SwitchComponent): void {
-  const el = t[1] as HTMLElement;
-  if (el.nodeType !== Node.ELEMENT_NODE) {
-    return;
-  }
-  const onEnd = component._onEndHandler;
-  el.classList.remove(tn + (e ? '-enter' : '-leave'));
-  el.classList.remove(tn + (e ? '-enter-active' : '-leave-active'));
-  removeEvent(el, 'transitionend', onEnd);
-  removeEvent(el, 'animationend', onEnd);
-  component.__notify('transition', e ? 'enter-cancelled' : 'leave-cancelled', el);
-}
-
-function startTs(t: [TransitionStates, Node], tn: string, e: boolean, component: IfComponent | SwitchComponent): void {
-  const el = t[1] as HTMLElement;
-  const onEnd = component._onEndHandler;
-  if (el.nodeType !== Node.ELEMENT_NODE) {
-    onEnd();
-    return;
-  }
-  const classOfStart = tn + (e ? '-enter' : '-leave');
-  const classOfActive = tn + (e ? '-enter-active' : '-leave-active');
-
-  el.classList.add(classOfStart);
-  // force render by calling getComputedStyle
-  getDurationType(el);
-  el.classList.add(classOfActive);
-  const tsEndName = getDurationType(el);
-  if (!tsEndName) {
-    onEnd();
-    return;
-  }
-  t[0] = e ? TransitionStates.ENTERING : TransitionStates.LEAVING;
-  addEvent(el, tsEndName, onEnd);
-  component.__notify('transition', e ? 'before-enter' : 'before-leave', el);
-  setImmediate(() => {
-    component.__notify('transition', e ? 'enter' : 'leave', el);
-  });
-}
-
-function updateSwitchWithTransition(component: IfComponent | SwitchComponent): void {
-  const value = component._currentValue;
-  const pv = component._previousValue;
-  const tn = component.transition;
-  let pt = component._transitionMap.get(pv);
-  if (!pt) {
-    pt = [
-      pv === 'else' ? TransitionStates.LEAVED : TransitionStates.ENTERED,
-      null, // element
-    ];
-    component._transitionMap.set(pv, pt);
-  }
-  // debugger;
-  if (pt[0] === TransitionStates.ENTERING) {
-    if (value === pv) return;
-    cancelTs(pt, tn, true, component);
-    startTs(pt, tn, false, component);
-  } else if (pt[0] === TransitionStates.LEAVING) {
-    if (value !== pv) return;
-    cancelTs(pt, tn, false, component);
-    startTs(pt, tn, true, component);
-  } else if (pt[0] === TransitionStates.ENTERED) {
-    pt[1] = component.__transitionDOM;
-    startTs(pt, tn, false, component);
-  } else if (pt[0] === TransitionStates.LEAVED) {
-    pt[1] = component.__transitionDOM;
-    startTs(pt, tn, true, component);
-  }
-}
-
-function updateSwitch(component: IfComponent | SwitchComponent): void {
-  if (!isComponent(component[__].rootNodes[0]) && !component[__].slots?.[component._currentValue]) {
-    return;
-  }
-
-  if (component._transitionMap) {
-    updateSwitchWithTransition(component);
-    return;
-  }
-
-  doUpdate(component);
-}
-
-function updateSwitchOnTransitionEnd(component: IfComponent | SwitchComponent): void {
-  // console.log('on end')
-  const value = component._currentValue;
-  const pv = component._previousValue;
-  const tn = component.transition;
-  const pt = component._transitionMap.get(pv);
-  const e = pt[0] === TransitionStates.ENTERING;
-  const el = pt[1] as HTMLElement;
-
-  if (el.nodeType === Node.ELEMENT_NODE) {
-    removeEvent(el, 'transitionend', component._onEndHandler);
-    removeEvent(el, 'animationend', component._onEndHandler);
-    el.classList.remove(tn + (e ? '-enter' : '-leave'));
-    el.classList.remove(tn + (e ? '-enter-active' : '-leave-active'));
-    component.__notify('transition', e ? 'after-enter' : 'after-leave');
-  }
-
-  pt[0] = e ? TransitionStates.ENTERED : TransitionStates.LEAVED;
-
-  if (e) return;
-
-  doUpdate(component);
-  component._previousValue = value;
-  const ct = component._transitionMap.get(value);
-  if (!ct) {
-    return;
-  }
-  const fd = component.__transitionDOM as HTMLElement;
-  if (fd.nodeType !== Node.ELEMENT_NODE) {
-    ct[0] = TransitionStates.ENTERED;
-    return;
-  }
-
-  ct[1] = fd;
-  startTs(ct, tn, true, component);
-}
-
-function destroySwitch(component: IfComponent | SwitchComponent): void {
-  if (component._transitionMap) {
-    component._transitionMap.forEach((ts) => {
-      const el = ts[1] as Element;
-      if (el) {
-        removeEvent(el, 'transitionend', component._onEndHandler);
-        removeEvent(el, 'animationend', component._onEndHandler);
-      }
-    });
-    component._transitionMap = null;
-  }
+  renderFn && (await (roots[0] as Component).__handleAfterRender());
 }
 
 export interface IfComponentAttrs {
   expect: boolean;
-  transition: string;
+}
+
+type IfSlots = 'default' | 'else' | 'true' | 'false';
+function getIfSlot(component: IfComponent, expect: boolean): IfSlots {
+  const slots = component[__].slots;
+  if (!slots) return 'default';
+  if (expect) {
+    return 'true' in slots ? 'true' : 'default';
+  } else {
+    return 'false' in slots ? 'false' : 'else';
+  }
 }
 export class IfComponent extends Component {
-  _transitionMap: Map<string, [TransitionStates, Node]>;
-  _previousValue: string;
-  _currentValue: string;
-  _onEndHandler: () => void;
-
-  transition: string;
+  _e: boolean;
+  /** 当前正在更新切换到的 slot 值。__update 切换是异步的。 */
+  _u: IfSlots;
 
   constructor(attrs: Attributes<IfComponentAttrs>) {
     super(attrs);
 
-    this._currentValue = 'default';
-    this._onEndHandler = null;
-    this._transitionMap = null;
-    this._previousValue = null;
-
     this.expect = attrs.expect;
-    this.transition = attrs.transition;
   }
 
   get expect(): boolean {
-    return this._currentValue === 'default';
+    return this._e;
   }
 
   set expect(value: boolean) {
-    const v = value ? 'default' : 'else';
-    if (this._currentValue === v) return;
-    this._currentValue = v;
+    if (this._e === value) return;
+    this._e = value;
     this.__updateIfNeed();
   }
 
-  get _branch(): boolean {
-    return this.expect;
+  async __doRender() {
+    const e = this._e;
+    this._u = getIfSlot(this, this._e);
+    const els = await renderSwitch(this, this._u);
+    this._u = undefined;
+    await this.__notify('branch-switched', e);
+    if (e !== this._e) {
+      // renderSwitch 是异步的，这个过程中，this._e 可能已经发生了变更。因此渲染结束后需要判定下是否需要重新更新。
+      this.__updateIfNeed(); // 在 nextTick 中重新更新
+    }
+    return els;
   }
 
-  onTransitionEnd(): void {
-    updateSwitchOnTransitionEnd(this);
-  }
-
-  __render(): Node[] {
-    return renderSwitch(this);
-  }
-
-  __update(): void {
-    updateSwitch(this);
-  }
-
-  __beforeDestroy(): void {
-    destroySwitch(this);
+  async __update(): Promise<void> {
+    if (this._u) {
+      return;
+    }
+    const e = this._e;
+    this._u = getIfSlot(this, e);
+    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[this._u]) {
+      this._u = undefined;
+      return;
+    }
+    await doUpdate(this, this._u);
+    this._u = undefined;
+    await this.__notify('branch-switched', e);
+    if (e !== this._e) {
+      this.__updateIfNeed();
+    }
   }
 }
 
 export interface SwitchComponentAttrs {
   test: string;
-  transition: string;
 }
 export class SwitchComponent extends Component {
-  _transitionMap: Map<string, [TransitionStates, Node]>;
-  _previousValue: string;
-  _currentValue: string;
-  _onEndHandler: () => void;
-
-  transition: string;
+  _v: string;
+  _u: string;
 
   constructor(attrs: Attributes<SwitchComponentAttrs>) {
     super(attrs);
 
-    this._onEndHandler = null;
-    this._transitionMap = null;
-    this._previousValue = null;
-    this._currentValue = null;
-
     this.test = attrs.test;
-    this.transition = attrs.transition;
   }
 
   get test(): string {
-    return this._currentValue;
+    return this._v;
   }
 
   set test(v: string) {
-    const acs = this[__].slots;
-    if (!acs || !(v in acs)) {
-      v = 'default';
-    }
-    if (this._currentValue === v) return;
-    this._currentValue = v;
+    if (this._v === v) return;
+    this._v = v;
     this.__updateIfNeed();
   }
 
-  get _branch(): string {
-    return this.test;
+  async __doRender() {
+    const v = this._v;
+    const els = await renderSwitch(this, v);
+    this._u = undefined;
+    if (v !== this._v) {
+      // renderSwitch 是异步的，这个过程中，this._e 可能已经发生了变更。因此渲染结束后需要判定下是否需要重新更新。
+      this.__updateIfNeed(); // 在 nextTick 中重新更新
+    } else {
+      await this.__notify('branch-switched', v);
+    }
+    return els;
   }
 
-  onTransitionEnd(): void {
-    updateSwitchOnTransitionEnd(this);
-  }
-
-  __render(): Node[] {
-    return renderSwitch(this);
-  }
-
-  __update(): void {
-    updateSwitch(this);
-  }
-
-  __beforeDestroy(): void {
-    destroySwitch(this);
+  async __update(): Promise<void> {
+    if (this._u) {
+      return;
+    }
+    const v = this._v;
+    this._u = v;
+    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[v]) {
+      this._u = undefined;
+      return;
+    }
+    await doUpdate(this, v);
+    this._u = undefined;
+    if (v !== this._v) {
+      this.__updateIfNeed();
+    } else {
+      await this.__notify('branch-switched', v);
+    }
   }
 }

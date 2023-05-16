@@ -1,4 +1,6 @@
-export type MessengerListener = (...args: unknown[]) => void;
+export type MessengerListener = (...args: unknown[]) => Promise<void> | void;
+export type MessengerOffFn = () => void;
+
 export interface MessengerListenerOptions {
   once?: boolean;
   /**
@@ -30,19 +32,27 @@ export class Messenger {
     }
   }
 
-  __notify(eventName: string, ...args: unknown[]): void {
+  async __notify(eventName: string, ...args: unknown[]): Promise<void> {
     if (!this[MESSENGER_LISTENERS]) return;
     const listeners = this[MESSENGER_LISTENERS].get(eventName);
     if (!listeners) return;
-    listeners.forEach((opts, handler) => {
-      handler(...args);
+    for await (const [handler, opts] of listeners) {
+      try {
+        await handler(...args);
+      } catch (ex) {
+        // eslint-disable-next-line no-console
+        console.error('failed __notify', eventName, 'due to:', ex);
+      }
       if (opts?.once) {
         listeners.delete(handler);
       }
-    });
+    }
   }
 
-  __on(eventName: string, eventListener: MessengerListener, options?: MessengerListenerOptions): void {
+  /**
+   * 监听事件，返回该监听的卸载函数
+   */
+  __on(eventName: string, eventListener: MessengerListener, options?: MessengerListenerOptions): MessengerOffFn {
     if (!this[MESSENGER_LISTENERS]) {
       this[MESSENGER_LISTENERS] = new Map();
     }
@@ -51,6 +61,10 @@ export class Messenger {
       this[MESSENGER_LISTENERS].set(eventName, (listeners = new Map()));
     }
     listeners.set(eventListener, options);
+
+    return () => {
+      this.__off(eventName, eventListener);
+    };
   }
 
   /**

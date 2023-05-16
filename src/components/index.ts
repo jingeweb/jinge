@@ -1,4 +1,3 @@
-export * from './class';
 export * from './for';
 export * from './hide';
 export * from './html';

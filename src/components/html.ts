@@ -35,7 +35,7 @@ export class BindHtmlComponent extends Component {
     this.__updateIfNeed();
   }
 
-  __render() {
+  __doRender() {
     return (this[__].rootNodes = renderHtml(this._c));
   }
 

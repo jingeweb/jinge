@@ -104,22 +104,22 @@ export class DynamicRenderComponent extends Component {
     this.__updateIfNeed();
   }
 
-  __render() {
+  __doRender() {
     const el = createEl(this);
     this[__].rootNodes.push(el);
     return el.__render();
   }
 
-  __update() {
+  async __update() {
     const roots = this[__].rootNodes;
     const el = roots[0] as Component;
     const fd = el.__firstDOM;
     const pa = fd.parentNode;
     const newEl = createEl(this);
     roots[0] = newEl;
-    const nels = newEl.__render();
+    const nels = await newEl.__render();
     pa.insertBefore(nels.length > 1 ? createFragment(nels) : nels[0], fd);
-    el.__destroy();
-    newEl.__handleAfterRender();
+    await el.__destroy();
+    await newEl.__handleAfterRender();
   }
 }
