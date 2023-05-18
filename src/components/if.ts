@@ -35,7 +35,7 @@ async function doUpdate(component: Component, slot: string) {
   const renderFn = component[__].slots?.[slot];
   if (renderFn) {
     const newEl = createEl(renderFn, component[__].context);
-    const nodes = await (newEl as Component).__render();
+    const nodes = await newEl.__render();
     parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
     roots[0] = newEl;
   } else {
@@ -43,7 +43,7 @@ async function doUpdate(component: Component, slot: string) {
     parentDOM.insertBefore(roots[0], firstDOM);
   }
   if (isComp) {
-    await (el as Component).__destroy();
+    await el.__destroy();
   } else {
     parentDOM.removeChild(firstDOM);
   }

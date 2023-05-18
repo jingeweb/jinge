@@ -338,16 +338,6 @@ export class Component extends Messenger {
   }
 
   /**
-   * Get rendered DOM Node which should be apply transition.
-   *
-   * 返回在 transition 动画时应该被应用到的 DOM 节点。默认返回第 0 个 html dom 节点，也可以通过覆盖该属性为特定业务组件指定动画节点。
-   */
-  get __transitionDOM(): Node {
-    const el = this[__].rootNodes[0];
-    return isComponent(el) ? (el as Component).__transitionDOM : (el as Node);
-  }
-
-  /**
    * Get first rendered DOM Node after Component is rendered.
    *
    * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
