@@ -35,7 +35,7 @@ function genClassNames(name?: string) {
   };
 }
 
-async function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
+function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
   const type = isEnter ? 'enter' : 'leave';
   const fromClass = comp._cs[`${type}From`];
   const activeClass = comp._cs[`${type}Active`];
@@ -53,16 +53,19 @@ async function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElem
       comp.__notify(`after-${type}`, el);
       return;
     }
-    const onEnd = () => {
+    const clear = () => {
       cancel = undefined;
+      comp._t = undefined;
       removeEvent(el, dt, onEnd);
       el.classList.remove(activeClass, toClass);
+    };
+    const onEnd = () => {
+      clear();
       comp.__notify(`after-${type}`, el);
     };
     addEvent(el, dt, onEnd);
     cancel = () => {
-      cancel = undefined;
-      removeEvent(el, dt, onEnd);
+      clear();
       comp.__notify(`${type}-cancelled`, el);
     };
     el.classList.remove(fromClass);
@@ -79,8 +82,8 @@ async function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElem
 export class TransitionComponent extends Component {
   _cs: ClassNames;
   _appear: boolean;
-  /** 当前正在进行的过渡 */
-  _t: () => void;
+  /** 当前正在进行的过渡的取消函数，不为 undefined 时代表正在过渡中 */
+  _t?: () => void;
 
   constructor(attrs: TransitionComponentAttrs) {
     super(attrs);
@@ -89,34 +92,34 @@ export class TransitionComponent extends Component {
     this._appear = attrs.appear === true;
   }
 
-  private async __trans(isEnter: boolean, isFirst: boolean) {
+  __transition(isEnter: boolean, isFirst: boolean) {
     if (isFirst && !this._appear) {
       // 初始渲染默认不启动过渡。
       return;
     }
     // 如果上一个过渡还未结束，先结束上一个过渡。
-    this._t?.();
+    this.__cancel();
+
     const el = this.__firstDOM as HTMLElement;
-    if (el.nodeType !== Node.ELEMENT_NODE) {
-      this._t = undefined;
-      // 如果不是 html element 则忽略过渡。只有 html 元素才有 class。
-      return;
-    } else {
+    if (el.nodeType === Node.ELEMENT_NODE) {
       // 执行实际的过渡。doTrans 函数中会将 this._t 变更为当前过渡的取消函数。
-      await doTrans(this, isEnter, el);
+      doTrans(this, isEnter, el);
     }
   }
 
-  __enter(isFirst?: boolean) {
-    return this.__trans(true, isFirst);
-  }
-
-  __leave(isFirst?: boolean) {
-    return this.__trans(false, isFirst);
+  /**
+   * 取消当前正在进行的渡（如果当前处于过渡中的话）
+   */
+  __cancel() {
+    if (this._t) {
+      // console.log('stop previous transition');
+      this._t();
+      this._t = undefined;
+    }
   }
 
   __destroy(removeDOM?: boolean) {
-    this._t?.(); // 取消正在进行中的过渡动画
+    this.__cancel(); // 取消正在进行中的过渡动画
     return super.__destroy(removeDOM);
   }
 }

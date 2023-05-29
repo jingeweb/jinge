@@ -21,7 +21,7 @@ export class LogComponent extends Component {
     return this._msg;
   }
 
-  __doRender(): Node[] {
+  __render() {
     return [document.createComment(this._msg.toString())];
   }
 }

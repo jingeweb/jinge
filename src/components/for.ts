@@ -96,7 +96,7 @@ function _prepareKey(item: unknown, i: number, keyMap: Map<unknown, number>, key
   return key;
 }
 
-async function renderItems(
+function renderItems(
   items: unknown[],
   itemRenderFn: RenderFn,
   roots: (Component | Node)[],
@@ -112,7 +112,7 @@ async function renderItems(
     if (keyName !== 'index') {
       keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
-    const els = await appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context);
+    const els = appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context);
     result.push(...els);
   }
   return result;
@@ -240,7 +240,7 @@ export class ForComponent extends Component {
     this.__updateIfNeed();
   }
 
-  __doRender() {
+  __render() {
     const roots = this[__].rootNodes;
     const itemRenderFn = this[__].slots?.default;
     if (!itemRenderFn) {
@@ -258,7 +258,7 @@ export class ForComponent extends Component {
     return renderItems(items, itemRenderFn, roots, this._keys, keyName, this[__].context);
   }
 
-  async _updateItem(index: number) {
+  _updateItem(index: number) {
     const items = this.loop;
     const roots = this[__].rootNodes;
     if (!isArray(items) || index >= roots.length) return;
@@ -278,12 +278,12 @@ export class ForComponent extends Component {
       if (newKey !== oldKey) {
         const $fd = oldEl.__firstDOM;
         const newEl = createEl(item, index, oldEl.isLast, itemRenderFn, this[__].context);
-        const rr = await newEl.__render();
+        const rr = newEl.__render();
         $fd.parentNode.insertBefore(rr.length > 1 ? createFragment(rr) : rr[0], $fd);
         oldEl.__destroy();
         roots[index] = newEl;
         keys[index] = newKey;
-        await newEl.__handleAfterRender();
+        newEl.__handleAfterRender();
         // console.log('update item render:', index);
       } else {
         oldEl.each = item as ViewModelObject;
@@ -293,7 +293,7 @@ export class ForComponent extends Component {
     }
   }
 
-  async __update() {
+  __update() {
     this._waitingUpdate = false;
     // console.log('for update');
     const itemRenderFn = this[__].slots?.default;
@@ -313,7 +313,7 @@ export class ForComponent extends Component {
       const $cmt = document.createComment('empty');
       fd.parentNode.insertBefore($cmt, fd);
       for (let i = 0; i < ol; i++) {
-        await (roots[i] as ForEachComponent).__destroy();
+        (roots[i] as ForEachComponent).__destroy();
       }
       roots.length = 1;
       roots[0] = $cmt;
@@ -338,7 +338,7 @@ export class ForComponent extends Component {
           updateEl(roots[i] as ForEachComponent, i, newItems);
         } else {
           if (!$f) $f = createFragment();
-          const doms = await appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx);
+          const doms = appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx);
           doms.forEach((el) => {
             $f.appendChild(el);
           });
@@ -348,7 +348,7 @@ export class ForComponent extends Component {
         const $le = ol === 0 ? (firstEl as Node) : (roots[ol - 1] as ForEachComponent).__lastDOM;
         insertAfter($parent, $f, $le);
         for (let i = ol; i < nl; i++) {
-          await (roots[i] as ForEachComponent).__handleAfterRender();
+          (roots[i] as ForEachComponent).__handleAfterRender();
         }
       }
       if (ol === 0) {
@@ -356,7 +356,7 @@ export class ForComponent extends Component {
       }
       if (nl >= ol) return;
       for (let i = nl; i < ol; i++) {
-        await (roots[i] as ForEachComponent).__destroy();
+        (roots[i] as ForEachComponent).__destroy();
       }
       roots.splice(nl);
 
@@ -366,11 +366,11 @@ export class ForComponent extends Component {
     const oldKeys = this._keys;
     if (ol === 0) {
       roots.length = 0;
-      const rs = await renderItems(newItems, itemRenderFn, roots, oldKeys, keyName, this[__].context);
+      const rs = renderItems(newItems, itemRenderFn, roots, oldKeys, keyName, this[__].context);
       insertAfter($parent, createFragment(rs), firstEl as Node);
       $parent.removeChild(firstEl as Node);
-      for await (const el of roots) {
-        await (el as ForEachComponent).__handleAfterRender();
+      for (const el of roots) {
+        (el as ForEachComponent).__handleAfterRender();
       }
       return;
     }
@@ -414,7 +414,7 @@ export class ForComponent extends Component {
         for (; ni < nl; ni++) {
           const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
           if (!$f) $f = createFragment();
-          const doms = await el.__render();
+          const doms = el.__render();
           doms.forEach(($n) => $f.appendChild($n));
           newRoots.push(el);
         }
@@ -425,7 +425,7 @@ export class ForComponent extends Component {
             $parent.appendChild($f);
           }
           for (let i = cei; i < newRoots.length; i++) {
-            await (newRoots[i] as ForEachComponent).__handleAfterRender();
+            (newRoots[i] as ForEachComponent).__handleAfterRender();
           }
         }
         break;
@@ -448,7 +448,7 @@ export class ForComponent extends Component {
         if (!$f) $f = createFragment();
         if (!reuseEl) {
           reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
-          const doms = await reuseEl.__render();
+          const doms = reuseEl.__render();
           doms.forEach(($n) => $f.appendChild($n));
           if (!$nes) $nes = [];
           $nes.push(reuseEl);
@@ -465,8 +465,8 @@ export class ForComponent extends Component {
       const el = roots[oi] as ForEachComponent;
       $f && $parent.insertBefore($f, el.__firstDOM);
       if ($nes?.length) {
-        for await (const el of $nes) {
-          await el.__handleAfterRender();
+        for (const el of $nes) {
+          el.__handleAfterRender();
         }
       }
       updateEl(el, ni, newItems);

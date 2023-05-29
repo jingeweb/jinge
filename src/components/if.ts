@@ -1,5 +1,6 @@
 import { __, isComponent, attrs as wrapAttrs, RenderFn, Component, Attributes } from '../core/component';
 import { createFragment } from '../util';
+import { TransitionComponent } from './transition';
 
 function createEl(renderFn: RenderFn, context: Record<string | symbol, unknown>) {
   const attrs = wrapAttrs({
@@ -23,10 +24,16 @@ function renderSwitch(component: Component, slot: string) {
   }
   const el = createEl(renderFn, component[__].context);
   roots.push(el);
-  return el.__render();
+  const doms = el.__render();
+  for (const node of el[__].rootNodes) {
+    if (isComponent(node) && node instanceof TransitionComponent) {
+      node.__transition(this.test, true);
+    }
+  }
+  return doms;
 }
 
-async function doUpdate(component: Component, slot: string) {
+function doUpdate(component: Component, slot: string) {
   const roots = component[__].rootNodes;
   const el = roots[0];
   const isComp = isComponent(el);
@@ -35,7 +42,7 @@ async function doUpdate(component: Component, slot: string) {
   const renderFn = component[__].slots?.[slot];
   if (renderFn) {
     const newEl = createEl(renderFn, component[__].context);
-    const nodes = await newEl.__render();
+    const nodes = newEl.__render();
     parentDOM.insertBefore(nodes.length > 1 ? createFragment(nodes) : nodes[0], firstDOM);
     roots[0] = newEl;
   } else {
@@ -43,11 +50,11 @@ async function doUpdate(component: Component, slot: string) {
     parentDOM.insertBefore(roots[0], firstDOM);
   }
   if (isComp) {
-    await el.__destroy();
+    el.__destroy();
   } else {
     parentDOM.removeChild(firstDOM);
   }
-  renderFn && (await (roots[0] as Component).__handleAfterRender());
+  renderFn && (roots[0] as Component).__handleAfterRender();
 }
 
 export interface IfComponentAttrs {
@@ -66,8 +73,6 @@ function getIfSlot(component: IfComponent, expect: boolean): IfSlots {
 }
 export class IfComponent extends Component {
   _e: boolean;
-  /** 当前正在更新切换到的 slot 值。__update 切换是异步的。 */
-  _u: IfSlots;
 
   constructor(attrs: Attributes<IfComponentAttrs>) {
     super(attrs);
@@ -85,35 +90,19 @@ export class IfComponent extends Component {
     this.__updateIfNeed();
   }
 
-  async __doRender() {
-    const e = this._e;
-    this._u = getIfSlot(this, this._e);
-    const els = await renderSwitch(this, this._u);
-    this._u = undefined;
-    await this.__notify('branch-switched', e);
-    if (e !== this._e) {
-      // renderSwitch 是异步的，这个过程中，this._e 可能已经发生了变更。因此渲染结束后需要判定下是否需要重新更新。
-      this.__updateIfNeed(); // 在 nextTick 中重新更新
-    }
+  __render() {
+    const els = renderSwitch(this, getIfSlot(this, this._e));
+    this.__notify('branch-switched', this._e);
     return els;
   }
 
-  async __update(): Promise<void> {
-    if (this._u) {
+  __update() {
+    const s = getIfSlot(this, this._e);
+    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[s]) {
       return;
     }
-    const e = this._e;
-    this._u = getIfSlot(this, e);
-    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[this._u]) {
-      this._u = undefined;
-      return;
-    }
-    await doUpdate(this, this._u);
-    this._u = undefined;
-    await this.__notify('branch-switched', e);
-    if (e !== this._e) {
-      this.__updateIfNeed();
-    }
+    doUpdate(this, s);
+    this.__notify('branch-switched', this._e);
   }
 }
 
@@ -122,7 +111,6 @@ export interface SwitchComponentAttrs {
 }
 export class SwitchComponent extends Component {
   _v: string;
-  _u: string;
 
   constructor(attrs: Attributes<SwitchComponentAttrs>) {
     super(attrs);
@@ -140,35 +128,17 @@ export class SwitchComponent extends Component {
     this.__updateIfNeed();
   }
 
-  async __doRender() {
-    const v = this._v;
-    const els = await renderSwitch(this, v);
-    this._u = undefined;
-    if (v !== this._v) {
-      // renderSwitch 是异步的，这个过程中，this._e 可能已经发生了变更。因此渲染结束后需要判定下是否需要重新更新。
-      this.__updateIfNeed(); // 在 nextTick 中重新更新
-    } else {
-      await this.__notify('branch-switched', v);
-    }
+  __render() {
+    const els = renderSwitch(this, this._v);
+    this.__notify('branch-switched', this._v);
     return els;
   }
 
-  async __update(): Promise<void> {
-    if (this._u) {
+  __update() {
+    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[this._v]) {
       return;
     }
-    const v = this._v;
-    this._u = v;
-    if (!isComponent(this[__].rootNodes[0]) && !this[__].slots?.[v]) {
-      this._u = undefined;
-      return;
-    }
-    await doUpdate(this, v);
-    this._u = undefined;
-    if (v !== this._v) {
-      this.__updateIfNeed();
-    } else {
-      await this.__notify('branch-switched', v);
-    }
+    doUpdate(this, this._v);
+    this.__notify('branch-switched', this._v);
   }
 }

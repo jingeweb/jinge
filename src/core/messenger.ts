@@ -1,4 +1,4 @@
-export type MessengerListener = (...args: unknown[]) => Promise<void> | void;
+export type MessengerListener = (...args: unknown[]) => void;
 export type MessengerOffFn = () => void;
 
 export interface MessengerListenerOptions {
@@ -32,13 +32,13 @@ export class Messenger {
     }
   }
 
-  async __notify(eventName: string, ...args: unknown[]): Promise<void> {
+  __notify(eventName: string, ...args: unknown[]) {
     if (!this[MESSENGER_LISTENERS]) return;
     const listeners = this[MESSENGER_LISTENERS].get(eventName);
     if (!listeners) return;
-    for await (const [handler, opts] of listeners) {
+    for (const [handler, opts] of listeners) {
       try {
-        await handler(...args);
+        handler(...args);
       } catch (ex) {
         // eslint-disable-next-line no-console
         console.error('failed __notify', eventName, 'due to:', ex);

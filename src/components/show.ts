@@ -1,5 +1,11 @@
 import { Attributes, Component, __, isComponent } from '../core/component';
-import { TransitionFns } from './transition';
+import { TransitionComponent } from './transition';
+
+function setDisplay(el: HTMLElement, show: boolean) {
+  if (el.nodeType === Node.ELEMENT_NODE) {
+    el.style.display = show ? '' : 'none';
+  }
+}
 
 export interface ShowComponentAttrs {
   test: boolean;
@@ -29,8 +35,8 @@ export class ShowComponent extends Component {
     this.__updateIfNeed();
   }
 
-  async __doRender() {
-    const els = await super.__doRender();
+  __render() {
+    const els = super.__render();
     this.__update(true);
     return els;
   }
@@ -38,20 +44,19 @@ export class ShowComponent extends Component {
   __update(isFirst = false) {
     for (const node of this[__].rootNodes) {
       if (isComponent(node)) {
-        if (this.test) {
-          (node as unknown as TransitionFns).__enter?.(isFirst);
+        if (node instanceof TransitionComponent) {
+          node.__cancel();
+          if (this.test) {
+            node.__on('before-enter', () => setDisplay(node.__firstDOM as HTMLElement, true), { once: true });
+          } else {
+            node.__on('after-leave', () => setDisplay(node.__firstDOM as HTMLElement, false), { once: true });
+          }
+          node.__transition(this.test, isFirst);
         } else {
-          (node as unknown as TransitionFns).__leave?.(isFirst);
+          setDisplay(node.__firstDOM as HTMLElement, this.test);
         }
-        return;
-      }
-      if (node.nodeType !== Node.ELEMENT_NODE) {
-        return;
-      }
-      if (!this.test) {
-        (node as HTMLElement).classList.add('jg-hide');
       } else {
-        (node as HTMLElement).classList.remove('jg-hide');
+        setDisplay(node as HTMLElement, this.test);
       }
     }
   }

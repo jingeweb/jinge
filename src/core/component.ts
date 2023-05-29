@@ -14,11 +14,7 @@ import {
 } from '../util';
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
-// import { i18n } from './i18n';
 import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
-import { initStyle } from './style';
-
-initStyle();
 
 export enum ComponentStates {
   INITIALIZE = 0,
@@ -35,7 +31,7 @@ export enum ContextStates {
 
 export const __ = Symbol('__');
 
-export type RenderFn = (comp: Component) => Promise<Node[]> | Node[];
+export type RenderFn = (comp: Component) => Node[];
 
 interface CompilerAttributes {
   context?: Record<string, unknown>;
@@ -122,7 +118,7 @@ export interface ComponentProperties {
   /**
    * update-next-map
    */
-  upNextMap: Map<(() => Promise<void> | void) | number, number>;
+  upNextMap: Map<(() => void) | number, number>;
   /**
    * deregister functions
    */
@@ -363,7 +359,7 @@ export class Component extends Messenger {
    * 该函数可被子组件重载，进而覆盖渲染逻辑。
    * 该函数可以是同步或异步函数，但通常推荐使用同步函数，将异步初始化逻辑放到 __beforeRender 生命周期函数中。
    */
-  protected __doRender(): Promise<Node[]> | Node[] {
+  __render(): Node[] {
     const Clazz = this.constructor as typeof Component;
     let renderFn = Clazz.template as unknown as RenderFn; // jinge-loader 已经将 string 转成了 RenderFn，此处强制转换类型以绕开 typescript.
     if (!renderFn && this[__].slots) {
@@ -372,18 +368,7 @@ export class Component extends Messenger {
     if (!isFunction(renderFn)) {
       throw new Error(`Template of ${Clazz.name} not found. Forget static getter "template"?`);
     }
-    return renderFn(this);
-  }
-  /**
-   * 组件的渲染函数，渲染组件模板或编译器传递的默认渲染函数。
-   * 渲染函数会先调用 __beforeRender() 生命周期函数，然后调用组件的实际渲染函数 __doRender()，
-   * 如果需要重载（覆盖）组件的渲染，请在子组件中重载 __doRender() 函数。
-   */
-  async __render(): Promise<Node[]> {
-    // 调用 __beforeRender 生命周期函数。在该函数中可进行组件的初始化，比如请求网络数据。
-    await this.__beforeRender();
-    await this.__notify('before-render');
-    return assertRenderResults(await this.__doRender());
+    return assertRenderResults(renderFn(this));
   }
 
   /**
@@ -395,20 +380,20 @@ export class Component extends Messenger {
    * But you can disable it by pass `replaceMode`=`false`,
    * which means component append to target as it's children.
    */
-  async __renderToDOM(targetEl: HTMLElement, replaceMode = true): Promise<void> {
+  __renderToDOM(targetEl: HTMLElement, replaceMode = true) {
     if (this[__].state !== ComponentStates.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
-    const rr = assertRenderResults(await this.__render());
+    const rr = assertRenderResults(this.__render());
     if (replaceMode) {
       replaceChildren(targetEl.parentNode, rr, targetEl);
     } else {
       appendChildren(targetEl, rr);
     }
-    await this.__handleAfterRender();
+    this.__handleAfterRender();
   }
 
-  async __destroy(removeDOM = true): Promise<void> {
+  __destroy(removeDOM = true) {
     const comp = this[__];
     if (comp.state > ComponentStates.WILLDESTROY) return;
     comp.state = ComponentStates.WILLDESTROY;
@@ -423,10 +408,10 @@ export class Component extends Messenger {
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
     //   因为在 BEFORE_DESTROY 里会销毁外部消息回调函数里可能会用到的属性等资源。
-    await this.__notify('before-destroy');
-    await this.__beforeDestroy();
+    this.__notify('before-destroy');
+    this.__beforeDestroy();
     // destroy children(include child component and html nodes)
-    await this.__handleBeforeDestroy(removeDOM);
+    this.__handleBeforeDestroy(removeDOM);
     // clear messenger listeners.
     super.__off();
     // destroy attrs passed to constructor
@@ -460,8 +445,8 @@ export class Component extends Messenger {
 
     // auto call all deregister functions
     if (comp.deregFns) {
-      for await (const deregFn of Array.from(comp.deregFns)) {
-        await deregFn();
+      for (const deregFn of Array.from(comp.deregFns)) {
+        deregFn();
       }
       comp.deregFns.clear();
       comp.deregFns = null;
@@ -473,17 +458,17 @@ export class Component extends Messenger {
     comp.rootNodes = comp.nonRootCompNodes = comp.refs = comp.slots = comp.context = null;
   }
 
-  async __handleBeforeDestroy(removeDOM = false): Promise<void> {
-    for await (const component of this[__].nonRootCompNodes) {
+  __handleBeforeDestroy(removeDOM = false) {
+    for (const component of this[__].nonRootCompNodes) {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
-      await component.__destroy(false);
+      component.__destroy(false);
     }
 
     let $parent: Node;
-    for await (const node of this[__].rootNodes) {
+    for (const node of this[__].rootNodes) {
       if (isComponent(node)) {
-        await (node as Component).__destroy(removeDOM);
+        (node as Component).__destroy(removeDOM);
       } else if (removeDOM) {
         if (!$parent) {
           $parent = (node as Node).parentNode;
@@ -493,7 +478,7 @@ export class Component extends Messenger {
     }
   }
 
-  async __handleAfterRender(): Promise<void> {
+  __handleAfterRender() {
     /*
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
@@ -501,19 +486,19 @@ export class Component extends Messenger {
     this[__].passedAttrs[$$].__notifiable = true;
     this[$$].__notifiable = true;
 
-    for await (const n of this[__].rootNodes) {
+    for (const n of this[__].rootNodes) {
       if (isComponent(n)) {
-        await n.__handleAfterRender();
+        n.__handleAfterRender();
       }
     }
-    for await (const n of this[__].nonRootCompNodes) {
-      await n.__handleAfterRender();
+    for (const n of this[__].nonRootCompNodes) {
+      n.__handleAfterRender();
     }
     this[__].state = ComponentStates.RENDERED;
     this[__].contextState =
       this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
-    await this.__afterRender();
-    await this.__notify('after-render');
+    this.__afterRender();
+    this.__notify('after-render');
   }
 
   /**
@@ -521,8 +506,8 @@ export class Component extends Messenger {
    * 默认情况下，会延后在 nextTick 时调用 __update 函数。可传递 nextTick = false 参数来立即调用。
    */
   __updateIfNeed(nextTick?: boolean): void;
-  __updateIfNeed(handler: () => Promise<void> | void, nextTick?: boolean): void;
-  __updateIfNeed(handler?: (() => Promise<void> | void) | boolean, nextTick = true): void {
+  __updateIfNeed(handler: () => void, nextTick?: boolean): void;
+  __updateIfNeed(handler?: (() => void) | boolean, nextTick = true): void {
     if (this[__].state !== ComponentStates.RENDERED) {
       return;
     }
@@ -552,7 +537,7 @@ export class Component extends Messenger {
     ntMap.set(
       handler,
       setImmediate(() => {
-        type F = () => Promise<void> | void;
+        type F = () => void;
         ntMap.delete(handler as F);
         (handler as F).call(this);
       }),
@@ -560,7 +545,7 @@ export class Component extends Messenger {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  __update(first?: boolean): Promise<void> | void {
+  __update(first?: boolean): void {
     // by default, do nothing.
   }
 
@@ -645,24 +630,18 @@ export class Component extends Messenger {
     }
     return this[__].refs?.get(ref) as T;
   }
-  /**
-   * lifecycle hook, called before render.
-   * 在该函数中可进行组件的初始化，比如请求网络数据。
-   */
-  __beforeRender(): Promise<void> | void {
-    // lifecycle hook, default do nothing
-  }
+
   /**
    * lifecycle hook, called after rendered.
    */
-  __afterRender(): Promise<void> | void {
+  __afterRender(): void {
     // lifecycle hook, default do nothing.
   }
 
   /**
    * lifecycle hook, called before destroy.
    */
-  __beforeDestroy(): Promise<void> | void {
+  __beforeDestroy(): void {
     // lifecycle hook, default do nothing.
   }
 }

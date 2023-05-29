@@ -22,25 +22,3 @@ export function textRenderFn(component: Component, txtContent: unknown): Node {
   component[__].rootNodes.push(el);
   return el;
 }
-
-// export function i18nRenderFn(component: Component, key: string, isRoot = false): Node {
-//   const el = createTextNode();
-//   const fn = (): void => {
-//     el.textContent = i18nService.__t(key);
-//   };
-//   fn();
-//   component.__i18nWatch(fn);
-//   isRoot && component[__].rootNodes.push(el);
-//   return el;
-// }
-
-// export function i18nRenderFn(component: Component, isRoot: boolean, dict: Record<string, string>): Node {
-//   const el = createTextNode();
-//   const fn = (): void => {
-//     el.textContent = dict[i18nService.locale];
-//   };
-//   fn();
-//   component.__i18nWatch(fn);
-//   isRoot && component[__].rootNodes.push(el);
-//   return el;
-// }
