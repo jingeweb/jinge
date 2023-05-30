@@ -21,7 +21,7 @@ export class LogComponent extends Component {
     return this._msg;
   }
 
-  __render(): Node[] {
-    return [document.createComment('log placeholder')];
+  __render() {
+    return [document.createComment(this._msg.toString())];
   }
 }

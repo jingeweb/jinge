@@ -6,7 +6,6 @@ import {
   RenderFn,
   isComponent,
   ComponentStates,
-  assertRenderResults,
   Attributes,
 } from '../core/component';
 import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/common';
@@ -39,10 +38,6 @@ export class ForEachComponent extends Component {
 
   set each(v: ViewModelObject) {
     this._e = v;
-  }
-
-  __render(): Node[] {
-    return this[__].slots.default(this);
   }
 }
 
@@ -111,13 +106,15 @@ function renderItems(
 ) {
   const result: Node[] = [];
   const tmpKeyMap = new Map();
-  items.forEach((item, i) => {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     // _assertVm(item, i);
     if (keyName !== 'index') {
       keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
-    result.push(...appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context));
-  });
+    const els = appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context);
+    result.push(...els);
+  }
   return result;
 }
 
@@ -281,7 +278,7 @@ export class ForComponent extends Component {
       if (newKey !== oldKey) {
         const $fd = oldEl.__firstDOM;
         const newEl = createEl(item, index, oldEl.isLast, itemRenderFn, this[__].context);
-        const rr = assertRenderResults(newEl.__render());
+        const rr = newEl.__render();
         $fd.parentNode.insertBefore(rr.length > 1 ? createFragment(rr) : rr[0], $fd);
         oldEl.__destroy();
         roots[index] = newEl;
@@ -341,7 +338,8 @@ export class ForComponent extends Component {
           updateEl(roots[i] as ForEachComponent, i, newItems);
         } else {
           if (!$f) $f = createFragment();
-          appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx).forEach((el) => {
+          const doms = appendRenderEach(newItems[i], i, i === nl - 1, itemRenderFn, roots, ctx);
+          doms.forEach((el) => {
             $f.appendChild(el);
           });
         }
@@ -371,7 +369,9 @@ export class ForComponent extends Component {
       const rs = renderItems(newItems, itemRenderFn, roots, oldKeys, keyName, this[__].context);
       insertAfter($parent, createFragment(rs), firstEl as Node);
       $parent.removeChild(firstEl as Node);
-      roots.forEach((el) => (el as ForEachComponent).__handleAfterRender());
+      for (const el of roots) {
+        (el as ForEachComponent).__handleAfterRender();
+      }
       return;
     }
 
@@ -414,7 +414,8 @@ export class ForComponent extends Component {
         for (; ni < nl; ni++) {
           const el = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
           if (!$f) $f = createFragment();
-          el.__render().forEach(($n) => $f.appendChild($n));
+          const doms = el.__render();
+          doms.forEach(($n) => $f.appendChild($n));
           newRoots.push(el);
         }
         if ($f) {
@@ -447,7 +448,8 @@ export class ForComponent extends Component {
         if (!$f) $f = createFragment();
         if (!reuseEl) {
           reuseEl = createEl(newItems[ni], ni, ni === nl - 1, itemRenderFn, ctx);
-          reuseEl.__render().forEach(($n) => $f.appendChild($n));
+          const doms = reuseEl.__render();
+          doms.forEach(($n) => $f.appendChild($n));
           if (!$nes) $nes = [];
           $nes.push(reuseEl);
         } else {
@@ -462,7 +464,11 @@ export class ForComponent extends Component {
       }
       const el = roots[oi] as ForEachComponent;
       $f && $parent.insertBefore($f, el.__firstDOM);
-      $nes?.forEach((el) => el.__handleAfterRender());
+      if ($nes?.length) {
+        for (const el of $nes) {
+          el.__handleAfterRender();
+        }
+      }
       updateEl(el, ni, newItems);
       newRoots.push(el);
       oi++;

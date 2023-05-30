@@ -15,4 +15,4 @@ export function disableWarning(): void {
   warning = false;
 }
 
-export type DeregisterFn = () => void;
+export type DeregisterFn = () => Promise<void> | void;

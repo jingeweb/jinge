@@ -14,11 +14,7 @@ import {
 } from '../util';
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
-// import { i18n } from './i18n';
 import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
-import { initStyle } from './style';
-
-initStyle();
 
 export enum ComponentStates {
   INITIALIZE = 0,
@@ -338,16 +334,6 @@ export class Component extends Messenger {
   }
 
   /**
-   * Get rendered DOM Node which should be apply transition.
-   *
-   * 返回在 transition 动画时应该被应用到的 DOM 节点。默认返回第 0 个 html dom 节点，也可以通过覆盖该属性为特定业务组件指定动画节点。
-   */
-  get __transitionDOM(): Node {
-    const el = this[__].rootNodes[0];
-    return isComponent(el) ? (el as Component).__transitionDOM : (el as Node);
-  }
-
-  /**
    * Get first rendered DOM Node after Component is rendered.
    *
    * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
@@ -369,8 +355,9 @@ export class Component extends Messenger {
   }
 
   /**
-   * 对模板进行渲染的函数，也可能是渲染编译器传递进来的默认渲染函数。
-   * 如果子组件需要进行自定义的渲染行为，需要重载该函数。
+   * 组件的实际渲染函数，渲染模板或默认插槽。
+   * 该函数可被子组件重载，进而覆盖渲染逻辑。
+   * 该函数可以是同步或异步函数，但通常推荐使用同步函数，将异步初始化逻辑放到 __beforeRender 生命周期函数中。
    */
   __render(): Node[] {
     const Clazz = this.constructor as typeof Component;
@@ -381,7 +368,7 @@ export class Component extends Messenger {
     if (!isFunction(renderFn)) {
       throw new Error(`Template of ${Clazz.name} not found. Forget static getter "template"?`);
     }
-    return renderFn(this);
+    return assertRenderResults(renderFn(this));
   }
 
   /**
@@ -393,7 +380,7 @@ export class Component extends Messenger {
    * But you can disable it by pass `replaceMode`=`false`,
    * which means component append to target as it's children.
    */
-  __renderToDOM(targetEl: HTMLElement, replaceMode = true): void {
+  __renderToDOM(targetEl: HTMLElement, replaceMode = true) {
     if (this[__].state !== ComponentStates.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
@@ -406,9 +393,9 @@ export class Component extends Messenger {
     this.__handleAfterRender();
   }
 
-  __destroy(removeDOM = true): void {
+  __destroy(removeDOM = true) {
     const comp = this[__];
-    if (comp.state > ComponentStates.WILLDESTROY) return;
+    if (comp.state >= ComponentStates.WILLDESTROY) return;
     comp.state = ComponentStates.WILLDESTROY;
     /*
      * once component is being destroied,
@@ -441,7 +428,7 @@ export class Component extends Messenger {
       comp.upNextMap = null;
     }
 
-    // destroy related refs:
+    // destroy 22 refs:
     if (comp.relatedRefs) {
       comp.relatedRefs.forEach((info) => {
         const refs = info.origin[__].refs;
@@ -458,7 +445,9 @@ export class Component extends Messenger {
 
     // auto call all deregister functions
     if (comp.deregFns) {
-      comp.deregFns.forEach((deregFn) => deregFn());
+      for (const deregFn of Array.from(comp.deregFns)) {
+        deregFn();
+      }
       comp.deregFns.clear();
       comp.deregFns = null;
     }
@@ -469,15 +458,15 @@ export class Component extends Messenger {
     comp.rootNodes = comp.nonRootCompNodes = comp.refs = comp.slots = comp.context = null;
   }
 
-  __handleBeforeDestroy(removeDOM = false): void {
-    this[__].nonRootCompNodes.forEach((component) => {
+  __handleBeforeDestroy(removeDOM = false) {
+    for (const component of this[__].nonRootCompNodes) {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
       component.__destroy(false);
-    });
+    }
 
     let $parent: Node;
-    this[__].rootNodes.forEach((node) => {
+    for (const node of this[__].rootNodes) {
       if (isComponent(node)) {
         (node as Component).__destroy(removeDOM);
       } else if (removeDOM) {
@@ -486,10 +475,10 @@ export class Component extends Messenger {
         }
         $parent.removeChild(node as Node);
       }
-    });
+    }
   }
 
-  __handleAfterRender(): void {
+  __handleAfterRender() {
     /*
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
@@ -497,12 +486,14 @@ export class Component extends Messenger {
     this[__].passedAttrs[$$].__notifiable = true;
     this[$$].__notifiable = true;
 
-    this[__].rootNodes.forEach((n) => {
-      if (isComponent(n)) n.__handleAfterRender();
-    });
-    this[__].nonRootCompNodes.forEach((n) => {
+    for (const n of this[__].rootNodes) {
+      if (isComponent(n)) {
+        n.__handleAfterRender();
+      }
+    }
+    for (const n of this[__].nonRootCompNodes) {
       n.__handleAfterRender();
-    });
+    }
     this[__].state = ComponentStates.RENDERED;
     this[__].contextState =
       this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
@@ -510,6 +501,10 @@ export class Component extends Messenger {
     this.__notify('after-render');
   }
 
+  /**
+   * 在时机合适时，调用 __update 函数。时机合适的定义为，组件已经渲染完成（即，是进行更新而不是首次渲染）。
+   * 默认情况下，会延后在 nextTick 时调用 __update 函数。可传递 nextTick = false 参数来立即调用。
+   */
   __updateIfNeed(nextTick?: boolean): void;
   __updateIfNeed(handler: () => void, nextTick?: boolean): void;
   __updateIfNeed(handler?: (() => void) | boolean, nextTick = true): void {
@@ -517,29 +512,34 @@ export class Component extends Messenger {
       return;
     }
     if (handler === false) {
-      return this.__update();
+      this.__update();
+      return;
     }
 
     if (!isFunction(handler)) {
-      handler = this.__update;
-    }
-
-    if (!nextTick) {
-      (handler as () => void).call(this);
+      if (!nextTick) {
+        this.__update();
+        return;
+      } else {
+        handler = this.__update;
+      }
+    } else if (!nextTick) {
+      handler.call(this);
       return;
     }
 
     let ntMap = this[__].upNextMap;
     if (!ntMap) ntMap = this[__].upNextMap = new Map();
-    if (ntMap.has(handler as () => void)) {
+    if (ntMap.has(handler)) {
       // already in queue.
       return;
     }
     ntMap.set(
-      handler as () => void,
+      handler,
       setImmediate(() => {
-        ntMap.delete(handler as () => void);
-        (handler as () => void).call(this);
+        type F = () => void;
+        ntMap.delete(handler as F);
+        (handler as F).call(this);
       }),
     );
   }
@@ -630,6 +630,7 @@ export class Component extends Messenger {
     }
     return this[__].refs?.get(ref) as T;
   }
+
   /**
    * lifecycle hook, called after rendered.
    */
