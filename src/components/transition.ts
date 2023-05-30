@@ -1,6 +1,14 @@
 import { addEvent, clearImmediate, removeEvent, setImmediate } from '../util';
 import { Attributes, Component } from '../core/component';
-import { getDurationType } from '../core/transition';
+import {
+  AFTER_ENTER,
+  AFTER_LEAVE,
+  BEFORE_ENTER,
+  BEFORE_LEAVE,
+  ENTER_CANCELLED,
+  LEAVE_CANCELLED,
+  getDurationType,
+} from '../core/transition';
 
 export interface TransitionFns {
   __enter: (isFirst?: boolean) => Promise<void>;
@@ -42,15 +50,15 @@ function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
   const toClass = comp._cs[`${type}To`];
 
   el.classList.add(fromClass, activeClass);
-  comp.__notify(`before-${type}`, el);
-  let cancel: () => void = undefined;
+  comp.__notify(isEnter ? BEFORE_ENTER : BEFORE_LEAVE, el);
+  let cancel: (notify: boolean) => void = undefined;
   let imm = setImmediate(() => {
     imm = 0;
     // 将 fromClass 移除，同时加入 toClass 触发动画
     // 但如果 getDurationType 为 null，说明 activeClass 并没生效，直接退出。
     const dt = getDurationType(el);
     if (!dt) {
-      comp.__notify(`after-${type}`, el);
+      comp.__notify(isEnter ? AFTER_ENTER : AFTER_LEAVE, el);
       return;
     }
     const clear = () => {
@@ -61,21 +69,21 @@ function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
     };
     const onEnd = () => {
       clear();
-      comp.__notify(`after-${type}`, el);
+      comp.__notify(isEnter ? AFTER_ENTER : AFTER_LEAVE, el);
     };
     addEvent(el, dt, onEnd);
-    cancel = () => {
+    cancel = (notify: boolean) => {
       clear();
-      comp.__notify(`${type}-cancelled`, el);
+      notify && comp.__notify(isEnter ? ENTER_CANCELLED : LEAVE_CANCELLED, el);
     };
     el.classList.remove(fromClass);
     el.classList.add(toClass);
     comp.__notify(type, el);
   });
 
-  comp._t = () => {
+  comp._t = (notify: boolean) => {
     if (imm) clearImmediate(imm);
-    if (cancel) cancel();
+    if (cancel) cancel(notify);
   };
 }
 
@@ -83,7 +91,7 @@ export class TransitionComponent extends Component {
   _cs: ClassNames;
   _appear: boolean;
   /** 当前正在进行的过渡的取消函数，不为 undefined 时代表正在过渡中 */
-  _t?: () => void;
+  _t?: (notify: boolean) => void;
 
   constructor(attrs: TransitionComponentAttrs) {
     super(attrs);
@@ -93,12 +101,16 @@ export class TransitionComponent extends Component {
   }
 
   __transition(isEnter: boolean, isFirst: boolean) {
+    if (this._t) {
+      // 调用 __transition 方必须保障不会有正在进行中的过渡。调用方需要调用 __cancel 来清理未完成的过渡。
+      throw new Error('assert failed: previous transition in progress');
+    }
+
     if (isFirst && !this._appear) {
-      // 初始渲染默认不启动过渡。
+      // 初始渲染默认不启动过渡。直接通知过渡结束。
+      this.__notify(isEnter ? AFTER_ENTER : AFTER_LEAVE);
       return;
     }
-    // 如果上一个过渡还未结束，先结束上一个过渡。
-    this.__cancel();
 
     const el = this.__firstDOM as HTMLElement;
     if (el.nodeType === Node.ELEMENT_NODE) {
@@ -110,16 +122,17 @@ export class TransitionComponent extends Component {
   /**
    * 取消当前正在进行的渡（如果当前处于过渡中的话）
    */
-  __cancel() {
+  __cancel(notify: boolean) {
     if (this._t) {
-      // console.log('stop previous transition');
-      this._t();
+      const f = this._t;
       this._t = undefined;
+      // console.log('stop previous transition');
+      f(notify);
     }
   }
 
   __destroy(removeDOM?: boolean) {
-    this.__cancel(); // 取消正在进行中的过渡动画
+    this.__cancel(false); // 取消正在进行中的过渡动画，并且不通知事件
     return super.__destroy(removeDOM);
   }
 }

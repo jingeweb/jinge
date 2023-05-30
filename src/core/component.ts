@@ -395,7 +395,7 @@ export class Component extends Messenger {
 
   __destroy(removeDOM = true) {
     const comp = this[__];
-    if (comp.state > ComponentStates.WILLDESTROY) return;
+    if (comp.state >= ComponentStates.WILLDESTROY) return;
     comp.state = ComponentStates.WILLDESTROY;
     /*
      * once component is being destroied,

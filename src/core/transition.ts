@@ -5,6 +5,13 @@ export enum TransitionStates {
   LEAVED = 4,
 }
 
+export const BEFORE_ENTER = 'before-enter';
+export const AFTER_ENTER = 'after-enter';
+export const BEFORE_LEAVE = 'before-leave';
+export const AFTER_LEAVE = 'after-leave';
+export const ENTER_CANCELLED = 'enter-cancelled';
+export const LEAVE_CANCELLED = 'leave-cancelled';
+
 export type DurationType = 'transitionend' | 'animationend';
 export type Duration = {
   type: DurationType;
