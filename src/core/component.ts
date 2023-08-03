@@ -12,6 +12,7 @@ import {
   DeregisterFn,
   CLASSNAME,
 } from '../util';
+
 import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
 import { createComponent, createAttributes } from '../vm/proxy';
 import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';

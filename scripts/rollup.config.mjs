@@ -36,9 +36,9 @@ function rollupJingePlugin() {
       return {
         code: result.code,
         map,
-      }
-    }
-  }
+      };
+    },
+  };
 }
 export default [
   {
@@ -49,10 +49,14 @@ export default [
       file: './dist/jinge.js',
       format: 'umd',
     },
-    plugins: [resolve(), esbuild({
-      target: 'es2020',
-      format: 'esm'
-    }), rollupJingePlugin()],
+    plugins: [
+      resolve(),
+      esbuild({
+        target: 'es2020',
+        format: 'esm',
+      }),
+      rollupJingePlugin(),
+    ],
   },
   {
     input: 'src/index.ts',
@@ -62,9 +66,14 @@ export default [
       file: './dist/jinge.min.js',
       format: 'umd',
     },
-    plugins: [resolve(), rollupJingePlugin(), esbuild({
-      target: 'es2020',
-      format: 'esm'
-    }), terser()],
+    plugins: [
+      resolve(),
+      rollupJingePlugin(),
+      esbuild({
+        target: 'es2020',
+        format: 'esm',
+      }),
+      terser(),
+    ],
   },
 ];
