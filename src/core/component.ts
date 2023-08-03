@@ -129,7 +129,7 @@ export interface ComponentProperties {
 /** Bellow is utility functions **/
 
 export function isComponent(v: unknown): v is Component {
-  return __ in (v as Record<symbol, unknown>);
+  return !!(v as Record<symbol, unknown>)[__];
 }
 
 export function assertRenderResults(renderResults: Node[]): Node[] {

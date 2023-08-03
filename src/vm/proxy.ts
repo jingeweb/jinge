@@ -490,7 +490,7 @@ export function createAttributes<T>(attributes: T) {
 // }
 
 export function createComponent<T extends object>(component: T): T {
-  if ($$ in component) {
+  if ((component as unknown as { [$$]: unknown })[$$]) {
     throw new Error('component has alreay been wrapped.');
   }
   // handleVMDebug(component);

@@ -30,7 +30,7 @@ async function transformFile(file) {
   const src = await fs.readFile(file, 'utf-8');
   const rf = path.relative(SRC_DIR, file);
   let { code, map, warnings } = await esbuild.transform(src, {
-    target: 'es2020',
+    target: 'es2022',
     format: 'esm',
     loader: path.extname(file).slice(1),
     sourcemap: true,

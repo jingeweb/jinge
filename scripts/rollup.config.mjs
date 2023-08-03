@@ -22,7 +22,7 @@ function rollupJingePlugin() {
       const rf = path.relative(SRC_DIR, id);
       const src = await fs.readFile(id, 'utf-8');
       const { code, map } = await transform(src, {
-        target: 'es2020',
+        target: 'es2022',
         format: 'esm',
         loader: 'ts',
         sourcemap: true,
@@ -52,7 +52,7 @@ export default [
     plugins: [
       resolve(),
       esbuild({
-        target: 'es2020',
+        target: 'es2022',
         format: 'esm',
       }),
       rollupJingePlugin(),
@@ -70,7 +70,7 @@ export default [
       resolve(),
       rollupJingePlugin(),
       esbuild({
-        target: 'es2020',
+        target: 'es2022',
         format: 'esm',
       }),
       terser(),
