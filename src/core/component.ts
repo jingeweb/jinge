@@ -13,42 +13,15 @@ import {
   CLASSNAME,
 } from '../util';
 
-import { $$, ViewModelCore, ViewModelObject } from '../vm/common';
+import { $$, ViewModelCore, ViewModelObject } from '../vm/core';
 import { createComponent, createAttributes } from '../vm/proxy';
-import { Messenger, MESSENGER_LISTENERS, MessengerHandler } from './messenger';
-
-export enum ComponentStates {
-  INITIALIZE = 0,
-  RENDERED = 1,
-  WILLDESTROY = 2,
-  DESTROIED = 3,
-}
-export enum ContextStates {
-  UNTOUCH = 0,
-  TOUCHED = 1,
-  UNTOUCH_FREEZED = 2,
-  TOUCHED_FREEZED = 3,
-}
+import { MESSENGER } from './emitter';
 
 export const __ = Symbol('__');
 
 export type RenderFn = (comp: Component) => Node[];
 
-interface CompilerAttributes {
-  context?: Record<string, unknown>;
-  slots?: Record<string, RenderFn>;
-  listeners?: Record<string, MessengerHandler>;
-}
-
-export type ComponentAttributes = ViewModelObject & {
-  class?: CLASSNAME;
-  style?: string | Record<string, string | number>;
-  [__]?: CompilerAttributes;
-};
-
-export type Attributes<Props = Record<string, unknown>> = ComponentAttributes & Props;
-
-export interface ComponentProperties {
+export interface ComponentInnerProperties {
   /**
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
    */
@@ -139,19 +112,7 @@ export function assertRenderResults(renderResults: Node[]): Node[] {
   return renderResults;
 }
 
-function wrapAttrs<Props extends Record<string, unknown>>(
-  target: Props & {
-    [__]?: CompilerAttributes;
-  },
-): ViewModelObject & Props {
-  if (!isObject(target) || isArray(target)) {
-    throw new Error('attrs() traget must be plain object.');
-  }
-  return createAttributes(target);
-}
-export { wrapAttrs as attrs };
-
-export class Component extends Messenger {
+export class Component {
   /**
    * 指定组件的渲染模板。务必使用 getter 的形式指定，例如：
    * ````js
@@ -188,8 +149,8 @@ export class Component extends Messenger {
   }
 
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */
-
-  [__]: ComponentProperties;
+  [];
+  [__]: ComponentInnerProperties;
   [$$]: ViewModelCore;
 
   /* 预定义好的常用的传递样式控制的属性 */
@@ -297,7 +258,7 @@ export class Component extends Messenger {
     if (this[__].state !== ComponentStates.RENDERED) {
       throw new Error('domPassListeners must be applied to component which is rendered.');
     }
-    const lis = this[MESSENGER_LISTENERS];
+    const lis = this[MESSENGER];
     if (!lis || lis.size === 0) {
       return;
     }

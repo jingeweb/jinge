@@ -2,7 +2,8 @@ export function typeOf(v: unknown): string {
   return typeof v;
 }
 
-export function isObject(v: unknown): v is Record<string, unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function isObject<T extends object = Record<string | symbol, any>>(v: unknown): v is T {
   return v !== null && typeOf(v) === 'object';
 }
 
@@ -18,7 +19,7 @@ export function isUndefined(v: unknown): v is undefined {
   return typeOf(v) === 'undefined';
 }
 
-export function isArray(v: unknown): v is unknown[] {
+export function isArray<T = unknown>(v: unknown): v is T[] {
   return Array.isArray(v);
 }
 
@@ -26,10 +27,15 @@ export function isBoolean(v: unknown): v is boolean {
   return typeof v === 'boolean' || v instanceof Boolean;
 }
 
-export function isFunction(v: unknown): v is (...args: unknown[]) => unknown {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyFn = (...args: any[]) => any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyObj = Record<string | symbol | number, any>;
+
+export function isFunction<T extends AnyFn = AnyFn>(v: unknown): v is T {
   return typeOf(v) === 'function';
 }
 
-export function isPromise(obj: unknown): obj is Promise<unknown> {
+export function isPromise<T = void>(obj: unknown): obj is Promise<T> {
   return isObject(obj) && isFunction(obj.then);
 }

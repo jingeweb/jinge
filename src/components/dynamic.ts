@@ -1,5 +1,5 @@
 import { Component, ComponentAttributes, __, attrs as wrapAttrs, RenderFn, Attributes } from '../core/component';
-import { $$ } from '../vm/common';
+import { $$ } from '../vm/core';
 import { createFragment } from '../util';
 import { emptyRenderFn } from '../core/render_fns';
 

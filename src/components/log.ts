@@ -1,4 +1,5 @@
-import { Component, ComponentAttributes } from '../core/component';
+import type { ComponentAttributes } from '../core/component';
+import { Component } from '../core/component';
 
 export interface LogComponentAttrs {
   msg: unknown;

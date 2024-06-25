@@ -8,7 +8,7 @@ import {
   ComponentStates,
   Attributes,
 } from '../core/component';
-import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/common';
+import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/core';
 import { isString, isNumber, isArray, createFragment, insertAfter, isUndefined } from '../util';
 
 type ForKeyNameFn = (v: unknown) => string;

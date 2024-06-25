@@ -1,5 +1,5 @@
 import { Component, ComponentAttributes } from '../core/component';
-import { $$ } from '../vm/common';
+import { $$ } from '../vm/core';
 
 /**
  * ParameterComponent 是特殊的组件，通常用于编译器自动生成的代码，因此有特别的第二个参数 params 。

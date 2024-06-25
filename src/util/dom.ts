@@ -1,5 +1,5 @@
 import { isString, isUndefined, isObject, isArray, isNumber } from './type';
-import { DeregisterFn } from './common';
+import type { DeregisterFn } from './common';
 
 export function setText($element: Node, text: unknown): void {
   if (isObject(text)) {
@@ -25,8 +25,8 @@ export function appendChildren($parent: Node, children: (Node | string)[]): void
     children.length > 1
       ? createFragment(children)
       : isString(children[0])
-      ? createTextNode(children[0] as string)
-      : (children[0] as Node),
+        ? createTextNode(children[0] as string)
+        : (children[0] as Node),
   );
 }
 
@@ -60,7 +60,7 @@ export function setAttribute($ele: Element, attrName: string, attrValue: unknown
   }
 }
 
-function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node | string)[]) {
+function _createEl($el: Element, attrs?: Record<string, unknown>, children?: (Node | string)[]) {
   if (attrs) {
     for (const an in attrs) {
       if (an && !isUndefined(attrs[an])) {
@@ -68,27 +68,39 @@ function _createEl($el: Element, attrs: Record<string, unknown>, children: (Node
       }
     }
   }
-  children.length > 0 && appendChildren($el, children);
+  children?.length && appendChildren($el, children);
   return $el;
 }
 
-export function createElement(tag: string, attrs: Record<string, unknown>, ...children: (Node | string)[]) {
+export function createElement(
+  tag: string,
+  attrs: Record<string, unknown> | undefined,
+  ...children: (Node | string)[]
+) {
   return _createEl(document.createElement(tag), attrs, children);
 }
 
 export function createElementWithoutAttrs(tag: string, ...children: (Node | string)[]) {
-  return createElement(tag, null, ...children);
+  return _createEl(document.createElement(tag), undefined, children);
 }
 
-export function createSVGElement(tag: string, attrs: Record<string, unknown>, ...children: Node[]) {
+export function createSVGElement(
+  tag: string,
+  attrs: Record<string, unknown> | undefined,
+  ...children: Node[]
+) {
   return _createEl(document.createElementNS('http://www.w3.org/2000/svg', tag), attrs, children);
 }
 
 export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]) {
-  return createSVGElement(tag, null, ...children);
+  return createSVGElement(tag, undefined, ...children);
 }
 
-export function createElementWithChild(tag: string, attrs: Record<string, unknown>, child: Node | string) {
+export function createElementWithChild(
+  tag: string,
+  attrs: Record<string, unknown>,
+  child: Node | string,
+) {
   const $e = createElement(tag, attrs);
   $e.appendChild(isString(child) ? createTextNode(child) : (child as Node));
   return $e;
@@ -119,7 +131,11 @@ export function addEvent(
   $element.addEventListener(eventName, handler, capture);
 }
 
-export function removeEvent($element: Element | Window | Document, eventName: string, handler: EventListener): void {
+export function removeEvent(
+  $element: Element | Window | Document,
+  eventName: string,
+  handler: EventListener,
+): void {
   $element.removeEventListener(eventName, handler);
 }
 
