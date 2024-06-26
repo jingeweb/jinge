@@ -1,4 +1,5 @@
-import { Attributes, Component, __ } from '../core/component';
+import { ROOT_NODES, __ } from 'src/core';
+import { Component } from '../core/component';
 import { createFragment } from '../util';
 
 function renderHtml(content: string): Node[] {
@@ -16,36 +17,39 @@ function renderHtml(content: string): Node[] {
 export interface BindHtmlComponentAttrs {
   content: string;
 }
-export class BindHtmlComponent extends Component {
-  _c: string;
 
-  constructor(attrs: Attributes<BindHtmlComponentAttrs>) {
-    if (!('content' in attrs)) throw new Error('<bind-html/> require "content" attribute');
+
+export class BindHtmlComponent extends Component {
+  content: string;
+
+  constructor(attrs: BindHtmlComponentAttrs) {
     super(attrs);
     this.content = attrs.content;
   }
 
   get content() {
-    return this._c;
+    return this.#content;
   }
 
   set content(v) {
-    if (this._c === v) return;
-    this._c = v;
+    if (this.#content === v) return;
+    this.#content = v;
     this.__updateIfNeed();
   }
 
   __render() {
-    return (this[__].rootNodes = renderHtml(this._c));
+    return (this[__][ROOT_NODES] = renderHtml(this.content));
   }
 
   __update() {
-    const roots = this[__].rootNodes;
+    const roots = this[__][ROOT_NODES];
     const oldFirstEl = roots[0] as Node;
     const $p = oldFirstEl.parentNode;
-    const newEls = renderHtml(this._c);
-    $p.insertBefore(newEls.length > 1 ? createFragment(newEls) : newEls[0], oldFirstEl);
-    roots.forEach((oldEl) => $p.removeChild(oldEl as Node));
-    this[__].rootNodes = newEls;
+    const newEls = renderHtml(this.content);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    $p!.insertBefore(newEls.length > 1 ? createFragment(newEls) : newEls[0], oldFirstEl);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    roots.forEach((oldEl) => $p!.removeChild(oldEl as Node));
+    this[__][ROOT_NODES] = newEls;
   }
 }

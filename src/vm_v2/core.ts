@@ -9,7 +9,7 @@ export const WATCHERS = Symbol();
 export const NOTIFIABLE = Symbol();
 export const RELATED = Symbol();
 export const SETTERS = Symbol();
-export const INNER = Symbol();
+export const TARGET = Symbol();
 export const PROXY = Symbol();
 
 export interface ViewModelCore<T extends object = AnyObj> {
@@ -19,7 +19,7 @@ export interface ViewModelCore<T extends object = AnyObj> {
   [RELATED]?: Set<AnyFn>;
   [SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
   /** 指向当前 vm core 所属的原始数据 */
-  [INNER]: T;
+  [TARGET]: T;
   /** 指向当前 vm core 所属的 Proxy */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [PROXY]: any;
@@ -31,7 +31,9 @@ export type ViewModel<T extends object = AnyObj> = {
 
 export type PropertyPathItem = string | number | symbol;
 
-export function isInnerObj<T extends RegExp | Date | boolean = RegExp | Date | boolean>(v: unknown): v is T {
+export function isInnerObj<T extends RegExp | Date | boolean = RegExp | Date | boolean>(
+  v: unknown,
+): v is T {
   const clazz = (
     v as {
       constructor: unknown;
@@ -60,11 +62,20 @@ export function addParent(child: ViewModelCore, parent: ViewModelCore, property:
   set.add(parent);
 }
 
-export function removeParent(child: ViewModelCore, parent: ViewModelCore, property: PropertyPathItem) {
+export function removeParent(
+  child: ViewModelCore,
+  parent: ViewModelCore,
+  property: PropertyPathItem,
+) {
   child[PARENTS]?.get(property)?.delete(parent);
 }
 
-export function shiftParent(child: ViewModelCore, parent: ViewModelCore, property: number, delta: number) {
+export function shiftParent(
+  child: ViewModelCore,
+  parent: ViewModelCore,
+  property: number,
+  delta: number,
+) {
   removeParent(child, parent, property);
   addParent(child, parent, property + delta);
 }
@@ -82,7 +93,7 @@ export function destroyViewModelCore(vm: ViewModelCore) {
   });
   vm[RELATED]?.clear();
 
-  const target = vm[INNER] as ViewModel;
+  const target = vm[TARGET] as ViewModel;
 
   /*
    * 解除 ViewModel 之间的 VM_PARENTS 关联。
@@ -108,5 +119,5 @@ export function destroyViewModelCore(vm: ViewModelCore) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   target[$$] = undefined as any; // unlink vm target
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  vm[INNER] = undefined as any;
+  vm[TARGET] = undefined as any;
 }

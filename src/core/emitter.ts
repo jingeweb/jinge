@@ -1,19 +1,11 @@
-import { AnyFn } from "src/util";
+import type { AnyFn } from 'src/util';
 
-
-export interface ListenerOptions {
-  once?: boolean;
-  /**
-   * bellow options only for dom listener
-   */
-  capture?: boolean;
-  passive?: boolean;
+export interface ListenerOptions extends AddEventListenerOptions {
   stop?: boolean;
   prevent?: boolean;
 }
 
-
-const LISTENERS = Symbol();
+export const LISTENERS = Symbol();
 
 export type EventMap = {
   [key: string]: AnyFn;
@@ -37,8 +29,12 @@ export class Emitter<Events extends EventMap> {
   //     }
   //   }
   // }
-
-  __emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
+  clear() {
+    const map = this[LISTENERS];
+    map?.forEach((lis) => lis?.clear());
+    map?.clear();
+  }
+  emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
     const listeners = this[LISTENERS]?.get(eventName);
     listeners?.forEach((opts, fn) => {
       try {
@@ -56,7 +52,7 @@ export class Emitter<Events extends EventMap> {
   /**
    * 监听事件，返回该监听的卸载函数
    */
-  __on<E extends keyof Events>(eventName: E, eventListener: Events[E], options?: ListenerOptions) {
+  on<E extends keyof Events>(eventName: E, eventListener: Events[E], options?: ListenerOptions) {
     let map = this[LISTENERS];
     if (!map) map = this[LISTENERS] = new Map();
     let listeners = map.get(eventName);

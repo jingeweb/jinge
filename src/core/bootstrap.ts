@@ -1,11 +1,12 @@
-import { Component } from './component';
+import { proxyAttributes } from 'src/vm_v2';
+import type { Component } from './component';
 
-export function bootstrap<Props, T extends typeof Component & { create(attrs: unknown): Component }, Props>(
+export function bootstrap<T extends typeof Component<any, any>>(
   ComponentClazz: T,
   dom: HTMLElement,
-  attrs?: Props,
+  attrs?: ConstructorParameters<T>[0],
 ): InstanceType<T> {
-  const app = ComponentClazz.create(attrs);
+  const app = new ComponentClazz(proxyAttributes(attrs ?? {}));
   app.__renderToDOM(dom, dom !== document.body);
   return app as InstanceType<T>;
 }

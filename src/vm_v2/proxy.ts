@@ -1,6 +1,6 @@
+import type { AnyComponent } from 'src/core/common';
 import type { AnyFn } from '../util';
 import { isNumber, isArray, isObject, isFunction, isPromise, isUndefined, warn } from '../util';
-import type { Component } from '../core/component';
 
 import type { PropertyPathItem, ViewModelCore, ViewModel } from './core';
 import {
@@ -13,7 +13,7 @@ import {
   $$,
   PROXY,
   NOTIFIABLE,
-  INNER,
+  TARGET,
   SETTERS,
 } from './core';
 import { notifyVmChange } from './watch';
@@ -23,7 +23,7 @@ type ViewModelArray = ViewModel<ViewModel[]>;
 function newViewModelCore<T extends object>(target: T, notifiable = true) {
   const vm = {
     [NOTIFIABLE]: notifiable,
-    [INNER]: target,
+    [TARGET]: target,
   } as ViewModelCore<T>;
   Object.defineProperty(target, $$, {
     value: vm,
@@ -222,7 +222,7 @@ function _arrayReverseSort(target: ViewModelArray, fn: () => void): ViewModelArr
       addParent(it[$$], target[$$], i);
     }
   });
-  notifyVmChange(target)
+  notifyVmChange(target);
 
   return target[$$][PROXY] as ViewModelArray;
 }
@@ -288,7 +288,6 @@ const ArrayFns = {
         shiftParent(el[$$], target[$$], i, delta);
       }
     }
-    const oldLen = target.length;
     const rtn = wrapSubArray(target.splice(idx, delCount, ...args) as ViewModelArray);
     notifyVmChange(target);
     return rtn;
@@ -316,7 +315,7 @@ const ArrayFns = {
     });
     _arrayShiftOrUnshiftProp(target, args.length);
     const rtn = target.unshift(...args);
-  notifyVmChange(target)
+    notifyVmChange(target);
     return rtn;
   },
   pop(target: ViewModelArray) {
@@ -328,7 +327,7 @@ const ArrayFns = {
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], oldLen - 1);
     }
-   notifyVmChange(target)
+    notifyVmChange(target);
     return el;
   },
   push(target: ViewModelArray, ...args: ViewModel[]): number {
@@ -338,9 +337,8 @@ const ArrayFns = {
         addParent(arg[$$], target[$$], target.length + i);
       }
     });
-    const oldLen = target.length;
     const rtn = target.push(...args);
-    notifyVmChange(target)
+    notifyVmChange(target);
 
     return rtn;
   },
@@ -357,9 +355,8 @@ const ArrayFns = {
       if (isViewModel(v)) {
         addParent(v[$$], target[$$], i);
       }
-     
     });
-    notifyVmChange(target)
+    notifyVmChange(target);
     return target[$$][PROXY] as ViewModelArray;
   },
   reverse(target: ViewModelArray): ViewModelArray {
@@ -425,7 +422,10 @@ export function wrapVm<T extends object>(target: T) {
       }
     } else {
       const vmCore = newViewModelCore(target);
-      const proxy = new Proxy(target as ViewModel, isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler);
+      const proxy = new Proxy(
+        target as ViewModel,
+        isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler,
+      );
       vmCore[PROXY] = proxy;
       for (const k in target) {
         if (isPublicProperty(k)) {
@@ -469,18 +469,15 @@ export function proxyAttributes<T extends object>(attributes: T) {
 //   _di.vms.push(vm);
 // }
 
-export function proxyComponent<T extends Component<any, any>>(component: T): T {
-  if (isViewModel<T>(component)) {
-    return component[$$][PROXY];
-  }
-  // handleVMDebug(component);
+export function proxyComponent(component: AnyComponent) {
   // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
   const vmCore = newViewModelCore(component, false);
 
-  return (vmCore[PROXY] = new Proxy<T>(component, {
+  vmCore[PROXY] = new Proxy(component, {
     set: componentPropSetHandler,
-  }));
+  });
+  return vmCore;
 }
 
 export function vm<T extends object>(target: T) {

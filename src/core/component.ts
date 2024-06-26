@@ -1,6 +1,6 @@
-import { isViewModel } from 'src/vm';
+import { watch } from 'src/vm_v2';
+import type { CLASSNAME } from '../util';
 import {
-  isObject,
   isArray,
   arrayRemove,
   registerEvent,
@@ -10,38 +10,56 @@ import {
   appendChildren,
   replaceChildren,
   warn,
-  DeregisterFn,
-  CLASSNAME,
 } from '../util';
 
-import { $$, NOTIFIABLE, PROXY, ViewModelCore } from '../vm_v2/core';
-import { proxyComponent, proxyAttributes } from '../vm_v2/proxy';
-import { Attributes, CompilerAttributes, ComponentAttributes, wrapAttrs } from './attribute';
-import { ComponentState, ContextStates, EMITTER, __ } from './common';
-import { Emitter, EventMap } from './emitter';
+import type { ViewModel, ViewModelCore } from '../vm_v2/core';
+import { $$, NOTIFIABLE, PROXY, destroyViewModelCore, isViewModel } from '../vm_v2/core';
+import { proxyComponent } from '../vm_v2/proxy';
+import type { BaseAttrs } from './attribute';
+import type { AnyComponent, RenderFn } from './common';
+import {
+  DEREGISTER_FUNCTIONS,
+  REFS,
+  RELATED_REFS,
+  RELATED_REFS_KEY,
+  RELATED_REFS_NODE,
+  RELATED_REFS_ORIGIN,
+  UPDATE_NEXT_MAP,
+  NON_ROOT_COMPONENT_NODES,
+  ROOT_NODES,
+  STATE,
+  CONTEXT,
+  CONTEXT_STATE,
+  PASSED_ATTRIBUTES,
+  SLOTS,
+  ComponentState,
+  ContextStates,
+  EMITTER,
+  __,
+} from './common';
+import type { EventMap, ListenerOptions } from './emitter';
+import { Emitter, LISTENERS } from './emitter';
 
-export type RenderFn = (comp: Component) => Node[];
-type AnyComponent = Component<any, any>
 export interface ComponentInnerProperties {
   /**
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
    */
-  passedAttrs: ComponentAttributes;
+  [PASSED_ATTRIBUTES]: ViewModel;
   /**
    * 组件的上下文对象
    */
-  context: Record<string | symbol, unknown>;
-  contextState: ContextStates;
+  [CONTEXT]?: Record<string | symbol, unknown>;
+  [CONTEXT_STATE]: ContextStates;
   /**
    * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。
    */
-  slots: Record<string, RenderFn> & {
+  [SLOTS]?: Record<string, RenderFn> & {
     default?: RenderFn;
   };
   /**
    * 组件的状态
    */
-  state: ComponentState;
+  [STATE]: ComponentState;
   /**
    * ROOT_NODES means root children of this component,
    *   include html-nodes and component-nodes.
@@ -50,7 +68,7 @@ export interface ComponentInnerProperties {
    * because when we remove the root children, whole view-tree will be
    * removed, so we do not need waste memory to maintain whole view-tree.
    */
-  rootNodes: (AnyComponent | Node)[];
+  [ROOT_NODES]: (AnyComponent | Node)[];
   /**
    * NON_ROOT_COMPONENT_NODES means nearest non-root component-nodes in the view-tree.
    * Node in view-tree have two types, html-node and component-node.
@@ -68,14 +86,14 @@ export interface ComponentInnerProperties {
    *
    * By the way, the ROOT_NODES of view-tree above is [h1, h2, A]
    */
-  nonRootCompNodes: AnyComponent[];
+  [NON_ROOT_COMPONENT_NODES]: AnyComponent[];
   /**
    * refs contains all children with ref: attribute.
    *
    * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
    *   之后通过 __getRef 函数可以获取到元素实例。
    */
-  refs: Map<string, AnyComponent | Node | (AnyComponent | Node)[]>;
+  [REFS]?: Map<string, AnyComponent | Node | (AnyComponent | Node)[]>;
   /**
    * 当被 ref: 标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素被添加到当前模板组件（称为 origin component)的 refs 里，
    *   但显然当 <if> 元素控制销毁时，也需要将这个元素从 origin component 的 refs 中删除，
@@ -85,19 +103,19 @@ export interface ComponentInnerProperties {
    *   这样，在关联节点（比如受 <if> 控制的元素，或 <if> 下面的 DOM 节点）被销毁时，
    *   也会从模板组件的 refs 里面删除。
    */
-  relatedRefs: {
-    origin: AnyComponent;
-    ref: string;
-    node?: Node;
+  [RELATED_REFS]?: {
+    [RELATED_REFS_ORIGIN]: AnyComponent;
+    [RELATED_REFS_KEY]: string;
+    [RELATED_REFS_NODE]?: Node;
   }[];
   /**
    * update-next-map
    */
-  upNextMap: Map<(() => void) | number, number>;
+  [UPDATE_NEXT_MAP]?: Map<(() => void) | number, number>;
   /**
    * deregister functions
    */
-  deregFns: Set<DeregisterFn>;
+  [DEREGISTER_FUNCTIONS]?: Set<() => void>;
 }
 
 /** Bellow is utility functions **/
@@ -113,7 +131,13 @@ export function assertRenderResults(renderResults: Node[]): Node[] {
   return renderResults;
 }
 
-export class Component<Attrs extends object, Events extends EventMap> {
+export type LifeCycleEvents = {
+  afterRender: () => void;
+  beforeDestroy: () => void;
+};
+
+// eslint-disable-next-line @typescript-eslint/ban-types
+export class Component<Events extends EventMap = {}> {
   /**
    * 指定组件的渲染模板。
    */
@@ -136,62 +160,63 @@ export class Component<Attrs extends object, Events extends EventMap> {
    */
   static readonly [__] = true;
 
-  static create<Attrs extends object, T extends Component<Attrs, EventMap>>(this: { new (attrs: Attributes<Attrs>): T }, attrs?: Attrs): T {
-    const vmAttrs = proxyAttributes(attrs ?? {});
-    return new this(vmAttrs as ComponentAttributes)[$$][PROXY] as T;
-  }
-
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */
   [__]: ComponentInnerProperties;
   [$$]: ViewModelCore;
-  [EMITTER]: Emitter<Events>;
+  [EMITTER]: Emitter<EventMap>;
 
   /* 预定义好的常用的传递样式控制的属性 */
-  class: ComponentAttributes['class'];
-  style: ComponentAttributes['style'];
+  class?: CLASSNAME;
+  style?: string | Record<string, string | number>;
 
   /**
    * ATTENTION!!!
    *
    * Don't use constructor directly, use static factory method `create(attrs)` instead.
    */
-  constructor(attrs: ComponentAttributes, compilerAttrs: CompilerAttributes) {
-    if (!isViewModel(attrs)) {
+  constructor(attrs: object) {
+    if (!isViewModel<BaseAttrs>(attrs)) {
       throw new Error('Attributes passed to Component constructor must be ViewModel. ');
     }
-    proxyComponent(this);
-
+    const compilerAttrs = attrs[__];
+    this[$$] = proxyComponent(this);
+    this[EMITTER] = new Emitter();
     this[__] = {
-      passedAttrs: attrs,
-      context: compilerAttrs.context || null,
-      contextState: ContextStates.UNTOUCH,
-      slots: compilerAttrs.slots,
-      state: ComponentState.INITIALIZE,
-      rootNodes: [],
-      nonRootCompNodes: [],
-      refs: null,
-      relatedRefs: null,
-      upNextMap: null,
-      deregFns: null,
+      [PASSED_ATTRIBUTES]: attrs,
+      [CONTEXT]: compilerAttrs?.[CONTEXT],
+      [CONTEXT_STATE]: ContextStates.UNTOUCH,
+      [SLOTS]: compilerAttrs?.[SLOTS],
+      [STATE]: ComponentState.INITIALIZE,
+      [ROOT_NODES]: [],
+      [NON_ROOT_COMPONENT_NODES]: [],
     };
 
     /** class 和 style 两个最常用的属性，默认从 attributes 中取出并监听。 */
-    const $proxy = this[$$][PROXY] as Record<string, unknown>;
+    const $proxy = this[$$][PROXY];
     ['class', 'style'].forEach((attrN) => {
       if (!(attrN in attrs)) return;
-      const f = () => ($proxy[attrN] = attrs[attrN]);
-      f();
-      attrs[$$].__watch(attrN, f);
+      watch(
+        attrs,
+        [attrN],
+        (v) => {
+          $proxy[attrN] = v;
+        },
+        {
+          immediate: true,
+        },
+      );
     });
+
+    return $proxy as unknown as typeof this;
   }
 
   /**
    * store deregisterFn and auto call it when component is being destroy.
    */
-  __addDeregisterFn(deregisterFn: DeregisterFn): void {
-    let deregs = this[__].deregFns;
+  __addDeregisterFn(deregisterFn: () => void): void {
+    let deregs = this[__][DEREGISTER_FUNCTIONS];
     if (!deregs) {
-      this[__].deregFns = deregs = new Set();
+      this[__][DEREGISTER_FUNCTIONS] = deregs = new Set();
     }
     deregs.add(deregisterFn);
   }
@@ -220,7 +245,7 @@ export class Component<Attrs extends object, Events extends EventMap> {
     eventName: string,
     listener: EventListener,
     capture?: boolean | AddEventListenerOptions,
-  ): DeregisterFn {
+  ) {
     const deregEvtFn = registerEvent(
       $el,
       eventName,
@@ -233,7 +258,7 @@ export class Component<Attrs extends object, Events extends EventMap> {
     this.__addDeregisterFn(deregEvtFn);
     return () => {
       deregEvtFn();
-      this[__].deregFns.delete(deregEvtFn);
+      this[__][DEREGISTER_FUNCTIONS]?.delete(deregEvtFn);
     };
   }
 
@@ -246,16 +271,16 @@ export class Component<Attrs extends object, Events extends EventMap> {
   __domPassListeners(targetEl?: HTMLElement): void;
   __domPassListeners(ignoredEventNames: string[], targetEl: HTMLElement): void;
   __domPassListeners(ignoredEventNames?: string[] | HTMLElement, targetEl?: HTMLElement): void {
-    if (this[__].state !== ComponentState.RENDERED) {
+    if (this[__][STATE] !== ComponentState.RENDERED) {
       throw new Error('domPassListeners must be applied to component which is rendered.');
     }
-    const lis = this[EMITTER];
-    if (!lis || lis.size === 0) {
+    const lis = this[EMITTER][LISTENERS];
+    if (!lis?.size) {
       return;
     }
     if (ignoredEventNames && !isArray(ignoredEventNames)) {
       targetEl = ignoredEventNames as HTMLElement;
-      ignoredEventNames = null;
+      ignoredEventNames = undefined;
     } else if (!targetEl) {
       targetEl = this.__firstDOM as unknown as HTMLElement;
     }
@@ -263,13 +288,13 @@ export class Component<Attrs extends object, Events extends EventMap> {
       return;
     }
     lis.forEach((handlers, eventName) => {
-      if (ignoredEventNames && (ignoredEventNames as string[]).indexOf(eventName) >= 0) {
+      if (ignoredEventNames?.indexOf(eventName as string)) {
         return;
       }
       handlers.forEach((opts, handler) => {
         const deregFn = registerEvent(
           targetEl,
-          eventName,
+          eventName as string,
           opts && (opts.stop || opts.prevent)
             ? ($evt: Event): void => {
                 opts.stop && $evt.stopPropagation();
@@ -279,7 +304,7 @@ export class Component<Attrs extends object, Events extends EventMap> {
             : ($evt: Event): void => {
                 handler.call(this, $evt);
               },
-          opts as unknown as AddEventListenerOptions,
+          opts,
         );
         this.__addDeregisterFn(deregFn);
       });
@@ -292,8 +317,8 @@ export class Component<Attrs extends object, Events extends EventMap> {
    * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
    */
   get __firstDOM(): Node {
-    const el = this[__].rootNodes[0];
-    return isComponent(el) ? (el as Component).__firstDOM : (el as Node);
+    const el = this[__][ROOT_NODES][0];
+    return isComponent(el) ? el.__firstDOM : (el as Node);
   }
 
   /**
@@ -302,9 +327,9 @@ export class Component<Attrs extends object, Events extends EventMap> {
    * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
    */
   get __lastDOM(): Node {
-    const rns = this[__].rootNodes;
+    const rns = this[__][ROOT_NODES];
     const el = rns[rns.length - 1];
-    return isComponent(el) ? (el as Component).__lastDOM : (el as Node);
+    return isComponent(el) ? el.__lastDOM : (el as Node);
   }
 
   /**
@@ -313,13 +338,14 @@ export class Component<Attrs extends object, Events extends EventMap> {
    * 该函数可以是同步或异步函数，但通常推荐使用同步函数，将异步初始化逻辑放到 __beforeRender 生命周期函数中。
    */
   __render(): Node[] {
-    const Clazz = this.constructor as typeof Component;
-    let renderFn = Clazz.template as unknown as RenderFn; // jinge-loader 已经将 string 转成了 RenderFn，此处强制转换类型以绕开 typescript.
-    if (!renderFn && this[__].slots) {
-      renderFn = this[__].slots.default;
+    let renderFn = (this.constructor as unknown as { template?: RenderFn }).template; // 编译器已经将 string 转成了 RenderFn，此处强制转换类型以绕开 typescript.
+    if (!renderFn && this[__][SLOTS]) {
+      renderFn = this[__][SLOTS].default;
     }
     if (!isFunction(renderFn)) {
-      throw new Error(`Template of ${Clazz.name} not found. Forget static getter "template"?`);
+      throw new Error(
+        `Template of ${this.constructor.name} not found. Forget static getter "template"?`,
+      );
     }
     return assertRenderResults(renderFn(this));
   }
@@ -334,7 +360,7 @@ export class Component<Attrs extends object, Events extends EventMap> {
    * which means component append to target as it's children.
    */
   __renderToDOM(targetEl: HTMLElement, replaceMode = true) {
-    if (this[__].state !== ComponentState.INITIALIZE) {
+    if (this[__][STATE] !== ComponentState.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
     const rr = assertRenderResults(this.__render());
@@ -348,86 +374,81 @@ export class Component<Attrs extends object, Events extends EventMap> {
 
   __destroy(removeDOM = true) {
     const comp = this[__];
-    if (comp.state >= ComponentState.WILLDESTROY) return;
-    comp.state = ComponentState.WILLDESTROY;
+    if (comp[STATE] >= ComponentState.WILLDESTROY) return;
+    comp[STATE] = ComponentState.WILLDESTROY;
     /*
      * once component is being destroied,
      *   we mark component and it's passed-attrs un-notifiable to ignore
      *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
      */
     this[$$][NOTIFIABLE] = false;
-    comp.passedAttrs[$$][NOTIFIABLE] = false;
+    const passedAttrs = comp[PASSED_ATTRIBUTES] as ViewModel;
+    passedAttrs[$$][NOTIFIABLE] = false;
 
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
     //   因为在 BEFORE_DESTROY 里会销毁外部消息回调函数里可能会用到的属性等资源。
     const emitter = this[EMITTER];
-    this.__notify('before-destroy');
+
+    emitter.emit('beforeDestroy');
     this.__beforeDestroy();
     // destroy children(include child component and html nodes)
     this.__handleBeforeDestroy(removeDOM);
     // clear messenger listeners.
-    emitter?.
-    // destroy attrs passed to constructor
-    comp.passedAttrs[$$].__destroy();
-    comp.passedAttrs = null;
+    emitter?.clear();
+    destroyViewModelCore(passedAttrs[$$]);
+
     // destroy view model
-    this[$$].__destroy();
+    destroyViewModelCore(this[$$]);
 
     // clear next tick update setImmediate
-    if (comp.upNextMap) {
-      comp.upNextMap.forEach((imm) => {
-        clearImmediate(imm);
-      });
-      comp.upNextMap = null;
-    }
+    comp[UPDATE_NEXT_MAP]?.forEach((imm) => {
+      clearImmediate(imm);
+    });
+    comp[UPDATE_NEXT_MAP]?.clear();
 
     // destroy 22 refs:
-    if (comp.relatedRefs) {
-      comp.relatedRefs.forEach((info) => {
-        const refs = info.origin[__].refs;
-        if (!refs) return;
-        const rns = refs.get(info.ref);
-        if (isArray(rns)) {
-          arrayRemove(rns as (Component | Node)[], info.node || this);
-        } else {
-          refs.delete(info.ref);
-        }
-      });
-      comp.relatedRefs = null;
-    }
+    comp[RELATED_REFS]?.forEach((info) => {
+      const refs = info[RELATED_REFS_ORIGIN][__][REFS];
+      if (!refs) return;
+      const rns = refs.get(info[RELATED_REFS_KEY]);
+      if (isArray(rns)) {
+        arrayRemove(rns as (AnyComponent | Node)[], info[RELATED_REFS_NODE] || this);
+      } else {
+        refs.delete(info[RELATED_REFS_KEY]);
+      }
+    });
+    comp[RELATED_REFS] && (comp[RELATED_REFS].length = 0);
 
     // auto call all deregister functions
-    if (comp.deregFns) {
-      for (const deregFn of Array.from(comp.deregFns)) {
-        deregFn();
-      }
-      comp.deregFns.clear();
-      comp.deregFns = null;
-    }
+    comp[DEREGISTER_FUNCTIONS]?.forEach((fn) => fn());
+    comp[DEREGISTER_FUNCTIONS]?.clear();
 
     // clear properties
-    comp.state = ComponentState.DESTROIED;
+    comp[STATE] = ComponentState.DESTROIED;
     // unlink all symbol properties. maybe unnecessary.
-    comp.rootNodes = comp.nonRootCompNodes = comp.refs = comp.slots = comp.context = null;
+    comp[ROOT_NODES].length = 0;
+    comp[NON_ROOT_COMPONENT_NODES].length = 0;
+    comp[REFS]?.clear();
+    comp[CONTEXT] = undefined;
   }
 
   __handleBeforeDestroy(removeDOM = false) {
-    for (const component of this[__].nonRootCompNodes) {
+    for (const component of this[__][NON_ROOT_COMPONENT_NODES]) {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
       component.__destroy(false);
     }
 
     let $parent: Node | null = null;
-    for (const node of this[__].rootNodes) {
+    for (const node of this[__][ROOT_NODES]) {
       if (isComponent(node)) {
-        (node as Component).__destroy(removeDOM);
+        node.__destroy(removeDOM);
       } else if (removeDOM) {
         if (!$parent) {
           $parent = (node as Node).parentNode;
         }
-       ( $parent as Node).removeChild(node as Node);
+        ($parent as Node).removeChild(node as Node);
       }
     }
   }
@@ -437,22 +458,25 @@ export class Component<Attrs extends object, Events extends EventMap> {
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
-    this[__].passedAttrs[$$][NOTIFIABLE] = true;
+    const comp = this[__];
+    comp[PASSED_ATTRIBUTES][$$][NOTIFIABLE] = true;
     this[$$][NOTIFIABLE] = true;
 
-    for (const n of this[__].rootNodes) {
+    for (const n of comp[ROOT_NODES]) {
       if (isComponent(n)) {
         n.__handleAfterRender();
       }
     }
-    for (const n of this[__].nonRootCompNodes) {
+    for (const n of comp[NON_ROOT_COMPONENT_NODES]) {
       n.__handleAfterRender();
     }
-    this[__].state = ComponentState.RENDERED;
-    this[__].contextState =
-      this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
+    comp[STATE] = ComponentState.RENDERED;
+    comp[CONTEXT_STATE] =
+      comp[CONTEXT_STATE] === ContextStates.TOUCHED
+        ? ContextStates.TOUCHED_FREEZED
+        : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
     this.__afterRender();
-    this.__notify('after-render');
+    this[EMITTER].emit('afterRender');
   }
 
   /**
@@ -461,8 +485,8 @@ export class Component<Attrs extends object, Events extends EventMap> {
    */
   __updateIfNeed(nextTick?: boolean): void;
   __updateIfNeed(handler: () => void, nextTick?: boolean): void;
-  __updateIfNeed(handler?: (() => void) | boolean, nextTick = true): void {
-    if (this[__].state !== ComponentState.RENDERED) {
+  __updateIfNeed(handler?: (() => void) | boolean, nextTick = true) {
+    if (this[__][STATE] !== ComponentState.RENDERED) {
       return;
     }
     if (handler === false) {
@@ -482,8 +506,8 @@ export class Component<Attrs extends object, Events extends EventMap> {
       return;
     }
 
-    let ntMap = this[__].upNextMap;
-    if (!ntMap) ntMap = this[__].upNextMap = new Map();
+    let ntMap = this[__][UPDATE_NEXT_MAP];
+    if (!ntMap) ntMap = this[__][UPDATE_NEXT_MAP] = new Map();
     if (ntMap.has(handler)) {
       // already in queue.
       return;
@@ -503,21 +527,27 @@ export class Component<Attrs extends object, Events extends EventMap> {
     // by default, do nothing.
   }
 
-  __setContext(key: string | symbol, value: unknown, forceOverride = false): void {
+  __setContext(key: string | symbol, value: unknown, forceOverride = false) {
+    const comp = this[__];
+    const contextState = comp[CONTEXT_STATE];
     if (
-      this[__].contextState === ContextStates.UNTOUCH_FREEZED ||
-      this[__].contextState === ContextStates.TOUCHED_FREEZED
+      contextState === ContextStates.UNTOUCH_FREEZED ||
+      contextState === ContextStates.TOUCHED_FREEZED
     ) {
-      throw new Error("Can't setContext after component has been rendered. Try put setContext code into constructor.");
+      throw new Error(
+        "Can't setContext after component has been rendered. Try put setContext code into constructor.",
+      );
     }
-    if (this[__].contextState === ContextStates.UNTOUCH) {
+    let context = comp[CONTEXT];
+    if (contextState === ContextStates.UNTOUCH) {
       // we copy context to make sure child component do not modify context passed from parent.
       // we do not copy it by default until setContext function is called, because it unnecessary to waste memory if
       // child component do not modify the context.
-      this[__].context = Object.assign({}, this[__].context);
-      this[__].contextState = ContextStates.TOUCHED; // has been copied.
+      context = comp[CONTEXT] = Object.assign({}, comp[CONTEXT]);
+      comp[CONTEXT_STATE] = ContextStates.TOUCHED; // has been copied.
     }
-    if (key in this[__].context) {
+    if (!context) return;
+    if (key in context) {
       // override exist may case hidden bug hard to debug.
       // so we force programmer to pass third argument to
       //   tell us he/she know what he/she is doing.
@@ -527,29 +557,30 @@ export class Component<Attrs extends object, Events extends EventMap> {
         );
       }
     }
-    this[__].context[key as string] = value;
+    context[key] = value;
   }
 
-  __getContext<T = unknown>(key: string | symbol): T {
-    return this[__].context?.[key as string] as T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  __getContext<T = any>(key: string | symbol): T {
+    return this[__][CONTEXT]?.[key as string] as T;
   }
 
   /**
    * This method is used for compiler generated code.
    * Do not use it manually.
    */
-  __setRef(ref: string, el: Component | Node, relatedComponent?: Component): void {
-    let rns = this[__].refs;
+  __setRef(ref: string, el: AnyComponent | Node, relatedComponent?: AnyComponent) {
+    let rns = this[__][REFS];
     if (!rns) {
-      this[__].refs = rns = new Map();
+      this[__][REFS] = rns = new Map();
     }
     let elOrArr = rns.get(ref);
     if (!elOrArr) {
       rns.set(ref, el);
     } else if (isArray(elOrArr)) {
-      (elOrArr as (Component | Node)[]).push(el);
+      (elOrArr as (AnyComponent | Node)[]).push(el);
     } else {
-      elOrArr = [elOrArr as Component, el];
+      elOrArr = [elOrArr as AnyComponent, el];
       rns.set(ref, elOrArr);
     }
     const isComp = isComponent(el);
@@ -562,40 +593,50 @@ export class Component<Attrs extends object, Events extends EventMap> {
      * 如果 el 是 DOM 节点，则必须将它添加到关联组件（比如 <if>） relatedComponent 里，
      *   在 relatedComponent 被销毁时执行关联 refs 的删除。
      */
-    let rbs = ((isComp ? el : relatedComponent) as Component)[__].relatedRefs;
+    let rbs = ((isComp ? el : relatedComponent) as AnyComponent)[__][RELATED_REFS];
     if (!rbs) {
-      ((isComp ? el : relatedComponent) as Component)[__].relatedRefs = rbs = [];
+      ((isComp ? el : relatedComponent) as AnyComponent)[__][RELATED_REFS] = rbs = [];
     }
     rbs.push({
-      origin: this,
-      ref,
-      node: isComp ? null : (el as Node),
+      [RELATED_REFS_ORIGIN]: this,
+      [RELATED_REFS_KEY]: ref,
+      [RELATED_REFS_NODE]: isComp ? undefined : (el as Node),
     });
   }
 
   /**
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
-  __getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string): T {
-    if (this[__].state !== ComponentState.RENDERED) {
+  __getRef<T extends AnyComponent | Node | (AnyComponent | Node)[] = HTMLElement>(ref: string) {
+    if (this[__][STATE] !== ComponentState.RENDERED) {
       warn(
         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
       );
     }
-    return this[__].refs?.get(ref) as T;
+    return this[__][REFS]?.get(ref) as T;
   }
 
+  __on<E extends keyof (Events & LifeCycleEvents)>(
+    eventName: E,
+    handler: (Events & LifeCycleEvents)[E],
+    options?: ListenerOptions,
+  ) {
+    return this[EMITTER].on(eventName as string, handler, options);
+  }
+  __emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
+    this[EMITTER].emit(eventName as string, ...args);
+  }
   /**
    * lifecycle hook, called after rendered.
    */
-  __afterRender(): void {
+  __afterRender() {
     // lifecycle hook, default do nothing.
   }
 
   /**
    * lifecycle hook, called before destroy.
    */
-  __beforeDestroy(): void {
+  __beforeDestroy() {
     // lifecycle hook, default do nothing.
   }
 }

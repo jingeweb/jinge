@@ -1,5 +1,6 @@
 import { AFTER_ENTER, AFTER_LEAVE, ENTER_CANCELLED, LEAVE_CANCELLED } from '../core/transition';
-import { __, isComponent, attrs as wrapAttrs, RenderFn, Component, Attributes } from '../core/component';
+import type { RenderFn, Attributes } from '../core/component';
+import { __, isComponent, attrs as wrapAttrs, Component } from '../core/component';
 import { createFragment } from '../util';
 import { TransitionComponent } from './transition';
 
@@ -33,7 +34,11 @@ function renderSwitch(component: Component, slot: string, isEnter = false) {
   return doms;
 }
 
-function doLeave(component: IfComponent | SwitchComponent, el: Component, doEnterCb?: (refDOM?: Node) => void) {
+function doLeave(
+  component: IfComponent | SwitchComponent,
+  el: Component,
+  doEnterCb?: (refDOM?: Node) => void,
+) {
   let tc_count = 0; // transition component 的总量
   const onEnd = (callCb: boolean) => {
     tc_count--; // 每一个 transition component 过渡结束后，tc_count 减 1。

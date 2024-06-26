@@ -1,28 +1,29 @@
-import type { ComponentAttributes } from '../core/component';
+import { watch } from 'src/vm_v2';
 import { Component } from '../core/component';
 
 export interface LogComponentAttrs {
-  msg: unknown;
+  message: unknown;
 }
+
+const MESSAGE = Symbol('MESSAGE');
 export class LogComponent extends Component {
-  _msg: unknown;
+  [MESSAGE]: unknown;
 
-  constructor(attrs: ComponentAttributes & LogComponentAttrs) {
+  constructor(attrs: LogComponentAttrs) {
     super(attrs);
-    this.msg = attrs.msg;
+    watch(
+      attrs,
+      'message',
+      (v) => {
+        this[MESSAGE] = v;
+        this.__updateIfNeed();
+      },
+      { immediate: true },
+    );
   }
-
-  set msg(v: unknown) {
-    // eslint-disable-next-line no-console
-    console.log(v);
-    this._msg = v;
-  }
-
-  get msg(): unknown {
-    return this._msg;
-  }
-
   __render() {
-    return [document.createComment(this._msg.toString())];
+    return [document.createComment(`${this[MESSAGE]}`)];
   }
+
+  __update() {}
 }

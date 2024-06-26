@@ -1,5 +1,4 @@
 import { isString, isUndefined, isObject, isArray, isNumber } from './type';
-import type { DeregisterFn } from './common';
 
 export function setText($element: Node, text: unknown): void {
   if (isObject(text)) {
@@ -150,9 +149,9 @@ export function registerEvent(
   eventName: string,
   handler: EventListener,
   capture?: boolean | AddEventListenerOptions,
-): DeregisterFn {
+) {
   addEvent($element, eventName, handler, capture);
-  return function deregister(): void {
+  return () => {
     removeEvent($element, eventName, handler);
   };
 }

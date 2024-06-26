@@ -1,22 +1,23 @@
-import { AnyFn, CLASSNAME } from "src/util";
-import { RenderFn } from "./component";
-import { ListenerOptions } from "./emitter";
-import { proxyAttributes } from "src/vm_v2";
+import type { AnyFn, AnyObj, CLASSNAME } from 'src/util';
+import type { ListenerOptions } from './emitter';
+import type { CONTEXT, RenderFn, SLOTS, __ } from './common';
 
-export interface CompilerAttributes {
-  context?: Record<string, unknown>;
-  slots?: Record<string, RenderFn>;
-  listeners?: Record<string, {
-    fn: AnyFn;
-    opts?: ListenerOptions
-  }>;
+export interface CompilerAttrs {
+  [CONTEXT]?: Record<string, unknown>;
+  [SLOTS]?: Record<string, RenderFn>;
+  // listeners?: Record<
+  //   string,
+  //   {
+  //     fn: AnyFn;
+  //     opts?: ListenerOptions;
+  //   }
+  // >;
 }
 
- 
-
-export type Attributes<Attrs extends object> = {
+export interface BaseAttrs {
   class?: CLASSNAME;
   style?: string | Record<string, string | number>;
-} & Attrs;
+  [__]?: CompilerAttrs;
+}
 
-export { wrapAttrs as attrs };
+export type Attrs<A extends AnyObj> = A & BaseAttrs;
