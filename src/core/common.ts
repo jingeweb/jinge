@@ -10,3 +10,6 @@ export enum ContextStates {
   UNTOUCH_FREEZED = 2,
   TOUCHED_FREEZED = 3,
 }
+
+export const EMITTER = Symbol();
+export const __ = Symbol('__');

@@ -1,4 +1,5 @@
-export type OffFn = () => void;
+import { AnyFn } from "src/util";
+
 
 export interface ListenerOptions {
   once?: boolean;
@@ -11,17 +12,15 @@ export interface ListenerOptions {
   prevent?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Fn = (...args: any[]) => void;
 
 const LISTENERS = Symbol();
 
 export type EventMap = {
-  [key: string]: Fn;
+  [key: string]: AnyFn;
 };
 
 export class Emitter<Events extends EventMap> {
-  [LISTENERS]: Map<keyof Events, Map<Fn, ListenerOptions>>;
+  [LISTENERS]?: Map<keyof Events, Map<AnyFn, ListenerOptions | undefined>>;
 
   // constructor(initializeListeners?: {
   //   [E in keyof Events]: {

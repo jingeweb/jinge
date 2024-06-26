@@ -1,3 +1,4 @@
+import { isViewModel } from 'src/vm';
 import {
   isObject,
   isArray,
@@ -13,14 +14,14 @@ import {
   CLASSNAME,
 } from '../util';
 
-import { $$, ViewModelCore, ViewModelObject } from '../vm/core';
-import { createComponent, createAttributes } from '../vm/proxy';
-import { MESSENGER } from './emitter';
-
-export const __ = Symbol('__');
+import { $$, NOTIFIABLE, PROXY, ViewModelCore } from '../vm_v2/core';
+import { proxyComponent, proxyAttributes } from '../vm_v2/proxy';
+import { Attributes, CompilerAttributes, ComponentAttributes, wrapAttrs } from './attribute';
+import { ComponentState, ContextStates, EMITTER, __ } from './common';
+import { Emitter, EventMap } from './emitter';
 
 export type RenderFn = (comp: Component) => Node[];
-
+type AnyComponent = Component<any, any>
 export interface ComponentInnerProperties {
   /**
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
@@ -40,7 +41,7 @@ export interface ComponentInnerProperties {
   /**
    * 组件的状态
    */
-  state: ComponentStates;
+  state: ComponentState;
   /**
    * ROOT_NODES means root children of this component,
    *   include html-nodes and component-nodes.
@@ -49,7 +50,7 @@ export interface ComponentInnerProperties {
    * because when we remove the root children, whole view-tree will be
    * removed, so we do not need waste memory to maintain whole view-tree.
    */
-  rootNodes: (Component | Node)[];
+  rootNodes: (AnyComponent | Node)[];
   /**
    * NON_ROOT_COMPONENT_NODES means nearest non-root component-nodes in the view-tree.
    * Node in view-tree have two types, html-node and component-node.
@@ -67,14 +68,14 @@ export interface ComponentInnerProperties {
    *
    * By the way, the ROOT_NODES of view-tree above is [h1, h2, A]
    */
-  nonRootCompNodes: Component[];
+  nonRootCompNodes: AnyComponent[];
   /**
    * refs contains all children with ref: attribute.
    *
    * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
    *   之后通过 __getRef 函数可以获取到元素实例。
    */
-  refs: Map<string, Component | Node | (Component | Node)[]>;
+  refs: Map<string, AnyComponent | Node | (AnyComponent | Node)[]>;
   /**
    * 当被 ref: 标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素被添加到当前模板组件（称为 origin component)的 refs 里，
    *   但显然当 <if> 元素控制销毁时，也需要将这个元素从 origin component 的 refs 中删除，
@@ -85,7 +86,7 @@ export interface ComponentInnerProperties {
    *   也会从模板组件的 refs 里面删除。
    */
   relatedRefs: {
-    origin: Component;
+    origin: AnyComponent;
     ref: string;
     node?: Node;
   }[];
@@ -101,7 +102,7 @@ export interface ComponentInnerProperties {
 
 /** Bellow is utility functions **/
 
-export function isComponent(v: unknown): v is Component {
+export function isComponent<T extends AnyComponent>(v: unknown): v is T {
   return !!(v as Record<symbol, unknown>)[__];
 }
 
@@ -112,16 +113,9 @@ export function assertRenderResults(renderResults: Node[]): Node[] {
   return renderResults;
 }
 
-export class Component {
+export class Component<Attrs extends object, Events extends EventMap> {
   /**
-   * 指定组件的渲染模板。务必使用 getter 的形式指定，例如：
-   * ````js
-   * class SomeComponent extends Component {
-   *   static get template() {
-   *     return '<p>hello, world</p>';
-   *   }
-   * }
-   * ````
+   * 指定组件的渲染模板。
    */
   static readonly template: string;
 
@@ -142,16 +136,15 @@ export class Component {
    */
   static readonly [__] = true;
 
-  static create<Props, T extends Component>(this: { new (attrs: ComponentAttributes): T }, attrs?: Props): T {
-    const isObj = isObject(attrs);
-    const vmAttrs = isObj && $$ in attrs ? attrs : wrapAttrs(isObj ? attrs : {});
-    return new this(vmAttrs as ComponentAttributes)[$$].proxy as T;
+  static create<Attrs extends object, T extends Component<Attrs, EventMap>>(this: { new (attrs: Attributes<Attrs>): T }, attrs?: Attrs): T {
+    const vmAttrs = proxyAttributes(attrs ?? {});
+    return new this(vmAttrs as ComponentAttributes)[$$][PROXY] as T;
   }
 
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */
-  [];
   [__]: ComponentInnerProperties;
   [$$]: ViewModelCore;
+  [EMITTER]: Emitter<Events>;
 
   /* 预定义好的常用的传递样式控制的属性 */
   class: ComponentAttributes['class'];
@@ -162,20 +155,18 @@ export class Component {
    *
    * Don't use constructor directly, use static factory method `create(attrs)` instead.
    */
-  constructor(attrs: ComponentAttributes) {
-    if (!isObject(attrs) || !($$ in attrs)) {
-      throw new Error('Attributes passed to Component constructor must be ViewModel. See https://[todo]');
+  constructor(attrs: ComponentAttributes, compilerAttrs: CompilerAttributes) {
+    if (!isViewModel(attrs)) {
+      throw new Error('Attributes passed to Component constructor must be ViewModel. ');
     }
-    const compilerAttrs = attrs[__] || {};
-    super(compilerAttrs.listeners);
-    createComponent(this);
+    proxyComponent(this);
 
     this[__] = {
       passedAttrs: attrs,
       context: compilerAttrs.context || null,
       contextState: ContextStates.UNTOUCH,
       slots: compilerAttrs.slots,
-      state: ComponentStates.INITIALIZE,
+      state: ComponentState.INITIALIZE,
       rootNodes: [],
       nonRootCompNodes: [],
       refs: null,
@@ -185,7 +176,7 @@ export class Component {
     };
 
     /** class 和 style 两个最常用的属性，默认从 attributes 中取出并监听。 */
-    const $proxy = this[$$].proxy as Record<string, unknown>;
+    const $proxy = this[$$][PROXY] as Record<string, unknown>;
     ['class', 'style'].forEach((attrN) => {
       if (!(attrN in attrs)) return;
       const f = () => ($proxy[attrN] = attrs[attrN]);
@@ -255,10 +246,10 @@ export class Component {
   __domPassListeners(targetEl?: HTMLElement): void;
   __domPassListeners(ignoredEventNames: string[], targetEl: HTMLElement): void;
   __domPassListeners(ignoredEventNames?: string[] | HTMLElement, targetEl?: HTMLElement): void {
-    if (this[__].state !== ComponentStates.RENDERED) {
+    if (this[__].state !== ComponentState.RENDERED) {
       throw new Error('domPassListeners must be applied to component which is rendered.');
     }
-    const lis = this[MESSENGER];
+    const lis = this[EMITTER];
     if (!lis || lis.size === 0) {
       return;
     }
@@ -343,12 +334,12 @@ export class Component {
    * which means component append to target as it's children.
    */
   __renderToDOM(targetEl: HTMLElement, replaceMode = true) {
-    if (this[__].state !== ComponentStates.INITIALIZE) {
+    if (this[__].state !== ComponentState.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
     const rr = assertRenderResults(this.__render());
     if (replaceMode) {
-      replaceChildren(targetEl.parentNode, rr, targetEl);
+      replaceChildren(targetEl.parentNode as HTMLElement, rr, targetEl);
     } else {
       appendChildren(targetEl, rr);
     }
@@ -357,25 +348,26 @@ export class Component {
 
   __destroy(removeDOM = true) {
     const comp = this[__];
-    if (comp.state >= ComponentStates.WILLDESTROY) return;
-    comp.state = ComponentStates.WILLDESTROY;
+    if (comp.state >= ComponentState.WILLDESTROY) return;
+    comp.state = ComponentState.WILLDESTROY;
     /*
      * once component is being destroied,
      *   we mark component and it's passed-attrs un-notifiable to ignore
      *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
      */
-    this[$$].__notifiable = false;
-    comp.passedAttrs[$$].__notifiable = false;
+    this[$$][NOTIFIABLE] = false;
+    comp.passedAttrs[$$][NOTIFIABLE] = false;
 
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
     //   因为在 BEFORE_DESTROY 里会销毁外部消息回调函数里可能会用到的属性等资源。
+    const emitter = this[EMITTER];
     this.__notify('before-destroy');
     this.__beforeDestroy();
     // destroy children(include child component and html nodes)
     this.__handleBeforeDestroy(removeDOM);
     // clear messenger listeners.
-    super.__off();
+    emitter?.
     // destroy attrs passed to constructor
     comp.passedAttrs[$$].__destroy();
     comp.passedAttrs = null;
@@ -415,7 +407,7 @@ export class Component {
     }
 
     // clear properties
-    comp.state = ComponentStates.DESTROIED;
+    comp.state = ComponentState.DESTROIED;
     // unlink all symbol properties. maybe unnecessary.
     comp.rootNodes = comp.nonRootCompNodes = comp.refs = comp.slots = comp.context = null;
   }
@@ -427,7 +419,7 @@ export class Component {
       component.__destroy(false);
     }
 
-    let $parent: Node;
+    let $parent: Node | null = null;
     for (const node of this[__].rootNodes) {
       if (isComponent(node)) {
         (node as Component).__destroy(removeDOM);
@@ -435,7 +427,7 @@ export class Component {
         if (!$parent) {
           $parent = (node as Node).parentNode;
         }
-        $parent.removeChild(node as Node);
+       ( $parent as Node).removeChild(node as Node);
       }
     }
   }
@@ -445,8 +437,8 @@ export class Component {
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
-    this[__].passedAttrs[$$].__notifiable = true;
-    this[$$].__notifiable = true;
+    this[__].passedAttrs[$$][NOTIFIABLE] = true;
+    this[$$][NOTIFIABLE] = true;
 
     for (const n of this[__].rootNodes) {
       if (isComponent(n)) {
@@ -456,7 +448,7 @@ export class Component {
     for (const n of this[__].nonRootCompNodes) {
       n.__handleAfterRender();
     }
-    this[__].state = ComponentStates.RENDERED;
+    this[__].state = ComponentState.RENDERED;
     this[__].contextState =
       this[__].contextState === ContextStates.TOUCHED ? ContextStates.TOUCHED_FREEZED : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
     this.__afterRender();
@@ -470,7 +462,7 @@ export class Component {
   __updateIfNeed(nextTick?: boolean): void;
   __updateIfNeed(handler: () => void, nextTick?: boolean): void;
   __updateIfNeed(handler?: (() => void) | boolean, nextTick = true): void {
-    if (this[__].state !== ComponentStates.RENDERED) {
+    if (this[__].state !== ComponentState.RENDERED) {
       return;
     }
     if (handler === false) {
@@ -585,9 +577,9 @@ export class Component {
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
   __getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string): T {
-    if (this[__].state !== ComponentStates.RENDERED) {
+    if (this[__].state !== ComponentState.RENDERED) {
       warn(
-        `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing. see https://[TODO]`,
+        `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
       );
     }
     return this[__].refs?.get(ref) as T;

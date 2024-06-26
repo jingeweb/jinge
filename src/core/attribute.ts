@@ -1,25 +1,22 @@
-interface CompilerAttributes {
+import { AnyFn, CLASSNAME } from "src/util";
+import { RenderFn } from "./component";
+import { ListenerOptions } from "./emitter";
+import { proxyAttributes } from "src/vm_v2";
+
+export interface CompilerAttributes {
   context?: Record<string, unknown>;
   slots?: Record<string, RenderFn>;
-  listeners?: Record<string, MessengerHandler>;
+  listeners?: Record<string, {
+    fn: AnyFn;
+    opts?: ListenerOptions
+  }>;
 }
 
-export type ComponentAttributes = ViewModelObject & {
+ 
+
+export type Attributes<Attrs extends object> = {
   class?: CLASSNAME;
   style?: string | Record<string, string | number>;
-  [__]?: CompilerAttributes;
-};
+} & Attrs;
 
-export type Attributes<Props = Record<string, unknown>> = ComponentAttributes & Props;
-
-function wrapAttrs<Props extends Record<string, unknown>>(
-  target: Props & {
-    [__]?: CompilerAttributes;
-  },
-): ViewModelObject & Props {
-  if (!isObject(target) || isArray(target)) {
-    throw new Error('attrs() traget must be plain object.');
-  }
-  return createAttributes(target);
-}
 export { wrapAttrs as attrs };

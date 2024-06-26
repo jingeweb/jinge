@@ -3,7 +3,7 @@ export function typeOf(v: unknown): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function isObject<T extends object = Record<string | symbol, any>>(v: unknown): v is T {
+export function isObject<T extends object = AnyObj>(v: unknown): v is T {
   return v !== null && typeOf(v) === 'object';
 }
 

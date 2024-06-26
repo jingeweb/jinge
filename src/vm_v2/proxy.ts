@@ -16,7 +16,7 @@ import {
   INNER,
   SETTERS,
 } from './core';
-import { notifyVmPropertyChange } from './notify_tree';
+import { notifyVmChange } from './watch';
 
 type ViewModelArray = ViewModel<ViewModel[]>;
 
@@ -102,7 +102,7 @@ function __propSetHandler(
   if (newValMaybeVM) {
     addParent((value as ViewModel)[$$], target[$$], prop);
   }
-  notifyVmPropertyChange(target, prop, oldVal, value);
+  notifyVmChange(target, [prop]);
   return true;
 }
 
@@ -144,11 +144,7 @@ function attrsPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: u
   return __propSetHandler(target as ViewModel, prop, value, __objectPropSetFn);
 }
 
-function componentPropSetHandler<T extends Component>(
-  target: T,
-  prop: PropertyPathItem,
-  value: unknown,
-) {
+function componentPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
   if (!target[$$]) {
     warn(
       `call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
@@ -171,13 +167,12 @@ function arrayLengthSetHandler(target: ViewModelArray, value: number) {
       if (isViewModel(v)) {
         removeParent(v[$$], target[$$], i);
       }
-      notifyVmPropertyChange(target, i, v, undefined);
     }
   } else {
     // length 增加，数组的元素值没有发生变化，前后都是 undefined。
   }
   target.length = value;
-  notifyVmPropertyChange(target, 'length', oldLen, value);
+  notifyVmChange(target);
   return true;
 }
 
@@ -226,8 +221,9 @@ function _arrayReverseSort(target: ViewModelArray, fn: () => void): ViewModelArr
     if (isViewModel(it)) {
       addParent(it[$$], target[$$], i);
     }
-    notifyVmPropertyChange(target, i, p, it);
   });
+  notifyVmChange(target)
+
   return target[$$][PROXY] as ViewModelArray;
 }
 
@@ -294,25 +290,7 @@ const ArrayFns = {
     }
     const oldLen = target.length;
     const rtn = wrapSubArray(target.splice(idx, delCount, ...args) as ViewModelArray);
-    if (delta !== 0) {
-      const eidx = delta > 0 ? oldLen + delta : oldLen;
-      for (let i = idx; i < eidx; i++) {
-        const oldV = idx - i < delCount ? rtn[idx - i] : target[idx - i - delCount + args.length];
-        const newV = target[i];
-        if (oldV !== newV) {
-          notifyVmPropertyChange(target, i, oldV, newV);
-        }
-      }
-      notifyVmPropertyChange(target, 'length', oldLen, oldLen + delta);
-    } else {
-      for (let i = 0; i < delCount; i++) {
-        const oldV = rtn[i];
-        const newV = args[i];
-        if (newV !== oldV) {
-          notifyVmPropertyChange(target, i + idx, oldV, newV);
-        }
-      }
-    }
+    notifyVmChange(target);
     return rtn;
   },
   shift(target: ViewModelArray) {
@@ -325,10 +303,7 @@ const ArrayFns = {
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], -1);
     }
-    notifyVmPropertyChange(target, 'length', oldLen, oldLen - 1);
-    for (let i = 0; i < target.length + 1; i++) {
-      notifyVmPropertyChange(target, i, i === 0 ? el : target[i - 1], target[i]);
-    }
+    notifyVmChange(target);
     return el;
   },
   unshift(target: ViewModelArray, ...args: ViewModel[]) {
@@ -341,10 +316,7 @@ const ArrayFns = {
     });
     _arrayShiftOrUnshiftProp(target, args.length);
     const rtn = target.unshift(...args);
-    notifyVmPropertyChange(target, 'length', oldLen, oldLen + args.length);
-    for (let i = 0; i < target.length; i++) {
-      notifyVmPropertyChange(target, i, target[i + args.length], target[i]);
-    }
+  notifyVmChange(target)
     return rtn;
   },
   pop(target: ViewModelArray) {
@@ -356,8 +328,7 @@ const ArrayFns = {
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], oldLen - 1);
     }
-    notifyVmPropertyChange(target, 'length', oldLen, oldLen - 1);
-    notifyVmPropertyChange(target, oldLen - 1, el, undefined);
+   notifyVmChange(target)
     return el;
   },
   push(target: ViewModelArray, ...args: ViewModel[]): number {
@@ -369,10 +340,8 @@ const ArrayFns = {
     });
     const oldLen = target.length;
     const rtn = target.push(...args);
-    notifyVmPropertyChange(target, 'length', oldLen, target.length);
-    for (let i = target.length - args.length; i < target.length; i++) {
-      notifyVmPropertyChange(target, i, undefined, target[i]);
-    }
+    notifyVmChange(target)
+
     return rtn;
   },
   fill(target: ViewModelArray, v: ViewModel): ViewModelArray {
@@ -388,8 +357,9 @@ const ArrayFns = {
       if (isViewModel(v)) {
         addParent(v[$$], target[$$], i);
       }
-      notifyVmPropertyChange(target, i, it, v);
+     
     });
+    notifyVmChange(target)
     return target[$$][PROXY] as ViewModelArray;
   },
   reverse(target: ViewModelArray): ViewModelArray {
@@ -455,10 +425,7 @@ export function wrapVm<T extends object>(target: T) {
       }
     } else {
       const vmCore = newViewModelCore(target);
-      const proxy = new Proxy(
-        target as ViewModel,
-        isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler,
-      );
+      const proxy = new Proxy(target as ViewModel, isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler);
       vmCore[PROXY] = proxy;
       for (const k in target) {
         if (isPublicProperty(k)) {
@@ -472,7 +439,7 @@ export function wrapVm<T extends object>(target: T) {
   }
 }
 
-export function createAttributes<T extends object>(attributes: T) {
+export function proxyAttributes<T extends object>(attributes: T) {
   if (!isObject(attributes)) throw new Error('attrs must be object');
   const p = (attributes as ViewModel<T>)[$$];
   if (p) return p[PROXY];
@@ -502,7 +469,7 @@ export function createAttributes<T extends object>(attributes: T) {
 //   _di.vms.push(vm);
 // }
 
-export function createComponent<T extends Component>(component: T): T {
+export function proxyComponent<T extends Component<any, any>>(component: T): T {
   if (isViewModel<T>(component)) {
     return component[$$][PROXY];
   }

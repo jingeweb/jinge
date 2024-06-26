@@ -1,6 +1,6 @@
 import { Component } from './component';
 
-export function bootstrap<T extends typeof Component & { create(attrs: unknown): Component }, Props>(
+export function bootstrap<Props, T extends typeof Component & { create(attrs: unknown): Component }, Props>(
   ComponentClazz: T,
   dom: HTMLElement,
   attrs?: Props,

@@ -1,12 +1,11 @@
 import type { AnyObj, AnyFn } from '../util';
 import { isString, isObject } from '../util';
-import type { NotifyNode } from './notify_tree/node';
-import { loopDownClearNode } from './notify_tree/node';
+import type { Watcher } from './watch';
 
 export const $$ = Symbol('$$');
 
 export const PARENTS = Symbol();
-export const NOTIFY_TREE = Symbol();
+export const WATCHERS = Symbol();
 export const NOTIFIABLE = Symbol();
 export const RELATED = Symbol();
 export const SETTERS = Symbol();
@@ -15,7 +14,7 @@ export const PROXY = Symbol();
 
 export interface ViewModelCore<T extends object = AnyObj> {
   [PARENTS]?: Map<PropertyPathItem, Set<ViewModelCore>>;
-  [NOTIFY_TREE]?: NotifyNode;
+  [WATCHERS]?: Set<Watcher>;
   [NOTIFIABLE]: boolean;
   [RELATED]?: Set<AnyFn>;
   [SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
@@ -32,9 +31,7 @@ export type ViewModel<T extends object = AnyObj> = {
 
 export type PropertyPathItem = string | number | symbol;
 
-export function isInnerObj<T extends RegExp | Date | boolean = RegExp | Date | boolean>(
-  v: unknown,
-): v is T {
+export function isInnerObj<T extends RegExp | Date | boolean = RegExp | Date | boolean>(v: unknown): v is T {
   const clazz = (
     v as {
       constructor: unknown;
@@ -63,20 +60,11 @@ export function addParent(child: ViewModelCore, parent: ViewModelCore, property:
   set.add(parent);
 }
 
-export function removeParent(
-  child: ViewModelCore,
-  parent: ViewModelCore,
-  property: PropertyPathItem,
-) {
+export function removeParent(child: ViewModelCore, parent: ViewModelCore, property: PropertyPathItem) {
   child[PARENTS]?.get(property)?.delete(parent);
 }
 
-export function shiftParent(
-  child: ViewModelCore,
-  parent: ViewModelCore,
-  property: number,
-  delta: number,
-) {
+export function shiftParent(child: ViewModelCore, parent: ViewModelCore, property: number, delta: number) {
   removeParent(child, parent, property);
   addParent(child, parent, property + delta);
 }
@@ -85,8 +73,7 @@ export function destroyViewModelCore(vm: ViewModelCore) {
   vm[NOTIFIABLE] = false;
   vm[PARENTS]?.clear();
   // clear listeners
-  vm[NOTIFY_TREE] && loopDownClearNode(vm[NOTIFY_TREE]);
-  vm[NOTIFY_TREE] = undefined;
+  vm[WATCHERS]?.clear();
   // unlink wrapper proxy
   vm[PROXY] = undefined;
 
