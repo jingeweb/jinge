@@ -10,7 +10,7 @@ export const VALUE = Symbol();
 export const DEEP = Symbol();
 export const LISTENER = Symbol();
 export const TARGET = Symbol();
-export type WatchHandler<T = any> = (newValue: T | undefined, oldValue: T | undefined) => void;
+export type WatchHandler<T = any> = (newValue: T, oldValue: T | undefined) => void;
 export interface Watcher<T = any> {
   [TARGET]?: ViewModel;
   [PATH]?: PropertyPathItem[];

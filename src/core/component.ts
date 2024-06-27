@@ -1,5 +1,5 @@
 import { watch } from 'src/vm_v2';
-import type { CLASSNAME } from '../util';
+import type { AnyFn, CLASSNAME } from '../util';
 import {
   isArray,
   arrayRemove,
@@ -13,10 +13,17 @@ import {
 } from '../util';
 
 import type { ViewModel, ViewModelCore } from '../vm_v2/core';
-import { $$, NOTIFIABLE, PROXY, destroyViewModelCore, isViewModel } from '../vm_v2/core';
+import {
+  $$,
+  NOTIFIABLE,
+  PROXY,
+  destroyViewModelCore,
+  isPublicProperty,
+  isViewModel,
+} from '../vm_v2/core';
 import { proxyComponent } from '../vm_v2/proxy';
-import type { BaseAttrs } from './attribute';
-import type { AnyComponent, RenderFn } from './common';
+import type { CompilerAttrs } from './attribute';
+import type { RenderFn } from './common';
 import {
   DEREGISTER_FUNCTIONS,
   REFS,
@@ -43,8 +50,9 @@ import { Emitter, LISTENERS } from './emitter';
 export interface ComponentInnerProperties {
   /**
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
+   * 如果传递的 attrs 不是 ViewModel，则说明没有需要监听绑定的 attribute，不保存该 attrs。
    */
-  [PASSED_ATTRIBUTES]: ViewModel;
+  [PASSED_ATTRIBUTES]?: ViewModel;
   /**
    * 组件的上下文对象
    */
@@ -68,7 +76,7 @@ export interface ComponentInnerProperties {
    * because when we remove the root children, whole view-tree will be
    * removed, so we do not need waste memory to maintain whole view-tree.
    */
-  [ROOT_NODES]: (AnyComponent | Node)[];
+  [ROOT_NODES]: (Component | Node)[];
   /**
    * NON_ROOT_COMPONENT_NODES means nearest non-root component-nodes in the view-tree.
    * Node in view-tree have two types, html-node and component-node.
@@ -86,14 +94,14 @@ export interface ComponentInnerProperties {
    *
    * By the way, the ROOT_NODES of view-tree above is [h1, h2, A]
    */
-  [NON_ROOT_COMPONENT_NODES]: AnyComponent[];
+  [NON_ROOT_COMPONENT_NODES]: Component[];
   /**
    * refs contains all children with ref: attribute.
    *
    * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
    *   之后通过 __getRef 函数可以获取到元素实例。
    */
-  [REFS]?: Map<string, AnyComponent | Node | (AnyComponent | Node)[]>;
+  [REFS]?: Map<string, Component | Node | (Component | Node)[]>;
   /**
    * 当被 ref: 标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素被添加到当前模板组件（称为 origin component)的 refs 里，
    *   但显然当 <if> 元素控制销毁时，也需要将这个元素从 origin component 的 refs 中删除，
@@ -104,7 +112,7 @@ export interface ComponentInnerProperties {
    *   也会从模板组件的 refs 里面删除。
    */
   [RELATED_REFS]?: {
-    [RELATED_REFS_ORIGIN]: AnyComponent;
+    [RELATED_REFS_ORIGIN]: Component;
     [RELATED_REFS_KEY]: string;
     [RELATED_REFS_NODE]?: Node;
   }[];
@@ -120,7 +128,7 @@ export interface ComponentInnerProperties {
 
 /** Bellow is utility functions **/
 
-export function isComponent<T extends AnyComponent>(v: unknown): v is T {
+export function isComponent<T extends Component>(v: unknown): v is T {
   return !!(v as Record<symbol, unknown>)[__];
 }
 
@@ -175,14 +183,12 @@ export class Component<Events extends EventMap = {}> {
    * Don't use constructor directly, use static factory method `create(attrs)` instead.
    */
   constructor(attrs: object) {
-    if (!isViewModel<BaseAttrs>(attrs)) {
-      throw new Error('Attributes passed to Component constructor must be ViewModel. ');
-    }
-    const compilerAttrs = attrs[__];
+    const isVmAttrs = isViewModel(attrs);
+    const compilerAttrs = (attrs as { [__]?: CompilerAttrs })[__];
     this[$$] = proxyComponent(this);
     this[EMITTER] = new Emitter();
     this[__] = {
-      [PASSED_ATTRIBUTES]: attrs,
+      [PASSED_ATTRIBUTES]: isVmAttrs ? attrs : undefined,
       [CONTEXT]: compilerAttrs?.[CONTEXT],
       [CONTEXT_STATE]: ContextStates.UNTOUCH,
       [SLOTS]: compilerAttrs?.[SLOTS],
@@ -192,22 +198,38 @@ export class Component<Events extends EventMap = {}> {
     };
 
     /** class 和 style 两个最常用的属性，默认从 attributes 中取出并监听。 */
-    const $proxy = this[$$][PROXY];
-    ['class', 'style'].forEach((attrN) => {
-      if (!(attrN in attrs)) return;
-      watch(
-        attrs,
-        [attrN],
-        (v) => {
-          $proxy[attrN] = v;
-        },
-        {
-          immediate: true,
-        },
-      );
+    ['class', 'style'].forEach((p) => {
+      if (!(p in attrs)) return;
+      if (!isVmAttrs) throw new Error('attrs must be ViewModel');
+      this.__bindAttr(attrs, p);
     });
 
-    return $proxy as unknown as typeof this;
+    return this[$$][PROXY] as typeof this;
+  }
+
+  /**
+   * 将 attrs 的属性（attrName）绑定到组件的（componentProp）属性上，即调用 watch 进行监控和更新并在更新后调用组件的 __updateNextTick()。
+   * 如果不传递 componentProp 参数，则 componentProp 和 attrName 同名。
+   */
+  __bindAttr<A extends object, P extends keyof typeof this>(
+    attrs: A,
+    attrName: keyof A,
+    componentProp?: P,
+  ) {
+    if (!isPublicProperty(attrName))
+      throw new Error(`attrName of __bindAttr() requires public property`);
+    this.__addDeregisterFn(
+      watch(
+        attrs,
+        attrName,
+        (v) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          this[componentProp ?? (attrName as unknown as P)] = v as any;
+          this.__updateNextTick();
+        },
+        { immediate: true },
+      ),
+    );
   }
 
   /**
@@ -220,19 +242,6 @@ export class Component<Events extends EventMap = {}> {
     }
     deregs.add(deregisterFn);
   }
-
-  /**
-   * Helper function to add i18n change listener.
-   * The listener will be auto removed when component is destroied.
-   */
-  // __i18nWatch(listener: (locale: string) => void, immediate = false): void {
-  //   this.__addDeregisterFn(
-  //     i18n.watch((locale) => {
-  //       // bind component to listener's function context.
-  //       listener.call(this, locale);
-  //     }, immediate),
-  //   );
-  // }
 
   /**
    * Helper function to add dom event listener.
@@ -382,8 +391,8 @@ export class Component<Events extends EventMap = {}> {
      *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
      */
     this[$$][NOTIFIABLE] = false;
-    const passedAttrs = comp[PASSED_ATTRIBUTES] as ViewModel;
-    passedAttrs[$$][NOTIFIABLE] = false;
+    const passedAttrs = comp[PASSED_ATTRIBUTES];
+    passedAttrs && (passedAttrs[$$][NOTIFIABLE] = false);
 
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
@@ -393,10 +402,10 @@ export class Component<Events extends EventMap = {}> {
     emitter.emit('beforeDestroy');
     this.__beforeDestroy();
     // destroy children(include child component and html nodes)
-    this.__handleBeforeDestroy(removeDOM);
+    this.__destroyContent(removeDOM);
     // clear messenger listeners.
     emitter?.clear();
-    destroyViewModelCore(passedAttrs[$$]);
+    passedAttrs && destroyViewModelCore(passedAttrs[$$]);
 
     // destroy view model
     destroyViewModelCore(this[$$]);
@@ -413,7 +422,7 @@ export class Component<Events extends EventMap = {}> {
       if (!refs) return;
       const rns = refs.get(info[RELATED_REFS_KEY]);
       if (isArray(rns)) {
-        arrayRemove(rns as (AnyComponent | Node)[], info[RELATED_REFS_NODE] || this);
+        arrayRemove(rns as (Component | Node)[], info[RELATED_REFS_NODE] || this);
       } else {
         refs.delete(info[RELATED_REFS_KEY]);
       }
@@ -433,7 +442,10 @@ export class Component<Events extends EventMap = {}> {
     comp[CONTEXT] = undefined;
   }
 
-  __handleBeforeDestroy(removeDOM = false) {
+  /**
+   * 销毁组件的内容，但不销毁组件本身。
+   */
+  __destroyContent(removeDOM = false) {
     for (const component of this[__][NON_ROOT_COMPONENT_NODES]) {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
@@ -453,13 +465,16 @@ export class Component<Events extends EventMap = {}> {
     }
   }
 
+  /**
+   *
+   */
   __handleAfterRender() {
     /*
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
     const comp = this[__];
-    comp[PASSED_ATTRIBUTES][$$][NOTIFIABLE] = true;
+    comp[PASSED_ATTRIBUTES] && (comp[PASSED_ATTRIBUTES][$$][NOTIFIABLE] = true);
     this[$$][NOTIFIABLE] = true;
 
     for (const n of comp[ROOT_NODES]) {
@@ -480,30 +495,16 @@ export class Component<Events extends EventMap = {}> {
   }
 
   /**
-   * 在时机合适时，调用 __update 函数。时机合适的定义为，组件已经渲染完成（即，是进行更新而不是首次渲染）。
-   * 默认情况下，会延后在 nextTick 时调用 __update 函数。可传递 nextTick = false 参数来立即调用。
+   * 在 nextTick 时调用 __update 函数。
    */
-  __updateIfNeed(nextTick?: boolean): void;
-  __updateIfNeed(handler: () => void, nextTick?: boolean): void;
-  __updateIfNeed(handler?: (() => void) | boolean, nextTick = true) {
-    if (this[__][STATE] !== ComponentState.RENDERED) {
-      return;
-    }
-    if (handler === false) {
-      this.__update();
+  __updateNextTick(handler?: AnyFn) {
+    const updateRenderFn = (this as unknown as { __update: AnyFn }).__update;
+    if (!updateRenderFn || this[__][STATE] !== ComponentState.RENDERED) {
       return;
     }
 
-    if (!isFunction(handler)) {
-      if (!nextTick) {
-        this.__update();
-        return;
-      } else {
-        handler = this.__update;
-      }
-    } else if (!nextTick) {
-      handler.call(this);
-      return;
+    if (!handler) {
+      handler = updateRenderFn;
     }
 
     let ntMap = this[__][UPDATE_NEXT_MAP];
@@ -520,11 +521,6 @@ export class Component<Events extends EventMap = {}> {
         (handler as F).call(this);
       }),
     );
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  __update(first?: boolean): void {
-    // by default, do nothing.
   }
 
   __setContext(key: string | symbol, value: unknown, forceOverride = false) {
@@ -569,7 +565,7 @@ export class Component<Events extends EventMap = {}> {
    * This method is used for compiler generated code.
    * Do not use it manually.
    */
-  __setRef(ref: string, el: AnyComponent | Node, relatedComponent?: AnyComponent) {
+  __setRef(ref: string, el: Component | Node, relatedComponent?: Component) {
     let rns = this[__][REFS];
     if (!rns) {
       this[__][REFS] = rns = new Map();
@@ -578,9 +574,9 @@ export class Component<Events extends EventMap = {}> {
     if (!elOrArr) {
       rns.set(ref, el);
     } else if (isArray(elOrArr)) {
-      (elOrArr as (AnyComponent | Node)[]).push(el);
+      (elOrArr as (Component | Node)[]).push(el);
     } else {
-      elOrArr = [elOrArr as AnyComponent, el];
+      elOrArr = [elOrArr as Component, el];
       rns.set(ref, elOrArr);
     }
     const isComp = isComponent(el);
@@ -593,9 +589,9 @@ export class Component<Events extends EventMap = {}> {
      * 如果 el 是 DOM 节点，则必须将它添加到关联组件（比如 <if>） relatedComponent 里，
      *   在 relatedComponent 被销毁时执行关联 refs 的删除。
      */
-    let rbs = ((isComp ? el : relatedComponent) as AnyComponent)[__][RELATED_REFS];
+    let rbs = ((isComp ? el : relatedComponent) as Component)[__][RELATED_REFS];
     if (!rbs) {
-      ((isComp ? el : relatedComponent) as AnyComponent)[__][RELATED_REFS] = rbs = [];
+      ((isComp ? el : relatedComponent) as Component)[__][RELATED_REFS] = rbs = [];
     }
     rbs.push({
       [RELATED_REFS_ORIGIN]: this,
@@ -607,7 +603,7 @@ export class Component<Events extends EventMap = {}> {
   /**
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
-  __getRef<T extends AnyComponent | Node | (AnyComponent | Node)[] = HTMLElement>(ref: string) {
+  __getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
     if (this[__][STATE] !== ComponentState.RENDERED) {
       warn(
         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
@@ -623,9 +619,11 @@ export class Component<Events extends EventMap = {}> {
   ) {
     return this[EMITTER].on(eventName as string, handler, options);
   }
+
   __emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
     this[EMITTER].emit(eventName as string, ...args);
   }
+
   /**
    * lifecycle hook, called after rendered.
    */

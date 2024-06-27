@@ -13,9 +13,7 @@ export enum ContextStates {
   TOUCHED_FREEZED = 3,
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyComponent = Component<any, any>;
-export type RenderFn<T extends AnyComponent = AnyComponent> = (component: T) => Node[];
+export type RenderFn<T extends Component = Component> = (containerComponent: T) => Node[];
 
 export const EMITTER = Symbol('EMITTER');
 export const __ = Symbol('__');

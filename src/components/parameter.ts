@@ -1,6 +1,4 @@
-import type { Attrs } from 'src/core/attribute';
 import type { AnyObj } from 'src/util';
-import { watch, type ViewModel } from 'src/vm_v2';
 import { Component } from '../core/component';
 
 /**
@@ -8,13 +6,10 @@ import { Component } from '../core/component';
  * 通常情况下请勿直接使用该组件。
  */
 export class ParameterComponent extends Component {
-  constructor(attrs: ViewModel<Attrs<AnyObj>>, params: string[]) {
+  constructor(attrs: AnyObj, params: string[]) {
     super(attrs);
     params.forEach((p) => {
-      (this as AnyObj)[p] = attrs[p];
-      watch(attrs, p, () => {
-        (this as AnyObj)[p] = attrs[p];
-      });
+      this.__bindAttr(attrs, p);
     });
   }
 }

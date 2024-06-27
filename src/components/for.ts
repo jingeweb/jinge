@@ -1,43 +1,34 @@
-import {
-  Component,
-  ComponentAttributes,
-  __,
-  attrs,
-  RenderFn,
-  isComponent,
-  ComponentStates,
-  Attributes,
-} from '../core/component';
-import { isViewModel, ViewModelArray, $$, ViewModelObject } from '../vm/core';
-import { isString, isNumber, isArray, createFragment, insertAfter, isUndefined } from '../util';
+import { isViewModel, notifyVmChange } from 'src/vm_v2';
+import { CONTEXT, ROOT_NODES, SLOTS, __, type RenderFn } from 'src/core';
+import { newEmptyAttrs } from 'src/core/attribute';
+import { Component, isComponent } from '../core/component';
+
+import { isString, isNumber, isArray, createFragment, insertAfter } from '../util';
 
 type ForKeyNameFn = (v: unknown) => string;
 type ForKeyName = string | ForKeyNameFn;
 
-export class ForEachComponent extends Component {
-  _e: ViewModelObject;
+export const ELEMENT = Symbol('ELEMENT');
+export class ForEach extends Component {
   index: number;
   isFirst: boolean;
   isLast: boolean;
+  [ELEMENT]: unknown;
 
-  constructor(attrs: ComponentAttributes, item: unknown, index: number, isLast: boolean) {
+  constructor(attrs: object, item: unknown, index: number, isLast: boolean) {
     super(attrs);
-    if (isViewModel(item)) {
-      this.each = item as ViewModelObject;
-    } else {
-      this._e = item as ViewModelObject;
-    }
+
+    // 此处不能直接使用 this.each = item，因为如果是 Public propery 的更新，会自动把 item 转成 ViewModel
+    // 但 For 组件支持渲染非 ViewModel 数据，当数据量很大时，必须阻止自动转成 ViewModel 数据。
+    this[ELEMENT] = item;
+
     this.index = index;
     this.isFirst = index === 0;
     this.isLast = isLast;
   }
 
-  get each(): ViewModelObject {
-    return this._e;
-  }
-
-  set each(v: ViewModelObject) {
-    this._e = v;
+  get each() {
+    return this[ELEMENT];
   }
 }
 
@@ -46,21 +37,9 @@ function createEl(
   i: number,
   isLast: boolean,
   itemRenderFn: RenderFn,
-  context: Record<string | symbol, unknown>,
-): ForEachComponent {
-  return new ForEachComponent(
-    attrs({
-      [__]: {
-        context,
-        slots: {
-          default: itemRenderFn,
-        },
-      },
-    }),
-    item,
-    i,
-    isLast,
-  )[$$].proxy as ForEachComponent;
+  context?: Record<string | symbol, unknown>,
+): ForEach {
+  return new ForEach(newEmptyAttrs(itemRenderFn, context), item, i, isLast);
 }
 
 function appendRenderEach(
@@ -69,7 +48,7 @@ function appendRenderEach(
   isLast: boolean,
   itemRenderFn: RenderFn,
   roots: (Component | Node)[],
-  context: Record<string | symbol, unknown>,
+  context?: Record<string | symbol, unknown>,
 ) {
   const el = createEl(item, i, isLast, itemRenderFn, context);
   roots.push(el);
@@ -82,7 +61,12 @@ function appendRenderEach(
 //   }
 // }
 
-function _prepareKey(item: unknown, i: number, keyMap: Map<unknown, number>, keyName: ForKeyName): unknown {
+function _prepareKey(
+  item: unknown,
+  i: number,
+  keyMap: Map<unknown, number>,
+  keyName: ForKeyName,
+): unknown {
   const key = keyName === 'each' ? item : (keyName as ForKeyNameFn)(item);
   if (keyMap.has(key)) {
     // eslint-disable-next-line no-console
@@ -100,9 +84,9 @@ function renderItems(
   items: unknown[],
   itemRenderFn: RenderFn,
   roots: (Component | Node)[],
-  keys: unknown[],
+  keys: unknown[] | undefined,
   keyName: ForKeyName,
-  context: Record<string | symbol, unknown>,
+  context?: Record<string | symbol, unknown>,
 ) {
   const result: Node[] = [];
   const tmpKeyMap = new Map();
@@ -110,7 +94,7 @@ function renderItems(
     const item = items[i];
     // _assertVm(item, i);
     if (keyName !== 'index') {
-      keys.push(_prepareKey(item, i, tmpKeyMap, keyName));
+      (keys as unknown[]).push(_prepareKey(item, i, tmpKeyMap, keyName));
     }
     const els = appendRenderEach(item, i, i === items.length - 1, itemRenderFn, roots, context);
     result.push(...els);
@@ -119,7 +103,7 @@ function renderItems(
 }
 
 function loopAppend($parent: Node, el: Component) {
-  el[__].rootNodes.forEach((node) => {
+  el[__][ROOT_NODES].forEach((node) => {
     if (isComponent(node)) {
       loopAppend($parent, node as Component);
     } else {
@@ -128,7 +112,7 @@ function loopAppend($parent: Node, el: Component) {
   });
 }
 
-function updateEl(el: ForEachComponent, i: number, items: unknown[]) {
+function updateEl(el: ForEach, i: number, items: unknown[]) {
   if (el.isFirst !== (i === 0)) {
     el.isFirst = i === 0;
   }
@@ -138,8 +122,10 @@ function updateEl(el: ForEachComponent, i: number, items: unknown[]) {
   if (el.index !== i) {
     el.index = i;
   }
-  if (el.each !== items[i]) {
-    el.each = items[i] as ViewModelObject;
+  const newV = items[i];
+  if (el[ELEMENT] !== newV) {
+    el[ELEMENT] = newV;
+    notifyVmChange(el, ['each']);
   }
 }
 
@@ -147,48 +133,34 @@ function _parseIndexPath(p: string | number): string | number {
   return isString(p) && p !== 'length' && /^\d+$/.test(p as string) ? Number(p) : p;
 }
 
-export interface ForComponentAttrs {
-  loop: ViewModelArray;
+export interface ForAttrs {
+  loop: unknown[];
+  key?: string;
 }
-export class ForComponent extends Component {
-  _l: ViewModelArray;
-  _keyName: ForKeyName;
-  _length: number;
-  _keys: unknown[];
-  _waitingUpdate: boolean;
+export const LOOP_DATA = Symbol('LOOP_DATA');
+export const KEY_NAME = Symbol('KEY_NAME');
+export const LEN = Symbol('LEN');
+export const KEYS = Symbol('KEYS');
+export const WATING_UPDATE = Symbol('WATING_UPDATE');
+export class For extends Component {
+  [LOOP_DATA]: unknown[];
+  [KEY_NAME]: ForKeyName;
+  [LEN]: number;
+  [KEYS]?: unknown[];
+  [WATING_UPDATE]?: boolean;
 
-  constructor(attrs: Attributes<ForComponentAttrs>) {
-    if (attrs.key && !/^(index|each(.[\w\d$_]+)*)$/.test(attrs.key as string)) {
-      throw new Error('Value of "key" attribute of <for> component is invalidate. See https://[todo]');
-    }
+  constructor(attrs: ForAttrs) {
     super(attrs);
 
-    /**
-     * <for> 组件的 loop 属性可以支持不是 ViewModel 的数组，因此直接通过
-     * this._l = attrs.loop 的形式初始化赋值。
-     */
-    if (isUndefined(attrs.loop) || attrs.loop === null || isViewModel(attrs.loop)) {
-      this.loop = attrs.loop as ViewModelArray;
-      /**
-       * 编译器只对直接在构造函数体里最顶部的 this.xxx = attrs.xxx 的赋值形式才会进行监听。
-       * 这里的 this.loop = attrs.loop 写在了 if 的条件内部，需要手动添加监听代码。
-       */
-      attrs[$$].__watch('loop', () => {
-        this.loop = attrs.loop as ViewModelArray;
-      });
-    } else {
-      this._l = attrs.loop as ViewModelArray;
-    }
+    this.__bindAttr(attrs, 'loop', LOOP_DATA);
 
-    const kn = (attrs.key as string) || 'index'; // TODO: support handle attrs.key change
-    this._keyName = kn;
-    this._length = 0;
-    this._keys = null;
-    this._waitingUpdate = false;
+    const kn = attrs.key ?? 'index'; // TODO: support handle attrs.key change
+    this[KEY_NAME] = kn;
+    this[LEN] = 0;
 
     if (kn !== 'index' && kn !== 'each') {
       /* eslint no-new-func:"off" */
-      this._keyName = new Function('each', `return ${kn}`) as ForKeyNameFn;
+      this[KEY_NAME] = new Function('each', `return ${kn}`) as ForKeyNameFn;
       // console.log('loop.*.' + kn.slice(5));
       const propCount = kn.split('.').length + 1;
       // console.log(propCount);
@@ -212,7 +184,11 @@ export class ForComponent extends Component {
       });
     }
     this[$$].__watch('loop.*', (propPath: (string | number)[]) => {
-      if (this[__].state !== ComponentStates.RENDERED || propPath.length !== 2 || this._waitingUpdate) {
+      if (
+        this[__].state !== ComponentStates.RENDERED ||
+        propPath.length !== 2 ||
+        this._waitingUpdate
+      ) {
         // if propPath.length === 1 means loop variable changed, loop setter will handle it.
         // ignore if is alreay waiting for update
         // console.log('skip', propPath);
@@ -222,40 +198,29 @@ export class ForComponent extends Component {
       const p = _parseIndexPath(propPath[1]);
       if (p === 'length') {
         this._waitingUpdate = true;
-        this.__updateIfNeed();
+        this.__updateNextTick();
       } else if (isNumber(p)) {
         this._updateItem(p as number);
       }
     });
   }
 
-  get loop(): ViewModelArray {
-    return this._l;
-  }
-
-  set loop(v: ViewModelArray) {
-    // console.log('set loop');
-    this._l = v;
-    this._waitingUpdate = true;
-    this.__updateIfNeed();
-  }
-
   __render() {
-    const roots = this[__].rootNodes;
-    const itemRenderFn = this[__].slots?.default;
+    const roots = this[__][ROOT_NODES];
+    const itemRenderFn = this[__][SLOTS]?.default;
     if (!itemRenderFn) {
       roots.push(document.createComment('empty'));
       return roots as Node[];
     }
-    const items = this.loop;
-    const keyName = this._keyName;
-    if (keyName !== 'index') this._keys = [];
+    const items = this[LOOP_DATA];
+    const keyName = this[KEY_NAME];
+    if (keyName !== 'index') this[KEYS] = [];
     if (!isArray(items) || items.length === 0) {
       roots.push(document.createComment('empty'));
       return roots as Node[];
     }
-    this._length = items.length;
-    return renderItems(items, itemRenderFn, roots, this._keys, keyName, this[__].context);
+    this[LEN] = items.length;
+    return renderItems(items, itemRenderFn, roots, this[KEYS], keyName, this[__][CONTEXT]);
   }
 
   _updateItem(index: number) {
@@ -327,7 +292,8 @@ export class ForComponent extends Component {
     this._length = nl;
     const ctx = this[__].context;
     const firstEl = roots[0]; // if ol === 0, firstEl is comment, else is component
-    const $parent = (ol === 0 ? (firstEl as Node) : (firstEl as ForEachComponent).__firstDOM).parentNode;
+    const $parent = (ol === 0 ? (firstEl as Node) : (firstEl as ForEachComponent).__firstDOM)
+      .parentNode;
 
     if (keyName === 'index') {
       let $f: DocumentFragment = null;

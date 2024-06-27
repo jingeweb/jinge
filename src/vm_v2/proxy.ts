@@ -1,4 +1,4 @@
-import type { AnyComponent } from 'src/core/common';
+import type { Component } from 'src/core';
 import type { AnyFn } from '../util';
 import { isNumber, isArray, isObject, isFunction, isPromise, isUndefined, warn } from '../util';
 
@@ -469,7 +469,7 @@ export function proxyAttributes<T extends object>(attributes: T) {
 //   _di.vms.push(vm);
 // }
 
-export function proxyComponent(component: AnyComponent) {
+export function proxyComponent(component: Component) {
   // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
   const vmCore = newViewModelCore(component, false);

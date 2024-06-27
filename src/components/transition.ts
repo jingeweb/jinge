@@ -1,49 +1,13 @@
 import { addEvent, clearImmediate, removeEvent, setImmediate } from '../util';
-import { Attributes, Component } from '../core/component';
-import {
-  AFTER_ENTER,
-  AFTER_LEAVE,
-  BEFORE_ENTER,
-  BEFORE_LEAVE,
-  ENTER_CANCELLED,
-  LEAVE_CANCELLED,
-  getDurationType,
-} from '../core/transition';
+import { Component } from '../core/component';
+import { TransitionAttrs, TransitionEvents } from 'src/core';
 
 export interface TransitionFns {
   __enter: (isFirst?: boolean) => Promise<void>;
   __leave: (isFirst?: boolean) => Promise<void>;
 }
 
-export interface ClassNames {
-  enterFrom: string;
-  enterActive: string;
-  enterTo: string;
-  leaveFrom: string;
-  leaveActive: string;
-  leaveTo: string;
-}
-
-export type TransitionComponentAttrs = Attributes<{
-  /** 是否对初始渲染使用过渡，默认为 false */
-  appear?: boolean;
-  name?: string;
-  classNames?: ClassNames;
-}>;
-
-function genClassNames(name?: string) {
-  name = name || 'jg';
-  return {
-    enterFrom: `${name}-enter-from`,
-    enterActive: `${name}-enter-active`,
-    enterTo: `${name}-enter-to`,
-    leaveFrom: `${name}-leave-from`,
-    leaveActive: `${name}-leave-active`,
-    leaveTo: `${name}-leave-to`,
-  };
-}
-
-function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
+function doTrans(comp: Transition, isEnter: boolean, el: HTMLElement) {
   const type = isEnter ? 'enter' : 'leave';
   const fromClass = comp._cs[`${type}From`];
   const activeClass = comp._cs[`${type}Active`];
@@ -87,13 +51,13 @@ function doTrans(comp: TransitionComponent, isEnter: boolean, el: HTMLElement) {
   };
 }
 
-export class TransitionComponent extends Component {
+export class Transition extends Component<TransitionEvents> {
   _cs: ClassNames;
   _appear: boolean;
   /** 当前正在进行的过渡的取消函数，不为 undefined 时代表正在过渡中 */
   _t?: (notify: boolean) => void;
 
-  constructor(attrs: TransitionComponentAttrs) {
+  constructor(attrs: TransitionAttrs) {
     super(attrs);
 
     this._cs = attrs.classNames || genClassNames(attrs.name);

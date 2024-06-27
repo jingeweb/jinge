@@ -1,4 +1,4 @@
-import { watch } from 'src/vm_v2';
+import { ROOT_NODES, __ } from 'src/core';
 import { Component } from '../core/component';
 
 export interface LogComponentAttrs {
@@ -11,19 +11,14 @@ export class LogComponent extends Component {
 
   constructor(attrs: LogComponentAttrs) {
     super(attrs);
-    watch(
-      attrs,
-      'message',
-      (v) => {
-        this[MESSAGE] = v;
-        this.__updateIfNeed();
-      },
-      { immediate: true },
-    );
-  }
-  __render() {
-    return [document.createComment(`${this[MESSAGE]}`)];
+    this.__bindAttr(attrs, 'message', MESSAGE);
   }
 
-  __update() {}
+  __render() {
+    return (this[__][ROOT_NODES] = [document.createComment(`${this[MESSAGE]}`)]);
+  }
+
+  __update() {
+    (this[__][ROOT_NODES][0] as Node).textContent = `${this[MESSAGE]}`;
+  }
 }

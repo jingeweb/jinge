@@ -22,6 +22,7 @@ module.exports = {
     '@typescript-eslint/no-unused-vars': 'error',
     '@typescript-eslint/no-non-null-assertion': 'error',
     'no-console': ['error', { allow: ['error'] }],
+    'lines-between-class-members': ['error', 'always', { exceptAfterSingleLine: true }],
     'prettier/prettier': 'error',
     '@typescript-eslint/no-floating-promises': ['error'],
     '@typescript-eslint/no-explicit-any': ['error'],
