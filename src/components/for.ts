@@ -1,4 +1,4 @@
-import { isViewModel, notifyVmChange } from 'src/vm_v2';
+import { isViewModel, notifyVmChange } from 'src/vm';
 import { CONTEXT, ROOT_NODES, SLOTS, __, type RenderFn } from 'src/core';
 import { newEmptyAttrs } from 'src/core/attribute';
 import { Component, isComponent } from '../core/component';

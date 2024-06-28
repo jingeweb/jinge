@@ -1,4 +1,5 @@
-import { watch } from 'src/vm_v2';
+import type { WatchHandler } from 'src/vm';
+import { watch, watchPath } from 'src/vm';
 import type { AnyFn, CLASSNAME } from '../util';
 import {
   isArray,
@@ -12,19 +13,21 @@ import {
   warn,
 } from '../util';
 
-import type { ViewModel, ViewModelCore } from '../vm_v2/core';
+import type { PropertyPathItem, ViewModel, ViewModelCore } from '../vm/core';
 import {
   $$,
-  NOTIFIABLE,
-  PROXY,
+  VM_NOTIFIABLE,
+  VM_PROXY,
+  VM_TARGET,
   destroyViewModelCore,
   isPublicProperty,
   isViewModel,
-} from '../vm_v2/core';
-import { proxyComponent } from '../vm_v2/proxy';
+} from '../vm/core';
+import { proxyComponent } from '../vm/proxy';
 import type { CompilerAttrs } from './attribute';
 import type { RenderFn } from './common';
 import {
+  RELATED_WATCH,
   DEREGISTER_FUNCTIONS,
   REFS,
   RELATED_REFS,
@@ -43,6 +46,12 @@ import {
   ContextStates,
   EMITTER,
   __,
+  SET_REF,
+  WATCH,
+  DESTROY_CONTENT,
+  DESTROY,
+  RENDER_TO_DOM,
+  HANDLE_RENDER_DONE,
 } from './common';
 import type { EventMap, ListenerOptions } from './emitter';
 import { Emitter, LISTENERS } from './emitter';
@@ -116,6 +125,11 @@ export interface ComponentInnerProperties {
     [RELATED_REFS_KEY]: string;
     [RELATED_REFS_NODE]?: Node;
   }[];
+
+  /**
+   *
+   */
+  [RELATED_WATCH]?: Set<AnyFn>;
   /**
    * update-next-map
    */
@@ -169,23 +183,24 @@ export class Component<Events extends EventMap = {}> {
   static readonly [__] = true;
 
   /* 使用 symbol 来定义属性，避免业务层无意覆盖了支撑 jinge 框架逻辑的属性带来坑 */
-  [__]: ComponentInnerProperties;
-  [$$]: ViewModelCore;
+  readonly [__]: ComponentInnerProperties;
+  readonly [$$]: ViewModelCore;
   [EMITTER]: Emitter<EventMap>;
 
   /* 预定义好的常用的传递样式控制的属性 */
   class?: CLASSNAME;
   style?: string | Record<string, string | number>;
 
-  /**
-   * ATTENTION!!!
-   *
-   * Don't use constructor directly, use static factory method `create(attrs)` instead.
-   */
   constructor(attrs: object) {
     const isVmAttrs = isViewModel(attrs);
     const compilerAttrs = (attrs as { [__]?: CompilerAttrs })[__];
-    this[$$] = proxyComponent(this);
+    this[$$] = {
+      // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
+      // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
+      [VM_NOTIFIABLE]: false,
+      [VM_TARGET]: this,
+      [VM_PROXY]: proxyComponent(this),
+    };
     this[EMITTER] = new Emitter();
     this[__] = {
       [PASSED_ATTRIBUTES]: isVmAttrs ? attrs : undefined,
@@ -204,7 +219,33 @@ export class Component<Events extends EventMap = {}> {
       this.__bindAttr(attrs, p);
     });
 
-    return this[$$][PROXY] as typeof this;
+    return this[$$][VM_PROXY] as typeof this;
+  }
+
+  /** 给编译器使用的 watch 函数 */
+  [WATCH](propPath: PropertyPathItem[], handler: WatchHandler, relatedComponent?: Component) {
+    const unwatchFn = watchPath(
+      this,
+      (v, old, p) => {
+        console.log('onchange', v, old, p, propPath);
+        handler(v, old, p);
+      },
+      propPath,
+      true,
+      true,
+    );
+    if (relatedComponent && relatedComponent !== this) {
+      let rw = relatedComponent[__][RELATED_WATCH];
+      if (!rw) rw = relatedComponent[__][RELATED_WATCH] = new Set();
+      const newFn = () => {
+        unwatchFn();
+        rw?.delete(newFn);
+      };
+      rw.add(newFn);
+      return newFn;
+    } else {
+      return unwatchFn;
+    }
   }
 
   /**
@@ -368,7 +409,7 @@ export class Component<Events extends EventMap = {}> {
    * But you can disable it by pass `replaceMode`=`false`,
    * which means component append to target as it's children.
    */
-  __renderToDOM(targetEl: HTMLElement, replaceMode = true) {
+  [RENDER_TO_DOM](targetEl: HTMLElement, replaceMode = true) {
     if (this[__][STATE] !== ComponentState.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
@@ -378,10 +419,10 @@ export class Component<Events extends EventMap = {}> {
     } else {
       appendChildren(targetEl, rr);
     }
-    this.__handleAfterRender();
+    this[HANDLE_RENDER_DONE]();
   }
 
-  __destroy(removeDOM = true) {
+  [DESTROY](removeDOM = true) {
     const comp = this[__];
     if (comp[STATE] >= ComponentState.WILLDESTROY) return;
     comp[STATE] = ComponentState.WILLDESTROY;
@@ -390,9 +431,9 @@ export class Component<Events extends EventMap = {}> {
      *   we mark component and it's passed-attrs un-notifiable to ignore
      *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
      */
-    this[$$][NOTIFIABLE] = false;
+    this[$$][VM_NOTIFIABLE] = false;
     const passedAttrs = comp[PASSED_ATTRIBUTES];
-    passedAttrs && (passedAttrs[$$][NOTIFIABLE] = false);
+    passedAttrs && (passedAttrs[$$][VM_NOTIFIABLE] = false);
 
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
@@ -402,13 +443,16 @@ export class Component<Events extends EventMap = {}> {
     emitter.emit('beforeDestroy');
     this.__beforeDestroy();
     // destroy children(include child component and html nodes)
-    this.__destroyContent(removeDOM);
+    this[DESTROY_CONTENT](removeDOM);
     // clear messenger listeners.
     emitter?.clear();
     passedAttrs && destroyViewModelCore(passedAttrs[$$]);
 
     // destroy view model
     destroyViewModelCore(this[$$]);
+    // 删除关联 watchers
+    comp[RELATED_WATCH]?.forEach((unwatchFn) => unwatchFn());
+    comp[RELATED_WATCH]?.clear();
 
     // clear next tick update setImmediate
     comp[UPDATE_NEXT_MAP]?.forEach((imm) => {
@@ -445,17 +489,17 @@ export class Component<Events extends EventMap = {}> {
   /**
    * 销毁组件的内容，但不销毁组件本身。
    */
-  __destroyContent(removeDOM = false) {
+  [DESTROY_CONTENT](removeDOM = false) {
     for (const component of this[__][NON_ROOT_COMPONENT_NODES]) {
       // it's not necessary to remove dom when destroy non-root component,
       // because those dom nodes will be auto removed when their parent dom is removed.
-      component.__destroy(false);
+      component[DESTROY](false);
     }
 
     let $parent: Node | null = null;
     for (const node of this[__][ROOT_NODES]) {
       if (isComponent(node)) {
-        node.__destroy(removeDOM);
+        node[DESTROY](removeDOM);
       } else if (removeDOM) {
         if (!$parent) {
           $parent = (node as Node).parentNode;
@@ -468,22 +512,22 @@ export class Component<Events extends EventMap = {}> {
   /**
    *
    */
-  __handleAfterRender() {
+  [HANDLE_RENDER_DONE]() {
     /*
      * Set NOTIFIABLE=true to enable ViewModel notify.
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
     const comp = this[__];
-    comp[PASSED_ATTRIBUTES] && (comp[PASSED_ATTRIBUTES][$$][NOTIFIABLE] = true);
-    this[$$][NOTIFIABLE] = true;
+    comp[PASSED_ATTRIBUTES] && (comp[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
+    this[$$][VM_NOTIFIABLE] = true;
 
     for (const n of comp[ROOT_NODES]) {
       if (isComponent(n)) {
-        n.__handleAfterRender();
+        n[HANDLE_RENDER_DONE]();
       }
     }
     for (const n of comp[NON_ROOT_COMPONENT_NODES]) {
-      n.__handleAfterRender();
+      n[HANDLE_RENDER_DONE]();
     }
     comp[STATE] = ComponentState.RENDERED;
     comp[CONTEXT_STATE] =
@@ -565,7 +609,7 @@ export class Component<Events extends EventMap = {}> {
    * This method is used for compiler generated code.
    * Do not use it manually.
    */
-  __setRef(ref: string, el: Component | Node, relatedComponent?: Component) {
+  [SET_REF](ref: string, el: Component | Node, relatedComponent?: Component) {
     let rns = this[__][REFS];
     if (!rns) {
       this[__][REFS] = rns = new Map();

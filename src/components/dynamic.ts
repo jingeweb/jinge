@@ -1,4 +1,14 @@
-import { __, Component, type RenderFn, ROOT_NODES, emptyRenderFn, CONTEXT, SLOTS } from 'src/core';
+import {
+  __,
+  Component,
+  type RenderFn,
+  ROOT_NODES,
+  emptyRenderFn,
+  CONTEXT,
+  SLOTS,
+  DESTROY,
+  HANDLE_RENDER_DONE,
+} from 'src/core';
 import { createFragment, type AnyObj } from 'src/util';
 
 interface ComponentConstructor {
@@ -10,9 +20,9 @@ export type DynamicAttrs = {
   render?: RenderFn;
 };
 
-export const COMPONENT = Symbol('COMPONENT');
-export const RENDER = Symbol('RENDER');
-export const ATTRS = Symbol('ATTRS');
+const COMPONENT = Symbol('COMPONENT');
+const RENDER = Symbol('RENDER');
+const ATTRS = Symbol('ATTRS');
 
 function createEl(component: Dynamic): Component {
   if (component[COMPONENT]) {
@@ -64,7 +74,7 @@ export class Dynamic extends Component {
     roots[0] = newEl;
     const nels = newEl.__render();
     pa.insertBefore(nels.length > 1 ? createFragment(nels) : nels[0], fd);
-    el.__destroy();
-    newEl.__handleAfterRender();
+    el[DESTROY]();
+    newEl[HANDLE_RENDER_DONE]();
   }
 }

@@ -1,28 +1,29 @@
 import type { AnyObj, AnyFn } from '../util';
-import { isString, isObject } from '../util';
+import { isString, isObject, isNumber } from '../util';
 import type { Watcher } from './watch';
 
 export const $$ = Symbol('$$');
 
-export const PARENTS = Symbol();
-export const WATCHERS = Symbol();
-export const NOTIFIABLE = Symbol();
-export const RELATED = Symbol();
-export const SETTERS = Symbol();
-export const TARGET = Symbol();
-export const PROXY = Symbol();
+export const VM_PARENTS = Symbol('PARENTS');
+export const VM_WATCHERS = Symbol('WATCHERS');
+export const VM_NOTIFIABLE = Symbol('NOTIFIABLE');
+// export const VM_RELATED = Symbol('RELATED');
+export const VM_SETTERS = Symbol('SETTERS');
+
+export const VM_TARGET = Symbol('TARGET');
+export const VM_PROXY = Symbol('PROXY');
 
 export interface ViewModelCore<T extends object = AnyObj> {
-  [PARENTS]?: Map<PropertyPathItem, Set<ViewModelCore>>;
-  [WATCHERS]?: Set<Watcher>;
-  [NOTIFIABLE]: boolean;
-  [RELATED]?: Set<AnyFn>;
-  [SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
+  [VM_PARENTS]?: Map<PropertyPathItem, Set<ViewModelCore>>;
+  [VM_WATCHERS]?: Set<Watcher>;
+  [VM_NOTIFIABLE]: boolean;
+  // [VM_RELATED]?: Set<AnyFn>;
+  [VM_SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
   /** 指向当前 vm core 所属的原始数据 */
-  [TARGET]: T;
+  [VM_TARGET]: T;
   /** 指向当前 vm core 所属的 Proxy */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [PROXY]: any;
+  [VM_PROXY]: any;
 }
 
 export type ViewModel<T extends object = AnyObj> = {
@@ -47,13 +48,14 @@ export function isViewModel<T extends object = AnyObj>(v: unknown): v is ViewMod
 }
 
 export function isPublicProperty(v: unknown) {
+  if (isNumber(v)) return true;
   return isString(v) && (v as string).charCodeAt(0) !== 95;
 }
 
 export function addParent(child: ViewModelCore, parent: ViewModelCore, property: PropertyPathItem) {
-  let map = child[PARENTS];
+  let map = child[VM_PARENTS];
   if (!map) {
-    map = child[PARENTS] = new Map();
+    map = child[VM_PARENTS] = new Map();
   }
   let set = map.get(property);
   if (!set) {
@@ -67,7 +69,7 @@ export function removeParent(
   parent: ViewModelCore,
   property: PropertyPathItem,
 ) {
-  child[PARENTS]?.get(property)?.delete(parent);
+  child[VM_PARENTS]?.get(property)?.delete(parent);
 }
 
 export function shiftParent(
@@ -81,25 +83,20 @@ export function shiftParent(
 }
 
 export function destroyViewModelCore(vm: ViewModelCore) {
-  vm[NOTIFIABLE] = false;
-  vm[PARENTS]?.clear();
+  vm[VM_NOTIFIABLE] = false;
+  vm[VM_PARENTS]?.clear();
   // clear listeners
-  vm[WATCHERS]?.clear();
+  vm[VM_WATCHERS]?.clear();
   // unlink wrapper proxy
-  vm[PROXY] = undefined;
+  vm[VM_PROXY] = undefined;
 
-  vm[RELATED]?.forEach((unwatchFn) => {
-    unwatchFn();
-  });
-  vm[RELATED]?.clear();
-
-  const target = vm[TARGET] as ViewModel;
+  const target = vm[VM_TARGET] as ViewModel;
 
   /*
    * 解除 ViewModel 之间的 VM_PARENTS 关联。
    * 使用 getOwnPropertyNames 可以获取所有属性，但无法获取 setter 函数定义的属性。
    */
-  vm[SETTERS]?.forEach((fn, prop) => {
+  vm[VM_SETTERS]?.forEach((fn, prop) => {
     if (!fn) {
       return;
     }
@@ -108,7 +105,7 @@ export function destroyViewModelCore(vm: ViewModelCore) {
       removeParent(v[$$], vm, prop);
     }
   });
-  vm[SETTERS]?.clear();
+  vm[VM_SETTERS]?.clear();
   Object.getOwnPropertyNames(target).forEach((prop) => {
     const v = target[prop];
     if (isViewModel(v)) {
@@ -119,5 +116,5 @@ export function destroyViewModelCore(vm: ViewModelCore) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   target[$$] = undefined as any; // unlink vm target
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  vm[TARGET] = undefined as any;
+  vm[VM_TARGET] = undefined as any;
 }

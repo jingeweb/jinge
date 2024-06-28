@@ -2,13 +2,13 @@
   "name": "jinge",
   "version": "3.3.0",
   "description": "A Proxy based MVVM framework",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "src/index.ts",
   "type": "module",
   "scripts": {
     "dev": "WATCH=true npm run build",
-    "build": "rm -rf {lib,.tmp,dist} && tsc && node ./scripts/esbuild.js && rollup -c ./scripts/rollup.config.mjs",
-    "rollup": "rollup -c ./scripts/rollup.config.mjs",
+    "build": "rm -rf dist && tsx ./scripts/esbuild.ts",
     "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,mjs,ts}' --fix",
     "lint-staged": "lint-staged",
     "prepare": "husky"
@@ -31,11 +31,9 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^15.2.3",
-    "@rollup/plugin-terser": "^0.4.4",
+    "@types/node": "^20.14.9",
     "@typescript-eslint/eslint-plugin": "^7.14.1",
     "@typescript-eslint/parser": "^7.14.1",
-    "chokidar": "^3.6.0",
     "esbuild": "^0.21.5",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
@@ -45,14 +43,7 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.7",
     "prettier": "^3.3.2",
-    "rollup": "^4.18.0",
-    "rollup-plugin-esbuild": "^6.1.1",
+    "tsx": "^4.15.7",
     "typescript": "^5.5.2"
-  },
-  "peerDependencies": {
-    "jinge-compiler": "^3.2.3"
-  },
-  "dependencies": {
-    "jinge-compiler": "^3.2.3"
   }
 }

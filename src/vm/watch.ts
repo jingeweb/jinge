@@ -3,20 +3,23 @@
 import type { AnyObj } from '../util';
 import { isFunction, isObject } from '../util';
 import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
-import { $$, PARENTS, WATCHERS } from './core';
+import { VM_TARGET, $$, VM_PARENTS, VM_WATCHERS } from './core';
 
-export const PATH = Symbol();
-export const VALUE = Symbol();
-export const DEEP = Symbol();
-export const LISTENER = Symbol();
-export const TARGET = Symbol();
-export type WatchHandler<T = any> = (newValue: T, oldValue: T | undefined) => void;
+export const VM_WATCHER_PATH = Symbol('PATH');
+export const VM_WATCHER_VALUE = Symbol('VALUE');
+export const VM_WATCHER_IS_DEEP = Symbol('IS_DEEP');
+export const VM_WATCHER_LISTENER = Symbol('LISTENER');
+export type WatchHandler<T = any> = (
+  newValue: T,
+  oldValue: T | undefined,
+  propertyPath?: PropertyPathItem[],
+) => void;
 export interface Watcher<T = any> {
-  [TARGET]?: ViewModel;
-  [PATH]?: PropertyPathItem[];
-  [VALUE]?: T;
-  [LISTENER]?: WatchHandler<T>;
-  [DEEP]?: boolean;
+  [VM_TARGET]?: ViewModel;
+  [VM_WATCHER_PATH]?: PropertyPathItem[];
+  [VM_WATCHER_VALUE]?: T;
+  [VM_WATCHER_LISTENER]?: WatchHandler<T>;
+  [VM_WATCHER_IS_DEEP]?: boolean;
 }
 
 function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
@@ -36,7 +39,7 @@ function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
  * watch view-model by property path.
  * TODO: watchPath 能实现深度的基于 keyof 的类型严格的 Property Path 么？
  */
-function innerWatch(
+export function watchPath(
   vm: ViewModel,
   handler: WatchHandler,
   propertyPath?: PropertyPathItem[],
@@ -45,26 +48,26 @@ function innerWatch(
 ) {
   const core = vm[$$];
   if (!core) throw new Error('watch() or watchPath() requires view-model, use vm() to wrap object');
-  let watchers = core[WATCHERS];
+  let watchers = core[VM_WATCHERS];
   if (!watchers) {
-    watchers = core[WATCHERS] = new Set();
+    watchers = core[VM_WATCHERS] = new Set();
   }
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
   const watcher: Watcher = {
-    [TARGET]: vm,
-    [PATH]: propertyPath,
-    [VALUE]: val,
-    [LISTENER]: handler,
-    [DEEP]: deep,
+    [VM_TARGET]: vm,
+    [VM_WATCHER_PATH]: propertyPath,
+    [VM_WATCHER_VALUE]: val,
+    [VM_WATCHER_LISTENER]: handler,
+    [VM_WATCHER_IS_DEEP]: deep,
   };
   watchers.add(watcher);
   if (immediate) {
     handler(val, undefined);
   }
   return () => {
-    watcher[TARGET] = undefined;
-    watcher[LISTENER] = undefined;
-    watcher[VALUE] = undefined;
+    watcher[VM_TARGET] = undefined;
+    watcher[VM_WATCHER_LISTENER] = undefined;
+    watcher[VM_WATCHER_VALUE] = undefined;
     watchers.delete(watcher);
   };
 }
@@ -80,41 +83,40 @@ export function watch<T extends object, P extends keyof T>(
   options?: WatchOptions,
 ): UnwatchFn;
 export function watch<T extends object>(vm: T, handler: WatchHandler<T>): UnwatchFn;
-// export function watch<T extends object>(
-//   vm: T,
-//   propertyPath: PropertyPathItem[],
-//   handler: WatchHandler<any>,
-//   options?: WatchOptions,
-// ): UnwatchFn;
+export function watch<T extends object>(
+  vm: T,
+  propertyPath: PropertyPathItem[],
+  handler: WatchHandler<any>,
+  options?: WatchOptions,
+): UnwatchFn;
 export function watch(vm: any, propOrPathOrHanlder: any, handler?: any, options?: any) {
   if (isFunction(propOrPathOrHanlder)) {
-    return innerWatch(vm, propOrPathOrHanlder, undefined, true);
+    return watchPath(vm, propOrPathOrHanlder, undefined, true);
   } else if (Array.isArray(propOrPathOrHanlder)) {
-    return innerWatch(vm, handler, propOrPathOrHanlder, options?.deep, options?.immediate);
+    return watchPath(vm, handler, propOrPathOrHanlder, options?.deep, options?.immediate);
   } else {
-    return innerWatch(vm, handler, [propOrPathOrHanlder], options?.deep, options?.immediate);
+    return watchPath(vm, handler, [propOrPathOrHanlder], options?.deep, options?.immediate);
   }
 }
 
 function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[]) {
-  const watchers = vmCore[WATCHERS];
-  if (!watchers?.size) return;
-  watchers.forEach((watcher) => {
-    const listener = watcher[LISTENER];
-    const vm = watcher[TARGET];
+  vmCore[VM_WATCHERS]?.forEach((watcher) => {
+    const listener = watcher[VM_WATCHER_LISTENER];
+    const vm = watcher[VM_TARGET];
     if (!vm || !listener) {
       // 如果 Watcher 已经被销毁，忽略
       return;
     }
 
-    const watchPath = watcher[PATH];
+    const watchPath = watcher[VM_WATCHER_PATH];
     if (!watchPath?.length) {
       // 如果 watch 的 path 为空，说明是深度 watch 当前 ViewModel，直接触发 listener
       listener(vm, vm);
       return;
     }
-    const deep = watcher[DEEP];
+    const deep = watcher[VM_WATCHER_IS_DEEP];
     const clen = changedPath?.length ?? 0;
+    console.log('check', changedPath, watchPath);
     // 不论是否是深度 watch，如果发生变化的 changedPath 是监听的 watchPath 的前缀，则监听的 watchPath 都可能发生变化，需要检测和触发 listener
     let match =
       clen === 0 ||
@@ -133,20 +135,24 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
       return;
     }
 
-    const oldValue = watcher[VALUE];
+    const oldValue = watcher[VM_WATCHER_VALUE];
     const newValue = getValueByPath(vm, watchPath);
+    // 如果是深度监听，则不论新旧数据的引用是否相同，都触发向外传递消息。
     if (deep || newValue !== oldValue) {
-      watcher[VALUE] = newValue;
-      listener(newValue, oldValue);
+      watcher[VM_WATCHER_VALUE] = newValue;
+      listener(newValue, oldValue, changedPath);
     }
   });
-  vmCore[PARENTS]?.forEach((parents, prop) => {
+  vmCore[VM_PARENTS]?.forEach((parents, prop) => {
     const parentPath = changedPath ? [prop, ...changedPath] : [prop];
     parents.forEach((parentVmCore) => {
       handleVmChange(parentVmCore, parentPath);
     });
   });
 }
-export function notifyVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
-  handleVmChange(vm[$$], changedPath);
+export function notifyVmPropChange(vm: ViewModel, prop: PropertyPathItem) {
+  handleVmChange(vm[$$], [prop]);
+}
+export function notifyVmArrayChange(vm: ViewModel) {
+  handleVmChange(vm[$$]);
 }

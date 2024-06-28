@@ -1,5 +1,5 @@
 import type { RenderFn } from 'src/core';
-import { Component, CONTEXT, ROOT_NODES, SLOTS, __ } from 'src/core';
+import { Component, CONTEXT, ROOT_NODES, SLOTS, __, DESTROY_CONTENT } from 'src/core';
 
 function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>) {
   const attrs = {
@@ -27,11 +27,11 @@ function renderSwitch(component: Component, slot: string) {
 }
 
 function doUpdate(component: Component, slot: string) {
-  component.__destroyContent(true);
+  component[DESTROY_CONTENT](true);
   renderSwitch(component, slot);
 }
 
-export const EXPECT = Symbol('EXPECT');
+const EXPECT = Symbol('EXPECT');
 
 export interface IfAttrs {
   expect?: boolean;

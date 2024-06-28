@@ -11,7 +11,7 @@ export interface ShowAttrs {
   expect?: boolean;
 }
 
-export const EXPECT = Symbol('EXPECT');
+const EXPECT = Symbol('EXPECT');
 /**
  * 控制元素显示隐藏（display: none）的组件。
  *

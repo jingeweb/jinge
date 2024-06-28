@@ -18,7 +18,7 @@ export interface BindHtmlAttrs {
   content: string;
 }
 
-export const CONTENT = Symbol();
+const CONTENT = Symbol();
 export class BindHtml extends Component {
   [CONTENT]?: string;
 

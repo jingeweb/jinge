@@ -1,6 +1,15 @@
 import type { Component } from 'src/core';
 import type { AnyFn } from '../util';
-import { isNumber, isArray, isObject, isFunction, isPromise, isUndefined, warn } from '../util';
+import {
+  isNumber,
+  isArray,
+  isObject,
+  isFunction,
+  isPromise,
+  isUndefined,
+  warn,
+  isString,
+} from '../util';
 
 import type { PropertyPathItem, ViewModelCore, ViewModel } from './core';
 import {
@@ -11,28 +20,14 @@ import {
   isPublicProperty,
   isInnerObj,
   $$,
-  PROXY,
-  NOTIFIABLE,
-  TARGET,
-  SETTERS,
+  VM_PROXY,
+  VM_NOTIFIABLE,
+  VM_TARGET,
+  VM_SETTERS,
 } from './core';
-import { notifyVmChange } from './watch';
+import { notifyVmPropChange, notifyVmArrayChange } from './watch';
 
 type ViewModelArray = ViewModel<ViewModel[]>;
-
-function newViewModelCore<T extends object>(target: T, notifiable = true) {
-  const vm = {
-    [NOTIFIABLE]: notifiable,
-    [TARGET]: target,
-  } as ViewModelCore<T>;
-  Object.defineProperty(target, $$, {
-    value: vm,
-    writable: false,
-    configurable: true,
-    enumerable: false,
-  });
-  return vm;
-}
 
 /**
  * check if property named "prop" is setter of instance "obj",
@@ -43,9 +38,9 @@ function newViewModelCore<T extends object>(target: T, notifiable = true) {
  * 由于 obj 可能是有继承关系的类的实例，因此需要向上检测继承的类的 prototype。
  */
 function getSetterFnIfPropIsSetter(obj: ViewModel, prop: PropertyPathItem) {
-  let map = obj[$$][SETTERS];
+  let map = obj[$$][VM_SETTERS];
   if (!map) {
-    obj[$$][SETTERS] = map = new Map();
+    obj[$$][VM_SETTERS] = map = new Map();
   }
   type Constructor = { prototype: unknown };
   if (!map.has(prop)) {
@@ -92,7 +87,10 @@ function __propSetHandler(
   }
   const newValMaybeVM = isObject(value) && !isInnerObj(value);
   if (newValMaybeVM && isPubProp && !(value as ViewModel)[$$]) {
-    value = wrapVm(value as object);
+    throw new Error(
+      "value of ViewModel's public property must also be ViewModel, use vm() to wrap it",
+    );
+    // value = wrapVm(value as object);
   }
   // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
   if (isViewModel(oldVal)) {
@@ -102,7 +100,7 @@ function __propSetHandler(
   if (newValMaybeVM) {
     addParent((value as ViewModel)[$$], target[$$], prop);
   }
-  notifyVmChange(target, [prop]);
+  notifyVmPropChange(target, prop);
   return true;
 }
 
@@ -122,7 +120,7 @@ function __componentPropSetFn(target: ViewModel, prop: PropertyPathItem, value: 
    */
   const setterFn = getSetterFnIfPropIsSetter(target, prop);
   if (setterFn) {
-    setterFn.call(target[$$][PROXY], value);
+    setterFn.call(target[$$][VM_PROXY], value);
   } else {
     target[prop] = value;
   }
@@ -168,11 +166,9 @@ function arrayLengthSetHandler(target: ViewModelArray, value: number) {
         removeParent(v[$$], target[$$], i);
       }
     }
-  } else {
-    // length 增加，数组的元素值没有发生变化，前后都是 undefined。
   }
   target.length = value;
-  notifyVmChange(target);
+  notifyVmArrayChange(target);
   return true;
 }
 
@@ -187,6 +183,9 @@ function arrayPropSetHandler(target: ViewModelArray, prop: PropertyPathItem, val
    * 即便是 arr[0] 这样的取值，在 Proxy 的 set 里面，传递的 property 也是 string 类型，即 "0"。
    * 因此，对数组也使用和对象一致的 objectPropSetHandler 来处理。
    */
+  if (isString(prop) && /^\d+$/.test(prop as string)) {
+    prop = parseInt(prop as string);
+  }
   return __propSetHandler(target as ViewModel, prop, value, __objectPropSetFn);
 }
 
@@ -222,15 +221,18 @@ function _arrayReverseSort(target: ViewModelArray, fn: () => void): ViewModelArr
       addParent(it[$$], target[$$], i);
     }
   });
-  notifyVmChange(target);
+  notifyVmArrayChange(target);
 
-  return target[$$][PROXY] as ViewModelArray;
+  return target[$$][VM_PROXY] as ViewModelArray;
 }
 
-function wrapSubArray(arr: unknown[], wrapEachItem = false) {
-  const vmCore = newViewModelCore(arr);
+function wrapSubArray(arr: ViewModelArray, wrapEachItem = false) {
   const proxy = new Proxy(arr, ArrayProxyHandler);
-  vmCore[PROXY] = proxy;
+  arr[$$] = {
+    [VM_NOTIFIABLE]: true,
+    [VM_TARGET]: arr,
+    [VM_PROXY]: proxy,
+  };
   // handleVMDebug(arr);
   arr.forEach((it, i) => {
     if (isViewModel(it)) {
@@ -289,7 +291,7 @@ const ArrayFns = {
       }
     }
     const rtn = wrapSubArray(target.splice(idx, delCount, ...args) as ViewModelArray);
-    notifyVmChange(target);
+    notifyVmArrayChange(target);
     return rtn;
   },
   shift(target: ViewModelArray) {
@@ -302,7 +304,7 @@ const ArrayFns = {
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], -1);
     }
-    notifyVmChange(target);
+    notifyVmArrayChange(target);
     return el;
   },
   unshift(target: ViewModelArray, ...args: ViewModel[]) {
@@ -315,7 +317,7 @@ const ArrayFns = {
     });
     _arrayShiftOrUnshiftProp(target, args.length);
     const rtn = target.unshift(...args);
-    notifyVmChange(target);
+    notifyVmArrayChange(target);
     return rtn;
   },
   pop(target: ViewModelArray) {
@@ -327,7 +329,7 @@ const ArrayFns = {
     if (isViewModel(el)) {
       removeParent(el[$$], target[$$], oldLen - 1);
     }
-    notifyVmChange(target);
+    notifyVmArrayChange(target);
     return el;
   },
   push(target: ViewModelArray, ...args: ViewModel[]): number {
@@ -338,7 +340,7 @@ const ArrayFns = {
       }
     });
     const rtn = target.push(...args);
-    notifyVmChange(target);
+    notifyVmArrayChange(target);
 
     return rtn;
   },
@@ -356,8 +358,8 @@ const ArrayFns = {
         addParent(v[$$], target[$$], i);
       }
     });
-    notifyVmChange(target);
-    return target[$$][PROXY] as ViewModelArray;
+    notifyVmArrayChange(target);
+    return target[$$][VM_PROXY] as ViewModelArray;
   },
   reverse(target: ViewModelArray): ViewModelArray {
     return _arrayReverseSort(target, () => target.reverse());
@@ -367,16 +369,16 @@ const ArrayFns = {
   },
   concat(target: ViewModelArray, arr: ViewModelArray) {
     _argAssert(arr, 'concat');
-    return wrapSubArray(target.concat(arr));
+    return wrapSubArray(target.concat(arr) as ViewModelArray);
   },
   filter(target: ViewModelArray, fn: (it: ViewModel, idx: number) => boolean) {
-    return wrapSubArray(target.filter(fn));
+    return wrapSubArray(target.filter(fn) as ViewModelArray);
   },
   slice(target: ViewModelArray, si: number, ei: number) {
-    return wrapSubArray(target.slice(si, ei));
+    return wrapSubArray(target.slice(si, ei) as ViewModelArray);
   },
   map(target: ViewModelArray, fn: (it: ViewModel, idx: number) => ViewModel) {
-    return wrapSubArray(target.map(fn), true);
+    return wrapSubArray(target.map(fn) as ViewModelArray, true);
   },
 };
 
@@ -384,7 +386,8 @@ const ArrayProxyHandler = {
   get(target: ViewModelArray, prop: PropertyPathItem): unknown {
     if (prop in ArrayFns) {
       const fn = ArrayFns[prop as keyof typeof ArrayFns];
-      return fn.bind(target);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (...args: any[]) => (fn as AnyFn)(target, ...args);
     } else {
       return target[prop as number];
     }
@@ -409,24 +412,30 @@ export function wrapVm<T extends object>(target: T) {
       return target;
     }
 
-    const proxy = (target as ViewModel)[$$]?.[PROXY];
+    let proxy = (target as ViewModel)[$$]?.[VM_PROXY];
     if (proxy) return proxy;
 
     const isArr = isArray(target);
     if (isArr) {
-      const vmCore = newViewModelCore(target);
-      const proxy = new Proxy(target as unknown as ViewModelArray, ArrayProxyHandler);
-      vmCore[PROXY] = proxy;
+      proxy = new Proxy(target as unknown as ViewModelArray, ArrayProxyHandler);
+      (target as unknown as ViewModel)[$$] = {
+        [VM_NOTIFIABLE]: true,
+        [VM_TARGET]: target,
+        [VM_PROXY]: proxy,
+      };
       for (let i = 0; i < target.length; i++) {
         wrapProp(target as ViewModel<T>, target[i], i);
       }
     } else {
-      const vmCore = newViewModelCore(target);
-      const proxy = new Proxy(
+      proxy = new Proxy(
         target as ViewModel,
         isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler,
       );
-      vmCore[PROXY] = proxy;
+      (target as unknown as ViewModel)[$$] = {
+        [VM_NOTIFIABLE]: true,
+        [VM_TARGET]: target,
+        [VM_PROXY]: proxy,
+      };
       for (const k in target) {
         if (isPublicProperty(k)) {
           wrapProp(target as ViewModel<T>, target[k], k);
@@ -439,17 +448,21 @@ export function wrapVm<T extends object>(target: T) {
   }
 }
 
-export function proxyAttributes<T extends object>(attributes: T) {
-  if (!isObject(attributes)) throw new Error('attrs must be object');
-  const p = (attributes as ViewModel<T>)[$$];
-  if (p) return p[PROXY];
+export function proxyAttributes<T extends object>(attrs: T) {
+  if (!isObject(attrs)) throw new Error('attrs must be object');
+  const p = (attrs as ViewModel<T>)[$$];
+  if (p) return p[VM_PROXY];
+  const proxy = new Proxy(attrs as ViewModel, {
+    set: attrsPropSetHandler,
+  });
   // 初始化时默认的 notifiable 为 false，
   // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
-  const vmCore = newViewModelCore(attributes, false);
-
-  return (vmCore[PROXY] = new Proxy(attributes as ViewModel, {
-    set: attrsPropSetHandler,
-  }));
+  (attrs as unknown as ViewModel)[$$] = {
+    [VM_NOTIFIABLE]: false,
+    [VM_TARGET]: attrs,
+    [VM_PROXY]: proxy,
+  };
+  return proxy;
 }
 
 // function handleVMDebug(vm) {
@@ -470,19 +483,14 @@ export function proxyAttributes<T extends object>(attributes: T) {
 // }
 
 export function proxyComponent(component: Component) {
-  // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
-  // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
-  const vmCore = newViewModelCore(component, false);
-
-  vmCore[PROXY] = new Proxy(component, {
+  return new Proxy(component, {
     set: componentPropSetHandler,
   });
-  return vmCore;
 }
 
 export function vm<T extends object>(target: T) {
   if (!isObject(target)) throw new Error('vm() only accept object');
   const p = (target as ViewModel)[$$];
-  if (p) return p[PROXY];
+  if (p) return p[VM_PROXY];
   return wrapVm(target);
 }
