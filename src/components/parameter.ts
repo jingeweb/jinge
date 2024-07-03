@@ -7,7 +7,7 @@ import { Component } from '../core/component';
  */
 export class Parameter extends Component {
   constructor(attrs: AnyObj, params: string[]) {
-    super(attrs);
+    super();
     params.forEach((p) => {
       this.__bindAttr(attrs, p);
     });

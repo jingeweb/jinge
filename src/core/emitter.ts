@@ -34,6 +34,7 @@ export class Emitter<Events extends EventMap> {
     map?.forEach((lis) => lis?.clear());
     map?.clear();
   }
+
   emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
     const listeners = this[LISTENERS]?.get(eventName);
     listeners?.forEach((opts, fn) => {

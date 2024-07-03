@@ -1,13 +1,14 @@
-import { proxyAttributes } from 'src/vm';
 import type { Component } from './component';
 import { RENDER_TO_DOM } from './common';
 
-export function bootstrap<
-  T extends {
-    new (attrs: object): Component;
+export function bootstrap<A extends object, C extends Component>(
+  ComponentClazz: {
+    new (attrs: A): C;
   },
->(ComponentClazz: T, dom: HTMLElement, attrs?: ConstructorParameters<T>[0]): InstanceType<T> {
-  const app = new ComponentClazz(attrs ? proxyAttributes(attrs) : {});
+  dom: HTMLElement,
+  attrs?: A,
+) {
+  const app = new ComponentClazz(attrs as A);
   app[RENDER_TO_DOM](dom, dom !== document.body);
-  return app as InstanceType<T>;
+  return app;
 }

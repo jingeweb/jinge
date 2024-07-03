@@ -49,7 +49,7 @@ export class Dynamic extends Component {
   [ATTRS]?: AnyObj;
 
   constructor(attrs: DynamicAttrs) {
-    super(attrs);
+    super();
     this[ATTRS] = attrs.attrs;
     if (attrs.attrs) {
       this[ATTRS] = attrs.attrs;

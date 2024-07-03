@@ -22,7 +22,7 @@ export interface Watcher<T = any> {
   [VM_WATCHER_IS_DEEP]?: boolean;
 }
 
-function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
+export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
   if (!path?.length) return target;
   if (!isObject(target)) return undefined;
   let idx = 0;
@@ -48,22 +48,34 @@ export function watchPath(
 ) {
   const core = vm[$$];
   if (!core) throw new Error('watch() or watchPath() requires view-model, use vm() to wrap object');
+
+  const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
+
+  if (immediate) {
+    handler(val, undefined);
+  }
+  return innerWatchPath(vm, core, val, handler, propertyPath, deep);
+}
+export function innerWatchPath(
+  vm: ViewModel,
+  core: ViewModelCore,
+  val: unknown,
+  handler: WatchHandler,
+  path?: PropertyPathItem[],
+  deep?: boolean,
+) {
   let watchers = core[VM_WATCHERS];
   if (!watchers) {
     watchers = core[VM_WATCHERS] = new Set();
   }
-  const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
   const watcher: Watcher = {
     [VM_TARGET]: vm,
-    [VM_WATCHER_PATH]: propertyPath,
+    [VM_WATCHER_PATH]: path,
     [VM_WATCHER_VALUE]: val,
     [VM_WATCHER_LISTENER]: handler,
     [VM_WATCHER_IS_DEEP]: deep,
   };
   watchers.add(watcher);
-  if (immediate) {
-    handler(val, undefined);
-  }
   return () => {
     watcher[VM_TARGET] = undefined;
     watcher[VM_WATCHER_LISTENER] = undefined;
@@ -116,7 +128,7 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
     }
     const deep = watcher[VM_WATCHER_IS_DEEP];
     const clen = changedPath?.length ?? 0;
-    console.log('check', changedPath, watchPath);
+    // console.log('check', changedPath, watchPath);
     // 不论是否是深度 watch，如果发生变化的 changedPath 是监听的 watchPath 的前缀，则监听的 watchPath 都可能发生变化，需要检测和触发 listener
     let match =
       clen === 0 ||

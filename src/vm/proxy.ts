@@ -488,7 +488,7 @@ export function proxyComponent(component: Component) {
   });
 }
 
-export function vm<T extends object>(target: T) {
+export function vm<T extends object>(target: T): T {
   if (!isObject(target)) throw new Error('vm() only accept object');
   const p = (target as ViewModel)[$$];
   if (p) return p[VM_PROXY];

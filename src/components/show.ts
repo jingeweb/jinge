@@ -1,4 +1,4 @@
-import { ROOT_NODES, __ } from 'src/core';
+import { ROOT_NODES } from 'src/core';
 import { Component, isComponent } from '../core/component';
 
 function setDisplay(el: Node, show?: boolean) {
@@ -23,7 +23,7 @@ export class Show extends Component {
   [EXPECT]?: boolean;
 
   constructor(attrs: ShowAttrs) {
-    super(attrs);
+    super();
     this.__bindAttr(attrs, 'expect', EXPECT);
   }
 
@@ -34,7 +34,7 @@ export class Show extends Component {
   }
 
   __update() {
-    for (const node of this[__][ROOT_NODES]) {
+    for (const node of this[ROOT_NODES]) {
       setDisplay(isComponent(node) ? node.__firstDOM : node, this[EXPECT]);
     }
   }

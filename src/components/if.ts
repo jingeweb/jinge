@@ -39,7 +39,7 @@ export interface IfAttrs {
 
 type IfSlots = 'default' | 'else' | 'true' | 'false';
 function getIfSlot(component: If): IfSlots {
-  const slots = component[__][SLOTS];
+  const slots = component[SLOTS];
   const expect = component[EXPECT];
   if (!slots) return expect ? 'default' : 'else';
   if (expect) {
@@ -53,7 +53,7 @@ export class If extends Component {
   [EXPECT]?: boolean;
 
   constructor(attrs: IfAttrs) {
-    super(attrs);
+    super();
     this.__bindAttr(attrs, 'expect', EXPECT);
   }
 
@@ -70,7 +70,7 @@ export interface SwitchAttrs {
   expect: string;
 }
 function getSwitchSlot(component: Switch) {
-  const slots = component[__][SLOTS];
+  const slots = component[SLOTS];
   if (!slots) return 'default';
   const expect = component[EXPECT];
   return expect && expect in slots ? expect : 'default';
@@ -79,7 +79,7 @@ export class Switch extends Component {
   [EXPECT]?: string;
 
   constructor(attrs: SwitchAttrs) {
-    super(attrs);
+    super();
     this.__bindAttr(attrs, 'expect', EXPECT);
   }
 
