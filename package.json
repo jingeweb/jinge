@@ -6,6 +6,16 @@
   "module": "dist/index.js",
   "types": "src/index.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./dev": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "dev": "WATCH=true npm run build",
     "build": "rm -rf dist && tsx ./scripts/esbuild.ts",

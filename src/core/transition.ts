@@ -1,4 +1,4 @@
-import { clearImmediate, setImmediate } from 'src/util';
+import { clearImmediate, setImmediate } from '../util';
 
 type DurationType = 'transitionend' | 'animationend';
 
