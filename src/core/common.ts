@@ -14,12 +14,17 @@ export enum ContextStates {
 }
 
 export type RenderFn<T extends Component = Component> = (containerComponent: T) => Node[];
+export interface Slots {
+  [DEFAULT_SLOT]?: RenderFn;
+  [slotName: string]: RenderFn;
+}
 
 export const EMITTER = Symbol('EMITTER');
 export const __ = Symbol('__');
 export const ROOT_NODES = Symbol('ROOT_NODES');
 export const NON_ROOT_COMPONENT_NODES = Symbol('NON_ROOT_COMPONENT_NODES');
 export const SLOTS = Symbol('SLOTS');
+export const DEFAULT_SLOT = Symbol('DEFAULT_SLOT');
 export const REFS = Symbol('REFS');
 export const CONTEXT = Symbol('CONTEXT');
 export const DEREGISTER_FUNCTIONS = Symbol('DEREGISTER_FUNCTIONS');

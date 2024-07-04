@@ -1,11 +1,12 @@
-import type { WatchHandler } from 'src/vm';
-import { innerWatchPath, watchPath } from 'src/vm';
+/* eslint-disable @typescript-eslint/ban-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { WatchHandler } from '../vm';
+import { innerWatchPath, watchPath } from '../vm';
 import type { AnyFn } from '../util';
 import {
   isArray,
   arrayRemove,
   registerEvent,
-  isFunction,
   clearImmediate,
   setImmediate,
   appendChildren,
@@ -23,8 +24,9 @@ import {
   isPublicProperty,
 } from '../vm/core';
 import { proxyComponent } from '../vm/proxy';
-import type { RenderFn } from './common';
+import type { Slots } from './common';
 import {
+  DEFAULT_SLOT,
   RELATED_WATCH,
   DEREGISTER_FUNCTIONS,
   REFS,
@@ -60,7 +62,7 @@ export function isComponent<T extends Component>(v: unknown): v is T {
   return !!(v as Record<symbol, unknown>)[__];
 }
 
-export function assertRenderResults(renderResults: Node[]): Node[] {
+export function assertRenderResults(renderResults?: Node[]): Node[] {
   if (!isArray(renderResults) || renderResults.length === 0) {
     throw new Error('Render results of component is empty');
   }
@@ -72,7 +74,17 @@ export type LifeCycleEvents = {
   beforeDestroy: () => void;
 };
 
-export class Component {
+export class Component<Props extends object = {}, Children = any> {
+  /**
+   * 专门用于 typescript jsx 类型校验的字段，请勿在 render() 函数之外使用。编译器会将 render() 函数里的 this.props.children 转换成 slots 传递。
+   */
+  get props(): {
+    children: Children;
+  } & Props {
+    // props 专门用于 typescript 类型提示
+    throw 'do not use props';
+  }
+
   readonly [$$]: ViewModelCore;
   readonly [__] = true;
   /**
@@ -88,9 +100,7 @@ export class Component {
   /**
    * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。
    */
-  [SLOTS]?: Record<string, RenderFn> & {
-    default?: RenderFn;
-  };
+  [SLOTS]: Slots;
 
   /**
    * 组件的状态
@@ -159,13 +169,7 @@ export class Component {
    */
   [ROOT_NODES]: (Component | Node)[] = [];
 
-  // /* 预定义好的常用的传递样式控制的属性 */
-  // class?: CLASSNAME;
-  // style?: string | Record<string, string | number>;
-
   constructor() {
-    // const isVmAttrs = isViewModel(attrs);
-    // const compilerAttrs = (attrs as { [__]?: CompilerAttrs })?.[__];
     this[$$] = {
       // 初始化时 Component 默认的 VM_NOTIFIABLE 为 false，
       // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
@@ -173,15 +177,7 @@ export class Component {
       [VM_TARGET]: this,
       [VM_PROXY]: proxyComponent(this),
     };
-
-    // /** class 和 style 两个最常用的属性，默认从 attributes 中取出并监听。 */
-    // attrs &&
-    //   ['class', 'style'].forEach((p) => {
-    //     if (!(p in attrs)) return;
-    //     if (!isVmAttrs) throw new Error('attrs must be ViewModel');
-    //     this.__bindAttr(attrs, p);
-    //   });
-
+    this[SLOTS] = {};
     return this[$$][VM_PROXY] as typeof this;
   }
 
@@ -214,19 +210,19 @@ export class Component {
   /**
    * 将 attrs 的属性（attrName）绑定到组件的同名属性上。调用 watch 监控 attrs[attrName]，在更新后更新同名属性并调用组件的 __updateNextTick()。
    */
-  __bindAttr<A extends object, P extends keyof A>(attrs: A, attrName: keyof A): A[P];
+  bindAttr<A extends object, P extends keyof A>(attrs: A, attrName: keyof A): A[P];
   /**
    *
    * 将 attrs 的属性（attrName）绑定到组件的 componentProp 属性上。调用 watch 监控 attrs[attrName]，在更新后更新 componentProp 属性并调用组件的 __updateNextTick()。
    */
-  __bindAttr<A extends object, P extends keyof A, BP extends keyof typeof this>(
+  bindAttr<A extends object, P extends keyof A, BP extends keyof typeof this>(
     attrs: A,
     attrName: P,
     componentProp: BP,
   ): A[P];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  __bindAttr(attrs: ViewModel, attrName: string, componentProp?: any) {
+  bindAttr(attrs: ViewModel, attrName: string, componentProp?: any) {
     if (!isPublicProperty(attrName))
       throw new Error(`attrName of __bindAttr() requires public property`);
     const core = attrs[$$];
@@ -240,18 +236,18 @@ export class Component {
       val,
       (v) => {
         this[(componentProp ?? attrName) as keyof typeof this] = v;
-        this.__updateNextTick();
+        this.updateNextTick();
       },
       [attrName],
     );
-    this.__addDeregisterFn(unwatchFn);
+    this.addDeregisterFn(unwatchFn);
     return val;
   }
 
   /**
    * store deregisterFn and auto call it when component is being destroy.
    */
-  __addDeregisterFn(deregisterFn: () => void): void {
+  addDeregisterFn(deregisterFn: () => void): void {
     let deregs = this[DEREGISTER_FUNCTIONS];
     if (!deregs) {
       this[DEREGISTER_FUNCTIONS] = deregs = new Set();
@@ -265,7 +261,7 @@ export class Component {
    * If you do dot call deregister function, it will be auto called when component is destroied.
    * @returns {Function} deregister function to remove listener
    */
-  __domAddListener(
+  domAddListener(
     $el: Element | Window | Document,
     eventName: string,
     listener: EventListener,
@@ -280,7 +276,7 @@ export class Component {
       },
       capture,
     );
-    this.__addDeregisterFn(deregEvtFn);
+    this.addDeregisterFn(deregEvtFn);
     return () => {
       deregEvtFn();
       this[DEREGISTER_FUNCTIONS]?.delete(deregEvtFn);
@@ -341,9 +337,9 @@ export class Component {
    *
    * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
    */
-  get __firstDOM(): Node {
+  get firstDOM(): Node {
     const el = this[ROOT_NODES][0];
-    return isComponent(el) ? el.__firstDOM : (el as Node);
+    return isComponent(el) ? el.firstDOM : (el as Node);
   }
 
   /**
@@ -351,28 +347,10 @@ export class Component {
    *
    * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
    */
-  get __lastDOM(): Node {
+  get lastDOM(): Node {
     const rns = this[ROOT_NODES];
     const el = rns[rns.length - 1];
-    return isComponent(el) ? el.__lastDOM : (el as Node);
-  }
-
-  /**
-   * 组件的实际渲染函数，渲染模板或默认插槽。
-   * 该函数可被子组件重载，进而覆盖渲染逻辑。
-   * 该函数可以是同步或异步函数，但通常推荐使用同步函数，将异步初始化逻辑放到 __beforeRender 生命周期函数中。
-   */
-  __render(): Node[] {
-    let renderFn = (this.constructor as unknown as { template?: RenderFn }).template; // 编译器已经将 string 转成了 RenderFn，此处强制转换类型以绕开 typescript.
-    if (!renderFn && this[SLOTS]) {
-      renderFn = this[SLOTS].default;
-    }
-    if (!isFunction(renderFn)) {
-      throw new Error(
-        `Template of ${this.constructor.name} not found. Forget static getter "template"?`,
-      );
-    }
-    return assertRenderResults(renderFn(this));
+    return isComponent(el) ? el.lastDOM : (el as Node);
   }
 
   /**
@@ -388,7 +366,7 @@ export class Component {
     if (this[STATE] !== ComponentState.INITIALIZE) {
       throw new Error('component has already been rendered.');
     }
-    const rr = assertRenderResults(this.__render());
+    const rr = this.render();
     if (replaceMode) {
       replaceChildren(targetEl.parentNode as HTMLElement, rr, targetEl);
     } else {
@@ -415,7 +393,7 @@ export class Component {
     // const emitter = this[EMITTER];
 
     // emitter.emit('beforeDestroy');
-    this.__beforeDestroy();
+    this.onBeforeDestroy();
     // destroy children(include child component and html nodes)
     this[DESTROY_CONTENT](removeDOM);
     // clear messenger listeners.
@@ -507,15 +485,27 @@ export class Component {
       this[CONTEXT_STATE] === ContextStates.TOUCHED
         ? ContextStates.TOUCHED_FREEZED
         : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
-    this.__afterRender();
+    this.onAfterRender();
     // this[EMITTER].emit('afterRender');
   }
 
+  // renderSlot<N extends keyof S>(slotName: N, ...args: Parameters<S[N]>) {
+  //   const renderFn = this[SLOTS][slotName];
+  //   if (!renderFn) throw new Error('slot not found');
+  //   return renderFn(this);
+  // }
+
+  render(): any {
+    const renderFn = this[SLOTS][DEFAULT_SLOT];
+    if (!renderFn) throw new Error('render() must be overrided');
+    return renderFn(this);
+  }
+
   /**
-   * 在 nextTick 时调用 __update 函数。
+   * 在 nextTick 时调用 update 函数。
    */
-  __updateNextTick(handler?: AnyFn) {
-    const updateRenderFn = (this as unknown as { __update: AnyFn }).__update;
+  updateNextTick(handler?: AnyFn) {
+    const updateRenderFn = (this as unknown as { update: AnyFn }).update;
     if (!updateRenderFn || this[STATE] !== ComponentState.RENDERED) {
       return;
     }
@@ -540,7 +530,7 @@ export class Component {
     );
   }
 
-  __setContext(key: string | symbol, value: unknown, forceOverride = false) {
+  setContext(key: string | symbol, value: unknown, forceOverride = false) {
     const contextState = this[CONTEXT_STATE];
     if (
       contextState === ContextStates.UNTOUCH_FREEZED ||
@@ -573,7 +563,7 @@ export class Component {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  __getContext<T = any>(key: string | symbol): T {
+  getContext<T = any>(key: string | symbol): T {
     return this[CONTEXT]?.[key as string] as T;
   }
 
@@ -619,7 +609,7 @@ export class Component {
   /**
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
-  __getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
+  getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
     if (this[STATE] !== ComponentState.RENDERED) {
       warn(
         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
@@ -643,14 +633,14 @@ export class Component {
   /**
    * lifecycle hook, called after rendered.
    */
-  __afterRender() {
+  onAfterRender() {
     // lifecycle hook, default do nothing.
   }
 
   /**
    * lifecycle hook, called before destroy.
    */
-  __beforeDestroy() {
+  onBeforeDestroy() {
     // lifecycle hook, default do nothing.
   }
 }

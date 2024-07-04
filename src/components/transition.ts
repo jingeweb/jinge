@@ -1,6 +1,6 @@
 import { addEvent, clearImmediate, removeEvent, setImmediate } from '../util';
 import { Component } from '../core/component';
-import { TransitionAttrs, TransitionEvents } from 'src/core';
+import type { TransitionAttrs, TransitionEvents } from '../core';
 
 export interface TransitionFns {
   __enter: (isFirst?: boolean) => Promise<void>;

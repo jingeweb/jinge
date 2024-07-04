@@ -1,7 +1,7 @@
 import type { Component } from './component';
 import { RENDER_TO_DOM } from './common';
 
-export function bootstrap<A extends object, C extends Component>(
+export function bootstrap<A extends object, C extends Component<A>>(
   ComponentClazz: {
     new (attrs: A): C;
   },

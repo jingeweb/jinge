@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "3.3.0",
+  "version": "4.0.0-alpha.1",
   "description": "A Proxy based MVVM framework",
   "main": "dist/index.js",
   "module": "dist/index.js",

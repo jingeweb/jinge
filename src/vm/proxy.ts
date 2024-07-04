@@ -1,4 +1,4 @@
-import type { Component } from 'src/core';
+import type { Component } from '../core';
 import type { AnyFn } from '../util';
 import {
   isNumber,

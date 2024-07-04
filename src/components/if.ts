@@ -1,93 +1,89 @@
-import type { RenderFn } from 'src/core';
-import { Component, CONTEXT, ROOT_NODES, SLOTS, __, DESTROY_CONTENT } from 'src/core';
-
-function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>) {
-  const attrs = {
-    [__]: {
-      [CONTEXT]: context,
-      [SLOTS]: {
-        default: renderFn,
-      },
-    },
-  };
-  return new Component(attrs);
-}
-
-function renderSwitch(component: Component, slot: string) {
-  const renderFn = component[__][SLOTS]?.[slot];
-  const roots = component[__][ROOT_NODES];
-  if (!renderFn) {
-    roots.push(document.createComment(slot));
-    return roots as Node[];
-  }
-  const el = createEl(renderFn, component[__][CONTEXT]);
-  roots.push(el);
-  const doms = el.__render();
-  return doms;
-}
-
-function doUpdate(component: Component, slot: string) {
-  component[DESTROY_CONTENT](true);
-  renderSwitch(component, slot);
-}
+import type { RenderFn } from '../core';
+import { Component, CONTEXT, ROOT_NODES, SLOTS, DESTROY_CONTENT, DEFAULT_SLOT } from '../core';
+import type { JNode } from '../jsx';
 
 const EXPECT = Symbol('EXPECT');
 
-export interface IfAttrs {
-  expect?: boolean;
+function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>) {
+  const el = new Component();
+  el[CONTEXT] = context;
+  el[SLOTS] = {
+    [DEFAULT_SLOT]: renderFn,
+  };
+  return el;
 }
 
-type IfSlots = 'default' | 'else' | 'true' | 'false';
-function getIfSlot(component: If): IfSlots {
-  const slots = component[SLOTS];
-  const expect = component[EXPECT];
-  if (!slots) return expect ? 'default' : 'else';
-  if (expect) {
-    return 'true' in slots ? 'true' : 'default';
-  } else {
-    return 'false' in slots ? 'false' : 'else';
+function doRender(component: Component, renderFn: RenderFn | undefined, cmt: string) {
+  const roots = component[ROOT_NODES];
+  if (!renderFn) {
+    roots.push(document.createComment(cmt));
+    return roots as Node[];
   }
+  const el = createEl(renderFn, component[CONTEXT]);
+  roots.push(el);
+  const doms = el.render();
+  return doms;
+}
+function renderIf(component: If) {
+  const slots = component[SLOTS];
+  const e = !!component[EXPECT];
+  const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
+  return doRender(component, renderFn, e.toString());
 }
 
-export class If extends Component {
-  [EXPECT]?: boolean;
+export interface IfAttrs {
+  expect: boolean;
+}
+
+export class If extends Component<
+  IfAttrs,
+  | JNode
+  | {
+      true: JNode;
+      false: JNode;
+    }
+> {
+  [EXPECT]: boolean;
 
   constructor(attrs: IfAttrs) {
     super();
-    this.__bindAttr(attrs, 'expect', EXPECT);
+    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT);
   }
 
-  __render(): Node[] {
-    return renderSwitch(this, getIfSlot(this));
+  render() {
+    return renderIf(this);
   }
 
-  __update() {
-    doUpdate(this, getIfSlot(this));
+  update() {
+    this[DESTROY_CONTENT](true);
+    renderIf(this);
   }
 }
 
+function renderSwitch(component: Switch) {
+  const slots = component[SLOTS];
+  const e = component[EXPECT];
+  const renderFn = slots[e] ?? slots[DEFAULT_SLOT];
+  if (!renderFn) throw new Error('<Switch /> requires default case');
+  return doRender(component, renderFn, e);
+}
 export interface SwitchAttrs {
   expect: string;
 }
-function getSwitchSlot(component: Switch) {
-  const slots = component[SLOTS];
-  if (!slots) return 'default';
-  const expect = component[EXPECT];
-  return expect && expect in slots ? expect : 'default';
-}
 export class Switch extends Component {
-  [EXPECT]?: string;
+  [EXPECT]: string;
 
   constructor(attrs: SwitchAttrs) {
     super();
-    this.__bindAttr(attrs, 'expect', EXPECT);
+    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT);
   }
 
-  __render(): Node[] {
-    return renderSwitch(this, getSwitchSlot(this));
+  render() {
+    return renderSwitch(this);
   }
 
-  __update() {
-    doUpdate(this, getSwitchSlot(this));
+  update() {
+    this[DESTROY_CONTENT](true);
+    renderSwitch(this);
   }
 }
