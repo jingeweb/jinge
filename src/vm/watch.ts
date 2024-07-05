@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { AnyObj } from '../util';
-import { isFunction, isObject } from '../util';
+import { isFunction, isObject, setImmediate, clearImmediate } from '../util';
 import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
 import { VM_TARGET, $$, VM_PARENTS, VM_WATCHERS } from './core';
 
@@ -9,6 +9,7 @@ export const VM_WATCHER_PATH = Symbol('PATH');
 export const VM_WATCHER_VALUE = Symbol('VALUE');
 export const VM_WATCHER_IS_DEEP = Symbol('IS_DEEP');
 export const VM_WATCHER_LISTENER = Symbol('LISTENER');
+export const VM_WATCHER_IMM = Symbol('IMM');
 export type WatchHandler<T = any> = (
   newValue: T,
   oldValue: T | undefined,
@@ -20,6 +21,7 @@ export interface Watcher<T = any> {
   [VM_WATCHER_VALUE]?: T;
   [VM_WATCHER_LISTENER]?: WatchHandler<T>;
   [VM_WATCHER_IS_DEEP]?: boolean;
+  [VM_WATCHER_IMM]: number;
 }
 
 export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
@@ -74,12 +76,14 @@ export function innerWatchPath(
     [VM_WATCHER_VALUE]: val,
     [VM_WATCHER_LISTENER]: handler,
     [VM_WATCHER_IS_DEEP]: deep,
+    [VM_WATCHER_IMM]: 0,
   };
   watchers.add(watcher);
   return () => {
     watcher[VM_TARGET] = undefined;
     watcher[VM_WATCHER_LISTENER] = undefined;
     watcher[VM_WATCHER_VALUE] = undefined;
+    clearImmediate(watcher[VM_WATCHER_IMM]);
     watchers.delete(watcher);
   };
 }
@@ -123,17 +127,21 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
     const watchPath = watcher[VM_WATCHER_PATH];
     if (!watchPath?.length) {
       // 如果 watch 的 path 为空，说明是深度 watch 当前 ViewModel，直接触发 listener
-      listener(vm, vm);
+
+      const imm = watcher[VM_WATCHER_IMM];
+      if (imm > 0) clearImmediate(imm);
+      watcher[VM_WATCHER_IMM] = setImmediate(() => {
+        listener(vm, vm);
+      });
       return;
     }
-    const deep = watcher[VM_WATCHER_IS_DEEP];
     const clen = changedPath?.length ?? 0;
     // console.log('check', changedPath, watchPath);
     // 不论是否是深度 watch，如果发生变化的 changedPath 是监听的 watchPath 的前缀，则监听的 watchPath 都可能发生变化，需要检测和触发 listener
     let match =
       clen === 0 ||
       (clen <= watchPath.length && changedPath && !changedPath.some((v, i) => v !== watchPath[i]));
-    if (!match && deep) {
+    if (!match && watcher[VM_WATCHER_IS_DEEP]) {
       // 如果是深度 watch，且监听 watchPath 是发生变化的 changedPath 的前缀，说明发生变化的是深度监听对象的子元素，需要触发 listener
       if (
         clen > watchPath.length &&
@@ -147,13 +155,16 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
       return;
     }
 
-    const oldValue = watcher[VM_WATCHER_VALUE];
-    const newValue = getValueByPath(vm, watchPath);
-    // 如果是深度监听，则不论新旧数据的引用是否相同，都触发向外传递消息。
-    if (deep || newValue !== oldValue) {
-      watcher[VM_WATCHER_VALUE] = newValue;
-      listener(newValue, oldValue, changedPath);
-    }
+    const imm = watcher[VM_WATCHER_IMM];
+    if (imm > 0) clearImmediate(imm);
+    watcher[VM_WATCHER_IMM] = setImmediate(() => {
+      const deep = watcher[VM_WATCHER_IS_DEEP];
+      const oldValue = watcher[VM_WATCHER_VALUE];
+      const newValue = getValueByPath(vm, watchPath);
+      newValue !== oldValue && (watcher[VM_WATCHER_VALUE] = newValue);
+      // 如果是深度监听，则不论新旧数据的引用是否相同，都触发向外传递消息。
+      (deep || newValue !== oldValue) && listener(newValue, oldValue, changedPath);
+    });
   });
   vmCore[VM_PARENTS]?.forEach((parents, prop) => {
     const parentPath = changedPath ? [prop, ...changedPath] : [prop];
