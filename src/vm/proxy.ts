@@ -1,15 +1,6 @@
 import type { Component } from '../core';
 import type { AnyFn } from '../util';
-import {
-  isNumber,
-  isArray,
-  isObject,
-  isFunction,
-  isPromise,
-  isUndefined,
-  warn,
-  isString,
-} from '../util';
+import { isArray, isObject, isFunction, isPromise, isUndefined, isString, throwErr } from '../util';
 
 import type { PropertyPathItem, ViewModelCore, ViewModel } from './core';
 import {
@@ -87,9 +78,7 @@ function __propSetHandler(
   }
   const newValMaybeVM = isObject(value) && !isInnerObj(value);
   if (newValMaybeVM && isPubProp && !(value as ViewModel)[$$]) {
-    throw new Error(
-      "value of ViewModel's public property must also be ViewModel, use vm() to wrap it",
-    );
+    throwErr('pub-prop-not-vm');
     // value = wrapVm(value as object);
   }
   // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
@@ -144,19 +133,17 @@ function attrsPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: u
 
 function componentPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
   if (!target[$$]) {
-    warn(
-      `call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
-      target,
-    );
+    import.meta.env.DEV &&
+      console.error(
+        `Warning: call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
+        target,
+      );
     return true;
   }
   return __propSetHandler(target, prop, value, __componentPropSetFn);
 }
 
 function arrayLengthSetHandler(target: ViewModelArray, value: number) {
-  if (!isNumber(value)) {
-    throw new Error('bad argument. array length must be validate number.');
-  }
   const oldLen = target.length;
   if (oldLen === value) return true;
   if (oldLen > value) {
@@ -255,7 +242,7 @@ function _arrayShiftOrUnshiftProp(arr: ViewModelArray, delta: number) {
 function _argAssert(arg: unknown, fn: string): arg is ViewModelCore {
   if (isObject(arg)) {
     if (!($$ in (arg as Record<symbol, unknown>))) {
-      throw new Error(`argument passed to Array.${fn} must be ViewModel if the array is ViewModel`);
+      throwErr('array-item-not-vm', fn);
     } else {
       return true;
     }
@@ -449,7 +436,6 @@ export function wrapVm<T extends object>(target: T) {
 }
 
 export function proxyAttributes<T extends object>(attrs: T) {
-  if (!isObject(attrs)) throw new Error('attrs must be object');
   const p = (attrs as ViewModel<T>)[$$];
   if (p) return p[VM_PROXY];
   const proxy = new Proxy(attrs as ViewModel, {
@@ -489,7 +475,6 @@ export function proxyComponent(component: Component) {
 }
 
 export function vm<T extends object>(target: T): T {
-  if (!isObject(target)) throw new Error('vm() only accept object');
   const p = (target as ViewModel)[$$];
   if (p) return p[VM_PROXY];
   return wrapVm(target);

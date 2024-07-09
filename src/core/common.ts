@@ -1,17 +1,16 @@
 import type { Component } from './component';
 
-export enum ComponentState {
-  INITIALIZE = 0,
-  RENDERED = 1,
-  WILLDESTROY = 2,
-  DESTROIED = 3,
-}
-export enum ContextStates {
-  UNTOUCH = 0,
-  TOUCHED = 1,
-  UNTOUCH_FREEZED = 2,
-  TOUCHED_FREEZED = 3,
-}
+export const COMPONENT_STATE_INITIALIZE = 0;
+export const COMPONENT_STATE_RENDERED = 1;
+export const COMPONENT_STATE_WILLDESTROY = 2;
+export const COMPONENT_STATE_DESTROIED = 3;
+export type ComponentState = 0 | 1 | 2 | 3;
+
+export const CONTEXT_STATE_UNTOUCH = 0;
+export const CONTEXT_STATE_TOUCHED = 1;
+export const CONTEXT_STATE_UNTOUCH_FREEZED = 2;
+export const CONTEXT_STATE_TOUCHED_FREEZED = 3;
+export type ContextState = 0 | 1 | 2 | 3;
 
 export type RenderFn<T extends Component = Component> = (containerComponent: T) => Node[];
 export interface Slots {
@@ -29,7 +28,6 @@ export const REFS = Symbol('REFS');
 export const CONTEXT = Symbol('CONTEXT');
 export const DEREGISTER_FUNCTIONS = Symbol('DEREGISTER_FUNCTIONS');
 export const STATE = Symbol('STATE');
-export const PASSED_ATTRIBUTES = Symbol('PASSED_ATTRIBUTES');
 export const WATCH = Symbol('WATCH');
 export const CONTEXT_STATE = Symbol('CONTEXT_STATE');
 export const UPDATE_NEXT_MAP = Symbol('UPDATE_NEXT_MAP');

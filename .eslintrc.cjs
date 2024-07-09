@@ -19,6 +19,7 @@ module.exports = {
   rules: {
     'import/order': 'error',
     'import/no-unresolved': 'off',
+    'prefer-template': 'error',
     '@typescript-eslint/no-unused-vars': 'error',
     '@typescript-eslint/no-non-null-assertion': 'error',
     'no-console': ['error', { allow: ['error'] }],
@@ -32,7 +33,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['./scripts/**/*.ts'],
+      files: ['./scripts/**/*.ts', './index.cjs'],
       env: { node: true, browser: false },
       rules: {
         'no-console': 'off',

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { AnyObj } from '../util';
-import { isFunction, isObject, setImmediate, clearImmediate } from '../util';
+import { isFunction, isObject, setImmediate, clearImmediate, throwErr } from '../util';
 import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
 import { VM_TARGET, $$, VM_PARENTS, VM_WATCHERS } from './core';
 
@@ -49,7 +49,7 @@ export function watchPath(
   immediate?: boolean,
 ) {
   const core = vm[$$];
-  if (!core) throw new Error('watch() or watchPath() requires view-model, use vm() to wrap object');
+  if (!core) throwErr('watch-not-vm');
 
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 

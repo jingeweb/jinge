@@ -7,5 +7,5 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["scripts/**/*", "*.js", ".eslintrc.cjs", "*.mjs"]
+  "include": ["scripts/**/*", "*.js", ".eslintrc.cjs", "index.cjs", "*.mjs"]
 }

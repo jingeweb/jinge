@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-types */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { WatchHandler } from '../vm';
 import { innerWatchPath, watchPath } from '../vm';
 import type { AnyFn } from '../util';
@@ -11,7 +9,7 @@ import {
   setImmediate,
   appendChildren,
   replaceChildren,
-  warn,
+  throwErr,
 } from '../util';
 
 import type { PropertyPathItem, ViewModel, ViewModelCore } from '../vm/core';
@@ -24,7 +22,7 @@ import {
   isPublicProperty,
 } from '../vm/core';
 import { proxyComponent } from '../vm/proxy';
-import type { Slots } from './common';
+import type { ComponentState, ContextState, Slots } from './common';
 import {
   DEFAULT_SLOT,
   RELATED_WATCH,
@@ -40,10 +38,8 @@ import {
   STATE,
   CONTEXT,
   CONTEXT_STATE,
-  PASSED_ATTRIBUTES,
+  // PASSED_ATTRIBUTES,
   SLOTS,
-  ComponentState,
-  ContextStates,
   // EMITTER,
   __,
   SET_REF,
@@ -52,6 +48,14 @@ import {
   DESTROY,
   RENDER_TO_DOM,
   HANDLE_RENDER_DONE,
+  COMPONENT_STATE_INITIALIZE,
+  COMPONENT_STATE_DESTROIED,
+  COMPONENT_STATE_WILLDESTROY,
+  COMPONENT_STATE_RENDERED,
+  CONTEXT_STATE_UNTOUCH,
+  CONTEXT_STATE_TOUCHED_FREEZED,
+  CONTEXT_STATE_UNTOUCH_FREEZED,
+  CONTEXT_STATE_TOUCHED,
 } from './common';
 // import type { EventMap, ListenerOptions } from './emitter';
 // import { Emitter, LISTENERS } from './emitter';
@@ -62,19 +66,17 @@ export function isComponent<T extends Component>(v: unknown): v is T {
   return !!(v as Record<symbol, unknown>)[__];
 }
 
-export function assertRenderResults(renderResults?: Node[]): Node[] {
-  if (!isArray(renderResults) || renderResults.length === 0) {
-    throw new Error('Render results of component is empty');
-  }
-  return renderResults;
-}
-
 export type LifeCycleEvents = {
   afterRender: () => void;
   beforeDestroy: () => void;
 };
 
-export class Component<Props extends object = {}, Children = any> {
+export class Component<
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  Props extends object = {},
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Children = any,
+> {
   /**
    * 专门用于 typescript jsx 类型校验的字段，请勿在 render() 函数之外使用。编译器会将 render() 函数里的 this.props.children 转换成 slots 传递。
    */
@@ -91,12 +93,12 @@ export class Component<Props extends object = {}, Children = any> {
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
    * 如果传递的 attrs 不是 ViewModel，则说明没有需要监听绑定的 attribute，不保存该 attrs。
    */
-  [PASSED_ATTRIBUTES]?: ViewModel;
+  // [PASSED_ATTRIBUTES]?: ViewModel;
   /**
    * 组件的上下文对象
    */
   [CONTEXT]?: Record<string | symbol, unknown>;
-  [CONTEXT_STATE]: ContextStates = ContextStates.UNTOUCH;
+  [CONTEXT_STATE]: ContextState = CONTEXT_STATE_UNTOUCH;
   /**
    * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。
    */
@@ -105,7 +107,7 @@ export class Component<Props extends object = {}, Children = any> {
   /**
    * 组件的状态
    */
-  [STATE]: ComponentState = ComponentState.INITIALIZE;
+  [STATE]: ComponentState = COMPONENT_STATE_INITIALIZE;
 
   /**
    * NON_ROOT_COMPONENT_NODES means nearest non-root component-nodes in the view-tree.
@@ -223,11 +225,9 @@ export class Component<Props extends object = {}, Children = any> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   bindAttr(attrs: ViewModel, attrName: string, componentProp?: any) {
-    if (!isPublicProperty(attrName))
-      throw new Error(`attrName of __bindAttr() requires public property`);
+    if (!isPublicProperty(attrName)) throwErr('bind-attr-not-pub-prop');
     const core = attrs[$$];
-    if (!core)
-      throw new Error('attrs of __bindAttr() requires view-model, use vm() to wrap object');
+    if (!core) throwErr('bind-attr-not-vm');
 
     const val = attrs[attrName];
     const unwatchFn = innerWatchPath(
@@ -292,7 +292,7 @@ export class Component<Props extends object = {}, Children = any> {
   // __domPassListeners(targetEl?: HTMLElement): void;
   // __domPassListeners(ignoredEventNames: string[], targetEl: HTMLElement): void;
   // __domPassListeners(ignoredEventNames?: string[] | HTMLElement, targetEl?: HTMLElement): void {
-  //   if (this[STATE] !== ComponentState.RENDERED) {
+  //   if (this[STATE] !== COMPONENT_STATE_RENDERED) {
   //     throw new Error('domPassListeners must be applied to component which is rendered.');
   //   }
   //   const lis = this[EMITTER][LISTENERS];
@@ -363,8 +363,8 @@ export class Component<Props extends object = {}, Children = any> {
    * which means component append to target as it's children.
    */
   [RENDER_TO_DOM](targetEl: HTMLElement, replaceMode = true) {
-    if (this[STATE] !== ComponentState.INITIALIZE) {
-      throw new Error('component has already been rendered.');
+    if (this[STATE] !== COMPONENT_STATE_INITIALIZE) {
+      throwErr('dup-render');
     }
     const rr = this.render();
     if (replaceMode) {
@@ -376,16 +376,16 @@ export class Component<Props extends object = {}, Children = any> {
   }
 
   [DESTROY](removeDOM = true) {
-    if (this[STATE] >= ComponentState.WILLDESTROY) return;
-    this[STATE] = ComponentState.WILLDESTROY;
+    if (this[STATE] >= COMPONENT_STATE_WILLDESTROY) return;
+    this[STATE] = COMPONENT_STATE_WILLDESTROY;
     /*
      * once component is being destroied,
      *   we mark component and it's passed-attrs un-notifiable to ignore
      *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
      */
     this[$$][VM_NOTIFIABLE] = false;
-    const passedAttrs = this[PASSED_ATTRIBUTES];
-    passedAttrs && (passedAttrs[$$][VM_NOTIFIABLE] = false);
+    // const passedAttrs = this[PASSED_ATTRIBUTES];
+    // passedAttrs && (passedAttrs[$$][VM_NOTIFIABLE] = false);
 
     // notify before destroy lifecycle
     // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
@@ -398,7 +398,7 @@ export class Component<Props extends object = {}, Children = any> {
     this[DESTROY_CONTENT](removeDOM);
     // clear messenger listeners.
     // emitter?.clear();
-    passedAttrs && destroyViewModelCore(passedAttrs[$$]);
+    // passedAttrs && destroyViewModelCore(passedAttrs[$$]);
 
     // destroy view model
     destroyViewModelCore(this[$$]);
@@ -430,7 +430,7 @@ export class Component<Props extends object = {}, Children = any> {
     this[DEREGISTER_FUNCTIONS]?.clear();
     this[REFS]?.clear();
     // clear properties
-    this[STATE] = ComponentState.DESTROIED;
+    this[STATE] = COMPONENT_STATE_DESTROIED;
     // unlink all symbol properties. maybe unnecessary.
     this[ROOT_NODES].length = 0;
     this[NON_ROOT_COMPONENT_NODES].length = 0;
@@ -469,7 +469,7 @@ export class Component<Props extends object = {}, Children = any> {
      * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
      */
 
-    this[PASSED_ATTRIBUTES] && (this[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
+    // this[PASSED_ATTRIBUTES] && (this[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
     this[$$][VM_NOTIFIABLE] = true;
 
     for (const n of this[ROOT_NODES]) {
@@ -480,25 +480,17 @@ export class Component<Props extends object = {}, Children = any> {
     for (const n of this[NON_ROOT_COMPONENT_NODES]) {
       n[HANDLE_RENDER_DONE]();
     }
-    this[STATE] = ComponentState.RENDERED;
+    this[STATE] = COMPONENT_STATE_RENDERED;
     this[CONTEXT_STATE] =
-      this[CONTEXT_STATE] === ContextStates.TOUCHED
-        ? ContextStates.TOUCHED_FREEZED
-        : ContextStates.UNTOUCH_FREEZED; // has been rendered, can't modify context
+      this[CONTEXT_STATE] === CONTEXT_STATE_TOUCHED
+        ? CONTEXT_STATE_TOUCHED_FREEZED
+        : CONTEXT_STATE_UNTOUCH_FREEZED; // has been rendered, can't modify context
     this.onAfterRender();
-    // this[EMITTER].emit('afterRender');
   }
 
-  // renderSlot<N extends keyof S>(slotName: N, ...args: Parameters<S[N]>) {
-  //   const renderFn = this[SLOTS][slotName];
-  //   if (!renderFn) throw new Error('slot not found');
-  //   return renderFn(this);
-  // }
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render(): any {
-    const renderFn = this[SLOTS][DEFAULT_SLOT];
-    if (!renderFn) throw new Error('render() must be overrided');
-    return renderFn(this);
+    return this[SLOTS][DEFAULT_SLOT]?.(this) ?? [];
   }
 
   /**
@@ -506,7 +498,7 @@ export class Component<Props extends object = {}, Children = any> {
    */
   updateNextTick(handler?: AnyFn) {
     const updateRenderFn = (this as unknown as { update: AnyFn }).update;
-    if (!updateRenderFn || this[STATE] !== ComponentState.RENDERED) {
+    if (!updateRenderFn || this[STATE] !== COMPONENT_STATE_RENDERED) {
       return;
     }
 
@@ -533,20 +525,18 @@ export class Component<Props extends object = {}, Children = any> {
   setContext(key: string | symbol, value: unknown, forceOverride = false) {
     const contextState = this[CONTEXT_STATE];
     if (
-      contextState === ContextStates.UNTOUCH_FREEZED ||
-      contextState === ContextStates.TOUCHED_FREEZED
+      contextState === CONTEXT_STATE_UNTOUCH_FREEZED ||
+      contextState === CONTEXT_STATE_TOUCHED_FREEZED
     ) {
-      throw new Error(
-        "Can't setContext after component has been rendered. Try put setContext code into constructor.",
-      );
+      throwErr('setctx-after-render');
     }
     let context = this[CONTEXT];
-    if (contextState === ContextStates.UNTOUCH) {
+    if (contextState === CONTEXT_STATE_TOUCHED) {
       // we copy context to make sure child component do not modify context passed from parent.
       // we do not copy it by default until setContext function is called, because it unnecessary to waste memory if
       // child component do not modify the context.
       context = this[CONTEXT] = Object.assign({}, this[CONTEXT]);
-      this[CONTEXT_STATE] = ContextStates.TOUCHED; // has been copied.
+      this[CONTEXT_STATE] = CONTEXT_STATE_TOUCHED; // has been copied.
     }
     if (!context) return;
     if (key in context) {
@@ -554,9 +544,7 @@ export class Component<Props extends object = {}, Children = any> {
       // so we force programmer to pass third argument to
       //   tell us he/she know what he/she is doing.
       if (!forceOverride) {
-        throw new Error(
-          `Contenxt with key: ${key.toString()} is exist. Pass third argument forceOverride=true to override it.`,
-        );
+        throwErr('ctx-key-exist', key);
       }
     }
     context[key] = value;
@@ -610,10 +598,11 @@ export class Component<Props extends object = {}, Children = any> {
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
   getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
-    if (this[STATE] !== ComponentState.RENDERED) {
-      warn(
-        `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
-      );
+    if (this[STATE] !== COMPONENT_STATE_RENDERED) {
+      import.meta.env.DEV &&
+        console.error(
+          `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
+        );
     }
     return this[REFS]?.get(ref) as T;
   }

@@ -2,23 +2,15 @@
   "name": "jinge",
   "version": "4.0.0-alpha.1",
   "description": "A Proxy based MVVM framework",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
+  "main": "index.js",
+  "module": "index.js",
   "types": "src/index.ts",
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./dist/index.js"
-    },
-    "./dev": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    }
-  },
   "scripts": {
     "dev": "WATCH=true npm run build",
-    "build": "rm -rf dist && tsx ./scripts/esbuild.ts",
+    "build-dev": "NODE_ENV=development vite build --mode development -c scripts/vite.config.ts",
+    "build-prod": "vite build -c scripts/vite.config.ts",
+    "build": "rm -rf dist && pnpm build-dev && pnpm build-prod",
     "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,mjs,ts}' --fix",
     "lint-staged": "lint-staged",
     "prepare": "husky"
@@ -41,9 +33,9 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@types/node": "^20.14.9",
-    "@typescript-eslint/eslint-plugin": "^7.15.0",
-    "@typescript-eslint/parser": "^7.15.0",
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
     "esbuild": "^0.23.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
@@ -53,7 +45,7 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.7",
     "prettier": "^3.3.2",
-    "tsx": "^4.16.1",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3"
   }
 }

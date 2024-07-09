@@ -1,4 +1,4 @@
-import { isString, isUndefined, isObject, isArray, isNumber } from './type';
+import { isString, isUndefined, isObject } from './type';
 
 export function setText($element: Node, text: unknown): void {
   if (isObject(text)) {
@@ -156,85 +156,12 @@ export function registerEvent(
   };
 }
 
-export type CLASSNAME = string | Record<string, boolean> | CLASSNAME[];
-
-export function class2str(className: CLASSNAME) {
-  if (!className) return className as string;
-  if (isString(className)) {
-    return className.trim();
-  }
-  if (isArray(className)) {
-    const clist: string[] = [];
-    className.forEach((cn) => {
-      const seg = class2str(cn);
-      seg && clist.push(seg);
-    });
-    return clist.join(' ').trim();
-  }
-  return Object.keys(className)
-    .filter((k) => !!className[k])
-    .join(' ')
-    .trim();
-}
-
-export function setClassAttribute($ele: Element, className: CLASSNAME) {
-  className = class2str(className);
+export function setClassAttribute($ele: Element, className?: string) {
   if (!className) $ele.removeAttribute('class');
   else $ele.setAttribute('class', className);
 }
 
-const UNITLESS = new Set([
-  'box-flex',
-  'box-flex-group',
-  'column-count',
-  'flex',
-  'flex-grow',
-  'flex-positive',
-  'flex-shrink',
-  'flex-negative',
-  'font-weight',
-  'line-clamp',
-  'line-height',
-  'opacity',
-  'order',
-  'orphans',
-  'tab-size',
-  'widows',
-  'z-index',
-  'zoom',
-  'fill-opacity',
-  'stroke-dashoffset',
-  'stroke-opacity',
-  'stroke-width',
-]);
-export function style2str(style: string | Record<string, string | number | boolean>) {
-  if (!style) return style as string;
-  if (isString(style)) return style.trim();
-  if (Array.isArray(style)) {
-    const slist: string[] = [];
-    style.forEach((sty) => {
-      const seg = style2str(sty);
-      seg && slist.push(seg);
-    });
-    return slist.join('').trim();
-  }
-  const segs: string[] = [];
-  Object.keys(style).forEach((k) => {
-    let v = style[k];
-    if (!v && v !== 0) return;
-    k = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-    if (isNumber(v) && !UNITLESS.has(k)) {
-      v = `${v}px`;
-    } else {
-      v = v.toString();
-    }
-    segs.push(`${k}:${v};`);
-  });
-  return segs.join('').trim();
-}
-
-export function setStyleAttribute($ele: Element, style: string | Record<string, string | number>) {
-  style = style2str(style);
+export function setStyleAttribute($ele: Element, style?: string) {
   if (!style) $ele.removeAttribute('style');
   else $ele.setAttribute('style', style);
 }

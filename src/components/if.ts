@@ -1,3 +1,4 @@
+import { throwErr } from '../util';
 import type { RenderFn } from '../core';
 import { Component, CONTEXT, ROOT_NODES, SLOTS, DESTROY_CONTENT, DEFAULT_SLOT } from '../core';
 import type { JNode } from '../jsx';
@@ -64,7 +65,7 @@ function renderSwitch(component: Switch) {
   const slots = component[SLOTS];
   const e = component[EXPECT];
   const renderFn = slots[e] ?? slots[DEFAULT_SLOT];
-  if (!renderFn) throw new Error('<Switch /> requires default case');
+  if (!renderFn) throwErr('switch-miss-slot', e);
   return doRender(component, renderFn, e);
 }
 export interface SwitchAttrs {
