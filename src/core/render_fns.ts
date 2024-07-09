@@ -1,4 +1,4 @@
-import { createElement, createTextNode } from '../util';
+import { createEleA, createTextNode } from '../util';
 import { ROOT_NODES } from './common';
 import type { Component } from './component';
 
@@ -9,7 +9,7 @@ export function emptyRenderFn(component: Component): Node[] {
 }
 
 export function errorRenderFn(component: Component, message: string): Node[] {
-  const el = createElement('code', {
+  const el = createEleA('code', {
     style: 'color: red !important;',
   });
   el.innerHTML = message;

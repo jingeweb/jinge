@@ -2,9 +2,23 @@
   "name": "jinge",
   "version": "4.0.0-alpha.1",
   "description": "A Proxy based MVVM framework",
-  "main": "index.js",
-  "module": "index.js",
+  "main": "./dist/jinge.prod.js",
+  "module": "./dist/jinge.prod.js",
   "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/jinge.prod.js"
+    },
+    "./dev": {
+      "types": "./src/index.ts",
+      "default": "./dist/jinge.dev.js"
+    },
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "type": "module",
   "scripts": {
     "dev": "WATCH=true npm run build",

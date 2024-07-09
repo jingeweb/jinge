@@ -71,38 +71,25 @@ function _createEl($el: Element, attrs?: Record<string, unknown>, children?: (No
   return $el;
 }
 
-export function createElement(
+export function createEleA(
   tag: string,
   attrs: Record<string, unknown> | undefined,
   ...children: (Node | string)[]
 ) {
   return _createEl(document.createElement(tag), attrs, children);
 }
-
-export function createElementWithoutAttrs(tag: string, ...children: (Node | string)[]) {
-  return _createEl(document.createElement(tag), undefined, children);
+export function createEle(tag: string, ...children: (Node | string)[]) {
+  return createEleA(tag, undefined, ...children);
 }
-
-export function createSVGElement(
+export function createSVGEleA(
   tag: string,
   attrs: Record<string, unknown> | undefined,
   ...children: Node[]
 ) {
   return _createEl(document.createElementNS('http://www.w3.org/2000/svg', tag), attrs, children);
 }
-
-export function createSVGElementWithoutAttrs(tag: string, ...children: Node[]) {
-  return createSVGElement(tag, undefined, ...children);
-}
-
-export function createElementWithChild(
-  tag: string,
-  attrs: Record<string, unknown>,
-  child: Node | string,
-) {
-  const $e = createElement(tag, attrs);
-  $e.appendChild(isString(child) ? createTextNode(child) : (child as Node));
-  return $e;
+export function createSVGEle(tag: string, ...children: Node[]) {
+  return createSVGEleA(tag, undefined, ...children);
 }
 
 export function insertAfter($parent: Node, newNode: Node, referenceNode: Node): void {
