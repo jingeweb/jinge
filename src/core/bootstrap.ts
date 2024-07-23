@@ -1,5 +1,4 @@
-import type { Component } from './component';
-import { RENDER_TO_DOM } from './common';
+import { renderToDOM, type Component } from './component';
 
 export function bootstrap<A extends object, C extends Component<A>>(
   ComponentClazz: {
@@ -9,6 +8,6 @@ export function bootstrap<A extends object, C extends Component<A>>(
   attrs?: A,
 ) {
   const app = new ComponentClazz(attrs as A);
-  app[RENDER_TO_DOM](dom, dom !== document.body);
+  renderToDOM(app, dom, dom !== document.body);
   return app;
 }

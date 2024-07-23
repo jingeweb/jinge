@@ -1,5 +1,4 @@
-import type { WatchHandler } from '../vm';
-import { innerWatchPath, watchPath } from '../vm';
+import { innerWatchPath } from '../vm';
 import type { AnyFn } from '../util';
 import {
   isArray,
@@ -12,7 +11,7 @@ import {
   throwErr,
 } from '../util';
 
-import type { PropertyPathItem, ViewModel, ViewModelCore } from '../vm/core';
+import type { ViewModel, ViewModelCore } from '../vm/core';
 import {
   $$,
   VM_NOTIFIABLE,
@@ -38,16 +37,8 @@ import {
   STATE,
   CONTEXT,
   CONTEXT_STATE,
-  // PASSED_ATTRIBUTES,
   SLOTS,
-  // EMITTER,
   __,
-  SET_REF,
-  WATCH,
-  DESTROY_CONTENT,
-  DESTROY,
-  RENDER_TO_DOM,
-  HANDLE_RENDER_DONE,
   COMPONENT_STATE_INITIALIZE,
   COMPONENT_STATE_DESTROIED,
   COMPONENT_STATE_WILLDESTROY,
@@ -152,7 +143,7 @@ export class Component<
   /**
    *
    */
-  [RELATED_WATCH]?: Set<AnyFn>;
+  [RELATED_WATCH]?: AnyFn[];
   /**
    * update-next-map
    */
@@ -181,32 +172,6 @@ export class Component<
     };
     this[SLOTS] = {};
     return this[$$][VM_PROXY] as typeof this;
-  }
-
-  /** 给编译器使用的 watch 函数 */
-  [WATCH](propPath: PropertyPathItem[], handler: WatchHandler, relatedComponent?: Component) {
-    const unwatchFn = watchPath(
-      this,
-      (v, old, p) => {
-        // console.log('onchange', v, old, p, propPath);
-        handler(v, old, p);
-      },
-      propPath,
-      true,
-      true,
-    );
-    if (relatedComponent && relatedComponent !== this) {
-      let rw = relatedComponent[RELATED_WATCH];
-      if (!rw) rw = relatedComponent[RELATED_WATCH] = new Set();
-      const newFn = () => {
-        unwatchFn();
-        rw?.delete(newFn);
-      };
-      rw.add(newFn);
-      return newFn;
-    } else {
-      return unwatchFn;
-    }
   }
 
   /**
@@ -283,211 +248,6 @@ export class Component<
     };
   }
 
-  // /**
-  //  * Helper function to pass all listener to target dom element.
-  //  * By default target dom element is first
-  //  * @param {Array} ignoredEventNames event names not passed
-  //  */
-  // __domPassListeners(ignoredEventNames?: string[]): void;
-  // __domPassListeners(targetEl?: HTMLElement): void;
-  // __domPassListeners(ignoredEventNames: string[], targetEl: HTMLElement): void;
-  // __domPassListeners(ignoredEventNames?: string[] | HTMLElement, targetEl?: HTMLElement): void {
-  //   if (this[STATE] !== COMPONENT_STATE_RENDERED) {
-  //     throw new Error('domPassListeners must be applied to component which is rendered.');
-  //   }
-  //   const lis = this[EMITTER][LISTENERS];
-  //   if (!lis?.size) {
-  //     return;
-  //   }
-  //   if (ignoredEventNames && !isArray(ignoredEventNames)) {
-  //     targetEl = ignoredEventNames as HTMLElement;
-  //     ignoredEventNames = undefined;
-  //   } else if (!targetEl) {
-  //     targetEl = this.__firstDOM as unknown as HTMLElement;
-  //   }
-  //   if (targetEl.nodeType !== Node.ELEMENT_NODE) {
-  //     return;
-  //   }
-  //   lis.forEach((handlers, eventName) => {
-  //     if (ignoredEventNames?.indexOf(eventName as string)) {
-  //       return;
-  //     }
-  //     handlers.forEach((opts, handler) => {
-  //       const deregFn = registerEvent(
-  //         targetEl,
-  //         eventName as string,
-  //         opts && (opts.stop || opts.prevent)
-  //           ? ($evt: Event): void => {
-  //               opts.stop && $evt.stopPropagation();
-  //               opts.prevent && $evt.preventDefault();
-  //               handler.call(this, $evt);
-  //             }
-  //           : ($evt: Event): void => {
-  //               handler.call(this, $evt);
-  //             },
-  //         opts,
-  //       );
-  //       this.__addDeregisterFn(deregFn);
-  //     });
-  //   });
-  // }
-
-  /**
-   * Get first rendered DOM Node after Component is rendered.
-   *
-   * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
-   */
-  get firstDOM(): Node {
-    const el = this[ROOT_NODES][0];
-    return isComponent(el) ? el.firstDOM : (el as Node);
-  }
-
-  /**
-   * Get last rendered DOM Node after Component is rendered.
-   *
-   * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
-   */
-  get lastDOM(): Node {
-    const rns = this[ROOT_NODES];
-    const el = rns[rns.length - 1];
-    return isComponent(el) ? el.lastDOM : (el as Node);
-  }
-
-  /**
-   * Render Component to HTMLElement.
-   * This method is usually used to render the entire application.
-   * See the `bootstrap()` function in `./bootstrap.js`.
-   *
-   * By default, the target element will be replaced(that means deleted).
-   * But you can disable it by pass `replaceMode`=`false`,
-   * which means component append to target as it's children.
-   */
-  [RENDER_TO_DOM](targetEl: HTMLElement, replaceMode = true) {
-    if (this[STATE] !== COMPONENT_STATE_INITIALIZE) {
-      throwErr('dup-render');
-    }
-    const rr = this.render();
-    if (replaceMode) {
-      replaceChildren(targetEl.parentNode as HTMLElement, rr, targetEl);
-    } else {
-      appendChildren(targetEl, rr);
-    }
-    this[HANDLE_RENDER_DONE]();
-  }
-
-  [DESTROY](removeDOM = true) {
-    if (this[STATE] >= COMPONENT_STATE_WILLDESTROY) return;
-    this[STATE] = COMPONENT_STATE_WILLDESTROY;
-    /*
-     * once component is being destroied,
-     *   we mark component and it's passed-attrs un-notifiable to ignore
-     *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
-     */
-    this[$$][VM_NOTIFIABLE] = false;
-    // const passedAttrs = this[PASSED_ATTRIBUTES];
-    // passedAttrs && (passedAttrs[$$][VM_NOTIFIABLE] = false);
-
-    // notify before destroy lifecycle
-    // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
-    //   因为在 BEFORE_DESTROY 里会销毁外部消息回调函数里可能会用到的属性等资源。
-    // const emitter = this[EMITTER];
-
-    // emitter.emit('beforeDestroy');
-    this.onBeforeDestroy();
-    // destroy children(include child component and html nodes)
-    this[DESTROY_CONTENT](removeDOM);
-    // clear messenger listeners.
-    // emitter?.clear();
-    // passedAttrs && destroyViewModelCore(passedAttrs[$$]);
-
-    // destroy view model
-    destroyViewModelCore(this[$$]);
-    // 删除关联 watchers
-    this[RELATED_WATCH]?.forEach((unwatchFn) => unwatchFn());
-    this[RELATED_WATCH]?.clear();
-
-    // clear next tick update setImmediate
-    this[UPDATE_NEXT_MAP]?.forEach((imm) => {
-      clearImmediate(imm);
-    });
-    this[UPDATE_NEXT_MAP]?.clear();
-
-    // destroy 22 refs:
-    this[RELATED_REFS]?.forEach((info) => {
-      const refs = info[RELATED_REFS_ORIGIN][REFS];
-      if (!refs) return;
-      const rns = refs.get(info[RELATED_REFS_KEY]);
-      if (isArray(rns)) {
-        arrayRemove(rns as (Component | Node)[], info[RELATED_REFS_NODE] || this);
-      } else {
-        refs.delete(info[RELATED_REFS_KEY]);
-      }
-    });
-    this[RELATED_REFS] && (this[RELATED_REFS].length = 0);
-
-    // auto call all deregister functions
-    this[DEREGISTER_FUNCTIONS]?.forEach((fn) => fn());
-    this[DEREGISTER_FUNCTIONS]?.clear();
-    this[REFS]?.clear();
-    // clear properties
-    this[STATE] = COMPONENT_STATE_DESTROIED;
-    // unlink all symbol properties. maybe unnecessary.
-    this[ROOT_NODES].length = 0;
-    this[NON_ROOT_COMPONENT_NODES].length = 0;
-    this[CONTEXT] = undefined;
-  }
-
-  /**
-   * 销毁组件的内容，但不销毁组件本身。
-   */
-  [DESTROY_CONTENT](removeDOM = false) {
-    for (const component of this[NON_ROOT_COMPONENT_NODES]) {
-      // it's not necessary to remove dom when destroy non-root component,
-      // because those dom nodes will be auto removed when their parent dom is removed.
-      component[DESTROY](false);
-    }
-
-    let $parent: Node | null = null;
-    for (const node of this[ROOT_NODES]) {
-      if (isComponent(node)) {
-        node[DESTROY](removeDOM);
-      } else if (removeDOM) {
-        if (!$parent) {
-          $parent = (node as Node).parentNode;
-        }
-        ($parent as Node).removeChild(node as Node);
-      }
-    }
-  }
-
-  /**
-   *
-   */
-  [HANDLE_RENDER_DONE]() {
-    /*
-     * Set NOTIFIABLE=true to enable ViewModel notify.
-     * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
-     */
-
-    // this[PASSED_ATTRIBUTES] && (this[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
-    this[$$][VM_NOTIFIABLE] = true;
-
-    for (const n of this[ROOT_NODES]) {
-      if (isComponent(n)) {
-        n[HANDLE_RENDER_DONE]();
-      }
-    }
-    for (const n of this[NON_ROOT_COMPONENT_NODES]) {
-      n[HANDLE_RENDER_DONE]();
-    }
-    this[STATE] = COMPONENT_STATE_RENDERED;
-    this[CONTEXT_STATE] =
-      this[CONTEXT_STATE] === CONTEXT_STATE_TOUCHED
-        ? CONTEXT_STATE_TOUCHED_FREEZED
-        : CONTEXT_STATE_UNTOUCH_FREEZED; // has been rendered, can't modify context
-    this.onAfterRender();
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render(): any {
     return this[SLOTS][DEFAULT_SLOT]?.(this) ?? [];
@@ -556,45 +316,6 @@ export class Component<
   }
 
   /**
-   * This method is used for compiler generated code.
-   * Do not use it manually.
-   */
-  [SET_REF](ref: string, el: Component | Node, relatedComponent?: Component) {
-    let rns = this[REFS];
-    if (!rns) {
-      this[REFS] = rns = new Map();
-    }
-    let elOrArr = rns.get(ref);
-    if (!elOrArr) {
-      rns.set(ref, el);
-    } else if (isArray(elOrArr)) {
-      (elOrArr as (Component | Node)[]).push(el);
-    } else {
-      elOrArr = [elOrArr as Component, el];
-      rns.set(ref, elOrArr);
-    }
-    const isComp = isComponent(el);
-    if (!isComp && this === relatedComponent) {
-      return;
-    }
-    /**
-     * 如果被 ref: 标记的元素（el）本身就是组件（Component）节点，
-     *   那么 el 自身就是关联组件，el 自身在被销毁时可以执行删除关联 refs 的操作；
-     * 如果 el 是 DOM 节点，则必须将它添加到关联组件（比如 <if>） relatedComponent 里，
-     *   在 relatedComponent 被销毁时执行关联 refs 的删除。
-     */
-    let rbs = ((isComp ? el : relatedComponent) as Component)[RELATED_REFS];
-    if (!rbs) {
-      ((isComp ? el : relatedComponent) as Component)[RELATED_REFS] = rbs = [];
-    }
-    rbs.push({
-      [RELATED_REFS_ORIGIN]: this,
-      [RELATED_REFS_KEY]: ref,
-      [RELATED_REFS_NODE]: isComp ? undefined : (el as Node),
-    });
-  }
-
-  /**
    * Get child node(or nodes) marked by 'ref:' attribute in template
    */
   getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
@@ -606,18 +327,6 @@ export class Component<
     }
     return this[REFS]?.get(ref) as T;
   }
-
-  // __on<E extends keyof (Events & LifeCycleEvents)>(
-  //   eventName: E,
-  //   handler: (Events & LifeCycleEvents)[E],
-  //   options?: ListenerOptions,
-  // ) {
-  //   return this[EMITTER].on(eventName as string, handler, options);
-  // }
-
-  // __emit<E extends keyof Events>(eventName: E, ...args: Parameters<Events[E]>) {
-  //   this[EMITTER].emit(eventName as string, ...args);
-  // }
 
   /**
    * lifecycle hook, called after rendered.
@@ -632,4 +341,161 @@ export class Component<
   onBeforeDestroy() {
     // lifecycle hook, default do nothing.
   }
+}
+
+///// 以下为不常用的函数，不作为 Component 的类成员函数，可以尽量减少打包产物的大小 //////
+
+/**
+ * Get first rendered DOM Node after Component is rendered.
+ *
+ * 按从左往右从上到下的深度遍历，找到的第一个 DOM 节点。
+ */
+export function getFirstDOM<T = Node>(component: Component): T {
+  const el = component[ROOT_NODES][0];
+  return isComponent(el) ? getFirstDOM(el) : (el as T);
+}
+
+/**
+ * Get last rendered DOM Node after Component is rendered.
+ *
+ * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
+ */
+export function getLastDOM<T = Node>(component: Component): T {
+  const rns = component[ROOT_NODES];
+  const el = rns[rns.length - 1];
+  return isComponent(el) ? getLastDOM(el) : (el as T);
+}
+
+/**
+ * Render Component to HTMLElement.
+ * This method is usually used to render the entire application.
+ * See the `bootstrap()` function in `./bootstrap.js`.
+ *
+ * By default, the target element will be replaced(that means deleted).
+ * But you can disable it by pass `replaceMode`=`false`,
+ * which means component append to target as it's children.
+ */
+export function renderToDOM(component: Component, targetEl: HTMLElement, replaceMode = true) {
+  if (component[STATE] !== COMPONENT_STATE_INITIALIZE) {
+    throwErr('dup-render');
+  }
+  const rr = component.render();
+  if (replaceMode) {
+    replaceChildren(targetEl.parentNode as HTMLElement, rr, targetEl);
+  } else {
+    appendChildren(targetEl, rr);
+  }
+  handleRenderDone(component);
+}
+export function handleRenderDone(component: Component) {
+  /*
+   * Set NOTIFIABLE=true to enable ViewModel notify.
+   * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
+   */
+
+  // this[PASSED_ATTRIBUTES] && (this[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
+  component[$$][VM_NOTIFIABLE] = true;
+
+  for (const n of component[ROOT_NODES]) {
+    if (isComponent(n)) {
+      handleRenderDone(n);
+    }
+  }
+  for (const n of component[NON_ROOT_COMPONENT_NODES]) {
+    handleRenderDone(n);
+  }
+  component[STATE] = COMPONENT_STATE_RENDERED;
+  component[CONTEXT_STATE] =
+    component[CONTEXT_STATE] === CONTEXT_STATE_TOUCHED
+      ? CONTEXT_STATE_TOUCHED_FREEZED
+      : CONTEXT_STATE_UNTOUCH_FREEZED; // has been rendered, can't modify context
+  component.onAfterRender();
+}
+
+/**
+ * 销毁组件的内容，但不销毁组件本身。
+ */
+export function destroyComponentContent(target: Component, removeDOM = false) {
+  for (const component of target[NON_ROOT_COMPONENT_NODES]) {
+    // it's not necessary to remove dom when destroy non-root component,
+    // because those dom nodes will be auto removed when their parent dom is removed.
+    destroyComponent(component, false);
+  }
+
+  let $parent: Node | null = null;
+  for (const node of target[ROOT_NODES]) {
+    if (isComponent(node)) {
+      destroyComponent(node, removeDOM);
+    } else if (removeDOM) {
+      if (!$parent) {
+        $parent = (node as Node).parentNode;
+      }
+      ($parent as Node).removeChild(node as Node);
+    }
+  }
+}
+
+/**
+ * 销毁组件
+ */
+export function destroyComponent(target: Component, removeDOM = true) {
+  if (target[STATE] >= COMPONENT_STATE_WILLDESTROY) return;
+  target[STATE] = COMPONENT_STATE_WILLDESTROY;
+  /*
+   * once component is being destroied,
+   *   we mark component and it's passed-attrs un-notifiable to ignore
+   *   possible messeges occurs in BEFORE_DESTROY lifecycle callback.
+   */
+  target[$$][VM_NOTIFIABLE] = false;
+  // const passedAttrs = this[PASSED_ATTRIBUTES];
+  // passedAttrs && (passedAttrs[$$][VM_NOTIFIABLE] = false);
+
+  // notify before destroy lifecycle
+  // 需要注意，必须先 NOTIFY 向外通知销毁消息，再执行 BEFORE_DESTROY 生命周期函数。
+  //   因为在 BEFORE_DESTROY 里会销毁外部消息回调函数里可能会用到的属性等资源。
+  // const emitter = this[EMITTER];
+
+  // emitter.emit('beforeDestroy');
+  target.onBeforeDestroy();
+  // destroy children(include child component and html nodes)
+  destroyComponentContent(target, removeDOM);
+  // clear messenger listeners.
+  // emitter?.clear();
+  // passedAttrs && destroyViewModelCore(passedAttrs[$$]);
+
+  // destroy view model
+  destroyViewModelCore(target[$$]);
+  // 删除关联 watchers
+  target[RELATED_WATCH]?.forEach((unwatchFn) => unwatchFn());
+  target[RELATED_WATCH] && (target[RELATED_WATCH].length = 0);
+
+  // clear next tick update setImmediate
+  target[UPDATE_NEXT_MAP]?.forEach((imm) => {
+    clearImmediate(imm);
+  });
+  target[UPDATE_NEXT_MAP]?.clear();
+
+  // destroy 22 refs:
+  target[RELATED_REFS]?.forEach((info) => {
+    const refs = info[RELATED_REFS_ORIGIN][REFS];
+    if (!refs) return;
+    const rns = refs.get(info[RELATED_REFS_KEY]);
+    if (isArray(rns)) {
+      arrayRemove(rns as (Component | Node)[], info[RELATED_REFS_NODE] || target);
+    } else {
+      refs.delete(info[RELATED_REFS_KEY]);
+    }
+  });
+  target[RELATED_REFS] && (target[RELATED_REFS].length = 0);
+
+  // auto call all deregister functions
+  target[DEREGISTER_FUNCTIONS]?.forEach((fn) => fn());
+  target[DEREGISTER_FUNCTIONS]?.clear();
+  target[REFS]?.clear();
+  // clear properties
+  target[STATE] = COMPONENT_STATE_DESTROIED;
+  // unlink all symbol properties. maybe unnecessary.
+  target[ROOT_NODES].length = 0;
+  target[NON_ROOT_COMPONENT_NODES].length = 0;
+  target[CONTEXT] = undefined;
 }

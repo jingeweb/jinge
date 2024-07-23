@@ -1,6 +1,13 @@
 import { throwErr } from '../util';
 import type { RenderFn } from '../core';
-import { Component, CONTEXT, ROOT_NODES, SLOTS, DESTROY_CONTENT, DEFAULT_SLOT } from '../core';
+import {
+  Component,
+  CONTEXT,
+  ROOT_NODES,
+  SLOTS,
+  DEFAULT_SLOT,
+  destroyComponentContent,
+} from '../core';
 import type { JNode } from '../jsx';
 
 const EXPECT = Symbol('EXPECT');
@@ -56,7 +63,7 @@ export class If extends Component<
   }
 
   update() {
-    this[DESTROY_CONTENT](true);
+    destroyComponentContent(this, true);
     renderIf(this);
   }
 }
@@ -84,7 +91,7 @@ export class Switch extends Component {
   }
 
   update() {
-    this[DESTROY_CONTENT](true);
+    destroyComponentContent(this, true);
     renderSwitch(this);
   }
 }
