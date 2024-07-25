@@ -1,4 +1,4 @@
-import { arrayEqual, throwErr } from '../util';
+import { arrayEqual, throwErr, clearImmediate, setImmediate } from '../util';
 import type { PropertyPathItem } from '../vm';
 import { VM_WATCHER_VALUE, $$, getValueByPath, innerWatchPath } from '../vm';
 import { RELATED_WATCH } from './common';
@@ -48,7 +48,7 @@ export function PathWatcher(
   const core = target[$$];
   if (!core) throwErr('watch-not-vm');
 
-  let val = getValueByPath(path);
+  let val = getValueByPath(target, path);
   let parent: ParentWatcher | undefined = undefined;
   const unwatchFn = innerWatchPath(
     target,
@@ -77,10 +77,23 @@ export function PathWatcher(
 export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => void) {
   let val = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
   let parent: ParentWatcher | undefined = undefined;
+  let imm: number = 0;
+  const update = () => {
+    imm = 0;
+    const newVal = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
+    if (newVal !== val) {
+      val = newVal;
+      parent?.[VM_WATCHER_NOTIFY](val);
+    }
+  };
   const rtn = {
     [VM_WATCHER_DESTROY]() {
       path.forEach((w) => w[VM_WATCHER_DESTROY]());
       parent = undefined;
+      if (imm > 0) {
+        clearImmediate(imm);
+        imm = 0;
+      }
     },
     get [VM_WATCHER_VALUE]() {
       return val;
@@ -89,11 +102,8 @@ export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => voi
       parent = v;
     },
     [VM_WATCHER_NOTIFY]() {
-      const newVal = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
-      if (newVal !== val) {
-        val = newVal;
-        parent?.[VM_WATCHER_NOTIFY](val);
-      }
+      if (imm > 0) clearImmediate(imm);
+      imm = setImmediate(update);
     },
   } as ViewWatcher;
   path.forEach((w) => (w[VM_WATCHER_PARENT] = rtn));
@@ -108,7 +118,7 @@ export function DymPathWatcher(
   const core = target[$$];
   if (!core) throwErr('watch-not-vm');
   let innerPath = path.map((p) => (typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p));
-  let val = getValueByPath(innerPath);
+  let val = getValueByPath(target, innerPath);
   renderFn?.(val);
   let parent: ParentWatcher | undefined = undefined;
   const __innerW = () => {
@@ -145,7 +155,7 @@ export function DymPathWatcher(
         return;
       }
       innerPath = newPath;
-      const newVal = getValueByPath(innerPath);
+      const newVal = getValueByPath(target, innerPath);
       if (newVal !== val) {
         val = newVal;
         parent?.[VM_WATCHER_NOTIFY](val);
