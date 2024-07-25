@@ -9,7 +9,6 @@ const Errs = {
   'setctx-after-render':
     "Can't setContext after component has been rendered. Try put setContext code into constructor.",
   'bind-attr-not-pub-prop': 'attrName of __bindAttr() requires public property.',
-  'bind-attr-not-vm': 'attrs of __bindAttr() requires view-model, use vm() to wrap object.',
   'switch-miss-slot': 'Slot {0} or [DEFAULT_SLOT] of <Switch /> not found.',
 };
 

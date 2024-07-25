@@ -1,15 +1,6 @@
 import { innerWatchPath } from '../vm';
 import type { AnyFn } from '../util';
-import {
-  isArray,
-  arrayRemove,
-  registerEvent,
-  clearImmediate,
-  setImmediate,
-  appendChildren,
-  replaceChildren,
-  throwErr,
-} from '../util';
+import { isArray, arrayRemove, appendChildren, replaceChildren, throwErr } from '../util';
 
 import type { ViewModel, ViewModelCore } from '../vm/core';
 import {
@@ -25,13 +16,12 @@ import type { ComponentState, ContextState, Slots } from './common';
 import {
   DEFAULT_SLOT,
   RELATED_WATCH,
-  DEREGISTER_FUNCTIONS,
+  UNMOUNT_FNS,
   REFS,
   RELATED_REFS,
   RELATED_REFS_KEY,
   RELATED_REFS_NODE,
   RELATED_REFS_ORIGIN,
-  UPDATE_NEXT_MAP,
   NON_ROOT_COMPONENT_NODES,
   ROOT_NODES,
   STATE,
@@ -48,19 +38,13 @@ import {
   CONTEXT_STATE_UNTOUCH_FREEZED,
   CONTEXT_STATE_TOUCHED,
 } from './common';
-// import type { EventMap, ListenerOptions } from './emitter';
-// import { Emitter, LISTENERS } from './emitter';
 
-/** Bellow is utility functions **/
-
+/**
+ * 用于判定是否是 Component 的函数。比 instanceof 要快很多。https://jsperf.app/bufamo
+ */
 export function isComponent<T extends Component>(v: unknown): v is T {
   return !!(v as Record<symbol, unknown>)[__];
 }
-
-export type LifeCycleEvents = {
-  afterRender: () => void;
-  beforeDestroy: () => void;
-};
 
 export class Component<
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -68,6 +52,11 @@ export class Component<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Children = any,
 > {
+  /**
+   * 用于判定是否是 Component 的属性。比 instanceof 要快很多。https://jsperf.app/bufamo
+   */
+  readonly [__] = true;
+
   /**
    * 专门用于 typescript jsx 类型校验的字段，请勿在 render() 函数之外使用。编译器会将 render() 函数里的 this.props.children 转换成 slots 传递。
    */
@@ -79,7 +68,6 @@ export class Component<
   }
 
   readonly [$$]: ViewModelCore;
-  readonly [__] = true;
   /**
    * 将构造函数传递来的 attrs 存下来，以便可以在后期使用，以及在组件销毁时销毁该 attrs。
    * 如果传递的 attrs 不是 ViewModel，则说明没有需要监听绑定的 attribute，不保存该 attrs。
@@ -144,14 +132,11 @@ export class Component<
    *
    */
   [RELATED_WATCH]?: AnyFn[];
+
   /**
-   * update-next-map
+   * store functions will be called before unmount/destroy
    */
-  [UPDATE_NEXT_MAP]?: Map<(() => void) | number, number>;
-  /**
-   * deregister functions
-   */
-  [DEREGISTER_FUNCTIONS]?: Set<() => void>;
+  [UNMOUNT_FNS]?: AnyFn[];
   /**
    * ROOT_NODES means root children of this component,
    *   include html-nodes and component-nodes.
@@ -175,77 +160,85 @@ export class Component<
   }
 
   /**
-   * 将 attrs 的属性（attrName）绑定到组件的同名属性上。调用 watch 监控 attrs[attrName]，在更新后更新同名属性并调用组件的 __updateNextTick()。
+   * 将 attrs 的属性（attrName）绑定到组件的同名属性上。调用 watch 监控 attrs[attrName]，在其变更后，更新组件的同名属性。如果提供了 onUpdate 参数，则会调用该函数。
    */
-  bindAttr<A extends object, P extends keyof A>(attrs: A, attrName: keyof A): A[P];
+  bindAttr<A extends object, P extends keyof A>(
+    attrs: A,
+    attrName: keyof A,
+    onUpdate?: (v: A[P]) => void,
+  ): A[P];
+
   /**
-   *
-   * 将 attrs 的属性（attrName）绑定到组件的 componentProp 属性上。调用 watch 监控 attrs[attrName]，在更新后更新 componentProp 属性并调用组件的 __updateNextTick()。
+   * 将 attrs 的属性（attrName）绑定到组件的 componentProp 属性上。调用 watch 监控 attrs[attrName]，在其变理后，更新组件的 componentProp 属性。如果提供了 onUpdate 参数，则会调用该函数。
    */
   bindAttr<A extends object, P extends keyof A, BP extends keyof typeof this>(
     attrs: A,
     attrName: P,
     componentProp: BP,
+    onUpdate?: (v: A[P]) => void,
   ): A[P];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  bindAttr(attrs: ViewModel, attrName: string, componentProp?: any) {
+  bindAttr(attrs: ViewModel, attrName: string, componentProp?: any, onUpdate?: any) {
     if (!isPublicProperty(attrName)) throwErr('bind-attr-not-pub-prop');
-    const core = attrs[$$];
-    if (!core) throwErr('bind-attr-not-vm');
 
     const val = attrs[attrName];
+    const core = attrs[$$];
+    if (!core) return val;
+    if (typeof componentProp === 'function') {
+      onUpdate = componentProp;
+      componentProp = undefined;
+    }
     const unwatchFn = innerWatchPath(
       attrs,
       core,
       val,
       (v) => {
         this[(componentProp ?? attrName) as keyof typeof this] = v;
-        this.updateNextTick();
+        onUpdate?.(v);
       },
       [attrName],
     );
-    this.addDeregisterFn(unwatchFn);
+    this.addUnmountFn(unwatchFn);
     return val;
   }
 
   /**
-   * store deregisterFn and auto call it when component is being destroy.
+   * 将 unmountFn 函数保存起来，在组件销毁(unmount/destroy)时自动调用。
+   *
+   * 这是一个辅助功能，相比于通过 onUnmount 生命周期函数来手动管理会更简洁些。
+   * 比如一个典型的使用场景是，在 onMount 生命周期函数中，通过 addEventListener 给 dom 元素手动绑定了事件，
+   * 然后在 onUnmount 中调用 removeEventListener 移除事件。使用 addUnmountFn 则可以简化为：
+   * ```ts
+   * import { Component } from 'jinge';
+   * class A extends Component {
+   *   onMount() {
+   *     const btn = this.getRef('button');
+   *     btn.addEventListener('click', handler)
+   *     this.addUnmountFn(() => {
+   *       btn.removeEventListener('click', handler);
+   *     });
+   *   }
+   * }
+   * ```
+   * 或者使用 `registerEvent` 则可以进一步简化：
+   * ```ts
+   * import { Component, registerEvent } from 'jinge';
+   * class A extends Component {
+   *   onMount() {
+   *     this.addUnmountFn(registerEvent(this.getRef('button'), 'click', (evt) => {
+   *       // click handler
+   *     }));
+   *   }
+   * }
+   * ```
    */
-  addDeregisterFn(deregisterFn: () => void): void {
-    let deregs = this[DEREGISTER_FUNCTIONS];
+  addUnmountFn(unmountFn: () => void): void {
+    let deregs = this[UNMOUNT_FNS];
     if (!deregs) {
-      this[DEREGISTER_FUNCTIONS] = deregs = new Set();
+      this[UNMOUNT_FNS] = deregs = [];
     }
-    deregs.add(deregisterFn);
-  }
-
-  /**
-   * Helper function to add dom event listener.
-   * Return deregister function which will remove event listener.
-   * If you do dot call deregister function, it will be auto called when component is destroied.
-   * @returns {Function} deregister function to remove listener
-   */
-  domAddListener(
-    $el: Element | Window | Document,
-    eventName: string,
-    listener: EventListener,
-    capture?: boolean | AddEventListenerOptions,
-  ) {
-    const deregEvtFn = registerEvent(
-      $el,
-      eventName,
-      ($event) => {
-        // bind component to listener's function context.
-        listener.call(this, $event);
-      },
-      capture,
-    );
-    this.addDeregisterFn(deregEvtFn);
-    return () => {
-      deregEvtFn();
-      this[DEREGISTER_FUNCTIONS]?.delete(deregEvtFn);
-    };
+    deregs.push(unmountFn);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -253,34 +246,34 @@ export class Component<
     return this[SLOTS][DEFAULT_SLOT]?.(this) ?? [];
   }
 
-  /**
-   * 在 nextTick 时调用 update 函数。
-   */
-  updateNextTick(handler?: AnyFn) {
-    const updateRenderFn = (this as unknown as { update: AnyFn }).update;
-    if (!updateRenderFn || this[STATE] !== COMPONENT_STATE_RENDERED) {
-      return;
-    }
+  // /**
+  //  * 在 nextTick 时调用 update 函数。
+  //  */
+  // updateNextTick(handler?: AnyFn) {
+  //   const updateRenderFn = (this as unknown as { update: AnyFn }).update;
+  //   if (!updateRenderFn || this[STATE] !== COMPONENT_STATE_RENDERED) {
+  //     return;
+  //   }
 
-    if (!handler) {
-      handler = updateRenderFn;
-    }
+  //   if (!handler) {
+  //     handler = updateRenderFn;
+  //   }
 
-    let ntMap = this[UPDATE_NEXT_MAP];
-    if (!ntMap) ntMap = this[UPDATE_NEXT_MAP] = new Map();
-    if (ntMap.has(handler)) {
-      // already in queue.
-      return;
-    }
-    ntMap.set(
-      handler,
-      setImmediate(() => {
-        type F = () => void;
-        ntMap.delete(handler as F);
-        (handler as F).call(this);
-      }),
-    );
-  }
+  //   let ntMap = this[UPDATE_NEXT_MAP];
+  //   if (!ntMap) ntMap = this[UPDATE_NEXT_MAP] = new Map();
+  //   if (ntMap.has(handler)) {
+  //     // already in queue.
+  //     return;
+  //   }
+  //   ntMap.set(
+  //     handler,
+  //     setImmediate(() => {
+  //       type F = () => void;
+  //       ntMap.delete(handler as F);
+  //       (handler as F).call(this);
+  //     }),
+  //   );
+  // }
 
   setContext(key: string | symbol, value: unknown, forceOverride = false) {
     const contextState = this[CONTEXT_STATE];
@@ -331,14 +324,14 @@ export class Component<
   /**
    * lifecycle hook, called after rendered.
    */
-  onAfterRender() {
+  onMount() {
     // lifecycle hook, default do nothing.
   }
 
   /**
    * lifecycle hook, called before destroy.
    */
-  onBeforeDestroy() {
+  onUnmount() {
     // lifecycle hook, default do nothing.
   }
 }
@@ -409,7 +402,7 @@ export function handleRenderDone(component: Component) {
     component[CONTEXT_STATE] === CONTEXT_STATE_TOUCHED
       ? CONTEXT_STATE_TOUCHED_FREEZED
       : CONTEXT_STATE_UNTOUCH_FREEZED; // has been rendered, can't modify context
-  component.onAfterRender();
+  component.onMount();
 }
 
 /**
@@ -456,7 +449,7 @@ export function destroyComponent(target: Component, removeDOM = true) {
   // const emitter = this[EMITTER];
 
   // emitter.emit('beforeDestroy');
-  target.onBeforeDestroy();
+  target.onUnmount();
   // destroy children(include child component and html nodes)
   destroyComponentContent(target, removeDOM);
   // clear messenger listeners.
@@ -469,11 +462,11 @@ export function destroyComponent(target: Component, removeDOM = true) {
   target[RELATED_WATCH]?.forEach((unwatchFn) => unwatchFn());
   target[RELATED_WATCH] && (target[RELATED_WATCH].length = 0);
 
-  // clear next tick update setImmediate
-  target[UPDATE_NEXT_MAP]?.forEach((imm) => {
-    clearImmediate(imm);
-  });
-  target[UPDATE_NEXT_MAP]?.clear();
+  // // clear next tick update setImmediate
+  // target[UPDATE_NEXT_MAP]?.forEach((imm) => {
+  //   clearImmediate(imm);
+  // });
+  // target[UPDATE_NEXT_MAP]?.clear();
 
   // destroy 22 refs:
   target[RELATED_REFS]?.forEach((info) => {
@@ -489,8 +482,8 @@ export function destroyComponent(target: Component, removeDOM = true) {
   target[RELATED_REFS] && (target[RELATED_REFS].length = 0);
 
   // auto call all deregister functions
-  target[DEREGISTER_FUNCTIONS]?.forEach((fn) => fn());
-  target[DEREGISTER_FUNCTIONS]?.clear();
+  target[UNMOUNT_FNS]?.forEach((fn) => fn());
+  target[UNMOUNT_FNS] && (target[UNMOUNT_FNS].length = 0);
   target[REFS]?.clear();
   // clear properties
   target[STATE] = COMPONENT_STATE_DESTROIED;

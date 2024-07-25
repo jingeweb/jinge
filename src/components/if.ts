@@ -55,7 +55,7 @@ export class If extends Component<
 
   constructor(attrs: IfAttrs) {
     super();
-    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT);
+    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
   }
 
   render() {
@@ -83,7 +83,7 @@ export class Switch extends Component {
 
   constructor(attrs: SwitchAttrs) {
     super();
-    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT);
+    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
   }
 
   render() {

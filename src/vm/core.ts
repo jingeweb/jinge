@@ -1,6 +1,6 @@
 import type { AnyObj, AnyFn } from '../util';
 import { isString, isObject, isNumber } from '../util';
-import type { Watcher } from './watch';
+import { destoryWatcher, type Watcher } from './watch';
 
 export const $$ = Symbol('$$');
 
@@ -86,6 +86,9 @@ export function destroyViewModelCore(vm: ViewModelCore) {
   vm[VM_NOTIFIABLE] = false;
   vm[VM_PARENTS]?.clear();
   // clear listeners
+  vm[VM_WATCHERS]?.forEach((watcher) => {
+    destoryWatcher(watcher);
+  });
   vm[VM_WATCHERS]?.clear();
   // unlink wrapper proxy
   vm[VM_PROXY] = undefined;

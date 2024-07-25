@@ -24,6 +24,12 @@ export interface Watcher<T = any> {
   [VM_WATCHER_IMM]: number;
 }
 
+export function destoryWatcher(watcher: Watcher) {
+  watcher[VM_TARGET] = undefined;
+  watcher[VM_WATCHER_LISTENER] = undefined;
+  watcher[VM_WATCHER_VALUE] = undefined;
+  clearImmediate(watcher[VM_WATCHER_IMM]);
+}
 export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
   if (!path?.length) return target;
   if (!isObject(target)) return undefined;
@@ -80,11 +86,8 @@ export function innerWatchPath(
   };
   watchers.add(watcher);
   return () => {
-    watcher[VM_TARGET] = undefined;
-    watcher[VM_WATCHER_LISTENER] = undefined;
-    watcher[VM_WATCHER_VALUE] = undefined;
-    clearImmediate(watcher[VM_WATCHER_IMM]);
     watchers.delete(watcher);
+    destoryWatcher(watcher);
   };
 }
 export type UnwatchFn = () => void;
