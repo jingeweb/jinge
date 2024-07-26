@@ -39,12 +39,8 @@ function renderIf(component: If) {
   return doRender(component, renderFn, e.toString());
 }
 
-export interface IfAttrs {
-  expect: boolean;
-}
-
 export class If extends Component<
-  IfAttrs,
+  { expect: boolean },
   | JNode
   | {
       true: JNode;
@@ -53,7 +49,7 @@ export class If extends Component<
 > {
   [EXPECT]: boolean;
 
-  constructor(attrs: IfAttrs) {
+  constructor(attrs: If['props']) {
     super();
     this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
   }

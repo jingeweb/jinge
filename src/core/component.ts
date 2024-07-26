@@ -1,6 +1,6 @@
 import { innerWatchPath } from '../vm';
 import type { AnyFn } from '../util';
-import { isArray, arrayRemove, appendChildren, replaceChildren, throwErr } from '../util';
+import { appendChildren, replaceChildren, throwErr, isObject } from '../util';
 
 import type { ViewModel, ViewModelCore } from '../vm/core';
 import {
@@ -18,10 +18,10 @@ import {
   RELATED_WATCH,
   UNMOUNT_FNS,
   REFS,
-  RELATED_REFS,
-  RELATED_REFS_KEY,
-  RELATED_REFS_NODE,
-  RELATED_REFS_ORIGIN,
+  // RELATED_REFS,
+  // RELATED_REFS_KEY,
+  // RELATED_REFS_NODE,
+  // RELATED_REFS_ORIGIN,
   NON_ROOT_COMPONENT_NODES,
   ROOT_NODES,
   STATE,
@@ -38,6 +38,7 @@ import {
   CONTEXT_STATE_UNTOUCH_FREEZED,
   CONTEXT_STATE_TOUCHED,
 } from './common';
+import type { Ref, RefFn } from './ref';
 
 /**
  * 用于判定是否是 Component 的函数。比 instanceof 要快很多。https://jsperf.app/bufamo
@@ -61,8 +62,10 @@ export class Component<
    * 专门用于 typescript jsx 类型校验的字段，请勿在 render() 函数之外使用。编译器会将 render() 函数里的 this.props.children 转换成 slots 传递。
    */
   get props(): {
+    ref?: Ref | RefFn;
+    key?: string | number;
     children: Children;
-  } & Props {
+  } & Omit<Props, 'ref' | 'key' | 'children'> {
     // props 专门用于 typescript 类型提示
     throw 'do not use props';
   }
@@ -106,13 +109,14 @@ export class Component<
    * By the way, the ROOT_NODES of view-tree above is [h1, h2, A]
    */
   [NON_ROOT_COMPONENT_NODES]: Component[] = [];
-  /**
-   * refs contains all children with ref: attribute.
-   *
-   * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
-   *   之后通过 __getRef 函数可以获取到元素实例。
-   */
-  [REFS]?: Map<string, Component | Node | (Component | Node)[]>;
+  // /**
+  //  * refs contains all children with ref: attribute.
+  //  *
+  //  * 使用 ref: 标记的元素（Component 或 html node），会保存在 REF_NODES 中，
+  //  *   之后通过 __getRef 函数可以获取到元素实例。
+  //  */
+  // [REFS]?: Map<string, Component | Node | (Component | Node)[]>;
+  [REFS]?: (Ref | RefFn)[];
   /**
    * 当被 ref: 标记的元素属于 <if> 或 <for> 等组件的 slot 时，这些元素被添加到当前模板组件（称为 origin component)的 refs 里，
    *   但显然当 <if> 元素控制销毁时，也需要将这个元素从 origin component 的 refs 中删除，
@@ -122,11 +126,11 @@ export class Component<
    *   这样，在关联节点（比如受 <if> 控制的元素，或 <if> 下面的 DOM 节点）被销毁时，
    *   也会从模板组件的 refs 里面删除。
    */
-  [RELATED_REFS]?: {
-    [RELATED_REFS_ORIGIN]: Component;
-    [RELATED_REFS_KEY]: string;
-    [RELATED_REFS_NODE]?: Node;
-  }[];
+  // [RELATED_REFS]?: {
+  //   [RELATED_REFS_ORIGIN]: Component;
+  //   [RELATED_REFS_KEY]: string;
+  //   [RELATED_REFS_NODE]?: Node;
+  // }[];
 
   /**
    *
@@ -308,18 +312,18 @@ export class Component<
     return this[CONTEXT]?.[key as string] as T;
   }
 
-  /**
-   * Get child node(or nodes) marked by 'ref:' attribute in template
-   */
-  getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
-    if (this[STATE] !== COMPONENT_STATE_RENDERED) {
-      import.meta.env.DEV &&
-        console.error(
-          `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
-        );
-    }
-    return this[REFS]?.get(ref) as T;
-  }
+  // /**
+  //  * Get child node(or nodes) marked by 'ref:' attribute in template
+  //  */
+  // getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
+  //   if (this[STATE] !== COMPONENT_STATE_RENDERED) {
+  //     import.meta.env.DEV &&
+  //       console.error(
+  //         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
+  //       );
+  //   }
+  //   return this[REFS]?.get(ref) as T;
+  // }
 
   /**
    * lifecycle hook, called after rendered.
@@ -469,26 +473,60 @@ export function destroyComponent(target: Component, removeDOM = true) {
   // target[UPDATE_NEXT_MAP]?.clear();
 
   // destroy 22 refs:
-  target[RELATED_REFS]?.forEach((info) => {
-    const refs = info[RELATED_REFS_ORIGIN][REFS];
-    if (!refs) return;
-    const rns = refs.get(info[RELATED_REFS_KEY]);
-    if (isArray(rns)) {
-      arrayRemove(rns as (Component | Node)[], info[RELATED_REFS_NODE] || target);
-    } else {
-      refs.delete(info[RELATED_REFS_KEY]);
-    }
-  });
-  target[RELATED_REFS] && (target[RELATED_REFS].length = 0);
+  // target[RELATED_REFS]?.forEach((info) => {
+  //   const refs = info[RELATED_REFS_ORIGIN][REFS];
+  //   if (!refs) return;
+  //   const rns = refs.get(info[RELATED_REFS_KEY]);
+  //   if (isArray(rns)) {
+  //     arrayRemove(rns as (Component | Node)[], info[RELATED_REFS_NODE] || target);
+  //   } else {
+  //     refs.delete(info[RELATED_REFS_KEY]);
+  //   }
+  // });
+  // target[RELATED_REFS] && (target[RELATED_REFS].length = 0);
 
   // auto call all deregister functions
   target[UNMOUNT_FNS]?.forEach((fn) => fn());
   target[UNMOUNT_FNS] && (target[UNMOUNT_FNS].length = 0);
-  target[REFS]?.clear();
+  target[REFS]?.forEach((ref) => {
+    if (isObject<Ref>(ref)) ref.value = undefined;
+    else ref(undefined);
+  });
+  target[REFS] && (target[REFS].length = 0);
   // clear properties
   target[STATE] = COMPONENT_STATE_DESTROIED;
   // unlink all symbol properties. maybe unnecessary.
   target[ROOT_NODES].length = 0;
   target[NON_ROOT_COMPONENT_NODES].length = 0;
   target[CONTEXT] = undefined;
+}
+
+/**
+ * 给编译器使用的创建 Component 并同时设置 SLOTS 的函数
+ */
+export function newComponentWithSlots(
+  Clazz: {
+    new (attrs: object): Component;
+  },
+  attrs: object,
+  slots: Slots,
+) {
+  const c = new Clazz(attrs);
+  Object.assign(c[SLOTS], slots);
+  return c;
+}
+
+/**
+ * 给编译器使用的创建 Component 并同时设置 DEFAULT_SLOT 的函数
+ */
+export function newComponentWithDefaultSlot(
+  Clazz: {
+    new (attrs: object): Component;
+  },
+  attrs: object,
+  defaultSlot: Slots[typeof DEFAULT_SLOT],
+) {
+  const c = new Clazz(attrs);
+  c[SLOTS][DEFAULT_SLOT] = defaultSlot;
+  return c;
 }

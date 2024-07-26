@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/ban-types */
 /* eslint-disable @typescript-eslint/no-namespace */
-import type { Component } from '../core';
+import type { Component, Ref, RefFn } from '../core';
 
 export type EmptyAttrs = {};
 export type SlotFn<VM extends object> = (vm: VM) => any;
@@ -1574,11 +1574,11 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
 }
 
 type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {
-  ref?: string;
+  ref?: Ref | RefFn;
 } & E;
 
 interface SVGProps<T> extends SVGAttributes<T> {
-  ref?: string;
+  ref?: Ref | RefFn;
 }
 
 interface SVGLineElementAttributes<T> extends SVGProps<T> {}
