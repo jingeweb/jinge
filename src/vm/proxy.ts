@@ -1,4 +1,4 @@
-import type { Component } from '../core';
+import { isRef, type Component } from '../core';
 import type { AnyFn } from '../util';
 import { isArray, isObject, isFunction, isPromise, isUndefined, isString, throwErr } from '../util';
 
@@ -76,7 +76,7 @@ function __propSetHandler(
   if (oldVal === value && !isUndefined(value)) {
     return true;
   }
-  const newValMaybeVM = isObject(value) && !isInnerObj(value);
+  const newValMaybeVM = isObject(value) && !isRef(value) && !isInnerObj(value);
   if (newValMaybeVM && isPubProp && !(value as ViewModel)[$$]) {
     throwErr('pub-prop-not-vm');
     // value = wrapVm(value as object);

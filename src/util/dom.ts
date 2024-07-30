@@ -19,6 +19,10 @@ export function createFragment(children?: (Node | string)[]): DocumentFragment {
   return f;
 }
 
+export function createComment(cmt?: string) {
+  return document.createComment(cmt ?? '');
+}
+
 export function appendChildren($parent: Node, children: (Node | string)[]): void {
   $parent.appendChild(
     children.length > 1

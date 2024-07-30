@@ -1,4 +1,4 @@
-import { throwErr } from '../util';
+import { createComment, createFragment } from '../util';
 import type { RenderFn } from '../core';
 import {
   Component,
@@ -7,6 +7,8 @@ import {
   SLOTS,
   DEFAULT_SLOT,
   destroyComponentContent,
+  getLastDOM,
+  handleRenderDone,
 } from '../core';
 import type { JNode } from '../jsx';
 
@@ -19,24 +21,6 @@ function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>
     [DEFAULT_SLOT]: renderFn,
   };
   return el;
-}
-
-function doRender(component: Component, renderFn: RenderFn | undefined, cmt: string) {
-  const roots = component[ROOT_NODES];
-  if (!renderFn) {
-    roots.push(document.createComment(cmt));
-    return roots as Node[];
-  }
-  const el = createEl(renderFn, component[CONTEXT]);
-  roots.push(el);
-  const doms = el.render();
-  return doms;
-}
-function renderIf(component: If) {
-  const slots = component[SLOTS];
-  const e = !!component[EXPECT];
-  const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
-  return doRender(component, renderFn, e.toString());
 }
 
 export class If extends Component<
@@ -55,39 +39,80 @@ export class If extends Component<
   }
 
   render() {
-    return renderIf(this);
+    const slots = this[SLOTS];
+    const e = !!this[EXPECT];
+    const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
+    const el = renderFn ? createEl(renderFn, this[CONTEXT]) : null;
+    const roots = this[ROOT_NODES];
+    if (el) {
+      roots.push(el);
+      return el.render();
+    } else {
+      const cmt = createComment(e.toString());
+      roots.push(cmt);
+      return roots;
+    }
   }
 
   update() {
+    const lastNode = getLastDOM(this);
+    const nextSib = lastNode.nextSibling;
+    const $parent = lastNode.parentNode as Node;
+
     destroyComponentContent(this, true);
-    renderIf(this);
+    const roots = this[ROOT_NODES];
+    roots.length = 0;
+
+    const slots = this[SLOTS];
+    const e = !!this[EXPECT];
+    const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
+    const el = renderFn ? createEl(renderFn, this[CONTEXT]) : null;
+    if (el) {
+      roots.push(el);
+      const doms = el.render();
+      const newNode = doms.length > 1 ? createFragment(doms) : doms[0];
+      if (nextSib) {
+        $parent.insertBefore(newNode, nextSib);
+      } else {
+        $parent.appendChild(newNode);
+      }
+      handleRenderDone(el);
+    } else {
+      const cmt = createComment(e.toString());
+      roots.push(cmt);
+      if (nextSib) {
+        $parent.insertBefore(cmt, nextSib);
+      } else {
+        $parent.appendChild(cmt);
+      }
+    }
   }
 }
 
-function renderSwitch(component: Switch) {
-  const slots = component[SLOTS];
-  const e = component[EXPECT];
-  const renderFn = slots[e] ?? slots[DEFAULT_SLOT];
-  if (!renderFn) throwErr('switch-miss-slot', e);
-  return doRender(component, renderFn, e);
-}
-export interface SwitchAttrs {
-  expect: string;
-}
-export class Switch extends Component {
-  [EXPECT]: string;
+// function renderSwitch(component: Switch) {
+//   const slots = component[SLOTS];
+//   const e = component[EXPECT];
+//   const renderFn = slots[e] ?? slots[DEFAULT_SLOT];
+//   if (!renderFn) throwErr('switch-miss-slot', e);
+//   return doRender(component, renderFn, e);
+// }
+// export interface SwitchAttrs {
+//   expect: string;
+// }
+// export class Switch extends Component {
+//   [EXPECT]: string;
 
-  constructor(attrs: SwitchAttrs) {
-    super();
-    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
-  }
+//   constructor(attrs: SwitchAttrs) {
+//     super();
+//     this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
+//   }
 
-  render() {
-    return renderSwitch(this);
-  }
+//   render() {
+//     return renderSwitch(this);
+//   }
 
-  update() {
-    destroyComponentContent(this, true);
-    renderSwitch(this);
-  }
-}
+//   update() {
+//     destroyComponentContent(this, true);
+//     renderSwitch(this);
+//   }
+// }
