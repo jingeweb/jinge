@@ -5,15 +5,14 @@ import { type Component } from './component';
 export const REF = Symbol('REF');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface Ref<T extends Node | Component = any> {
-  [REF]: true;
   value?: T;
 }
 export function ref<T extends Node | Component>(): Ref<T> {
-  return { [REF]: true, value: undefined };
+  return { [REF]: true, value: undefined } as unknown as Ref<T>;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isRef<T extends Node | Component = any>(v: object): v is Ref<T> {
-  return (v as unknown as Ref)[REF] === true;
+  return (v as unknown as { [REF]: boolean })[REF] === true;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RefFn<T extends Node | Component = any> = (el: T) => void;
