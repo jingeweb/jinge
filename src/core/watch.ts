@@ -1,5 +1,5 @@
 import { arrayEqual, throwErr, clearImmediate, setImmediate } from '../util';
-import type { PropertyPathItem } from '../vm';
+import type { PropertyPathItem, UnwatchFn, ViewModel } from '../vm';
 import { VM_WATCHER_VALUE, $$, getValueByPath, innerWatchPath } from '../vm';
 import { RELATED_WATCH } from './common';
 import type { Component } from './component';
@@ -7,8 +7,12 @@ import type { Component } from './component';
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
 ////// 业务中请直接使用 `watch` 函数进行 Component 或 ViewModel 的监听。        /////
 
-export function watchForComponent(
-  target: Component,
+function addRelated(c: Component, fn: UnwatchFn) {
+  let rw = c[RELATED_WATCH];
+  if (!rw) rw = c[RELATED_WATCH] = [];
+  rw.push(fn);
+}
+export function watchForRender(
   watcher: Pick<
     ViewWatcher,
     typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
@@ -21,13 +25,45 @@ export function watchForComponent(
   };
   renderFn(watcher[VM_WATCHER_VALUE]);
 
-  if (relatedComponent && relatedComponent !== target) {
-    let rw = relatedComponent[RELATED_WATCH];
-    if (!rw) rw = relatedComponent[RELATED_WATCH] = [];
-    rw.push(() => {
-      watcher[VM_WATCHER_DESTROY]();
-    });
-  }
+  relatedComponent && addRelated(relatedComponent, () => watcher[VM_WATCHER_DESTROY]());
+}
+
+/**
+ * 用于最简单的诸如 {this.a.b.c} 这样的纯 path 的表达式的监控。同时也支持附带了简单 `!` 运算符的情况。
+ * @param notOp 0 代表不进行 bool 转换，1 代表一次(!运算，例如 `<button disabled={!this.submitting} />`，2代表两次（!!运算，例如 `<button disabled={!!this.submitting} />`)
+ */
+export function watchPathForRender2(
+  target: ViewModel,
+  path: PropertyPathItem[],
+  renderFn: (v: unknown) => void,
+  notOp: number,
+  relatedComponent?: Component,
+) {
+  const core = target[$$];
+  if (!core) throwErr('watch-not-vm');
+
+  const val = getValueByPath(target, path);
+  const innerRenderFn =
+    notOp === 1
+      ? (v: unknown) => renderFn(!v)
+      : notOp === 2
+        ? (v: unknown) => renderFn(!!v)
+        : renderFn;
+  innerRenderFn(val);
+  const unwatchFn = innerWatchPath(target, core, val, innerRenderFn, path, true);
+  relatedComponent && addRelated(relatedComponent, unwatchFn);
+}
+
+/**
+ * 用于最简单的诸如 {this.a.b.c} 这样的纯 path 的表达式的监控。
+ */
+export function watchPathForRender(
+  target: ViewModel,
+  path: PropertyPathItem[],
+  renderFn: (v: unknown) => void,
+  relatedComponent?: Component,
+) {
+  watchPathForRender2(target, path, renderFn, 0, relatedComponent);
 }
 
 const VM_WATCHER_PARENT = Symbol('PARENT');
