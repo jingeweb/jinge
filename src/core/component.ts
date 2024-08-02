@@ -15,7 +15,7 @@ import { proxyComponent } from '../vm/proxy';
 import type { ComponentState, ContextState, Slots } from './common';
 import {
   DEFAULT_SLOT,
-  RELATED_WATCH,
+  HOST_UNWATCH,
   UNMOUNT_FNS,
   REFS,
   // RELATED_REFS,
@@ -64,7 +64,7 @@ export class Component<
   get props(): {
     ref?: Ref | RefFn;
     key?: string | number;
-    children: Children;
+    children?: Children;
   } & Omit<Props, 'ref' | 'key' | 'children'> {
     // props 专门用于 typescript 类型提示
     throw 'do not use props';
@@ -133,9 +133,19 @@ export class Component<
   // }[];
 
   /**
-   *
+   * 当前组件（作为容器/宿主时）的渲染中注册的属于其它 ViewModel 的监听的卸载监听函数。
+   * 比如：
+   * ```tsx
+   * class A {
+   *   render() {
+   *     return this.a ? <B>{this.b}</B> : null
+   *   }
+   * }
+   * ```
+   * 其中 `this.b` 是挂在 A 上的监听，但被通过 Slot 传递给了 B，当 B 组件销毁时，这个监听也应该被卸载。
+   * 因此对于 `this.b` 的监听的卸载函数，需要被存到 B 的 [HOST_UNWATCH] 里。
    */
-  [RELATED_WATCH]?: AnyFn[];
+  [HOST_UNWATCH]?: AnyFn[];
 
   /**
    * store functions will be called before unmount/destroy
@@ -463,8 +473,8 @@ export function destroyComponent(target: Component, removeDOM = true) {
   // destroy view model
   destroyViewModelCore(target[$$]);
   // 删除关联 watchers
-  target[RELATED_WATCH]?.forEach((unwatchFn) => unwatchFn());
-  target[RELATED_WATCH] && (target[RELATED_WATCH].length = 0);
+  target[HOST_UNWATCH]?.forEach((unwatchFn) => unwatchFn());
+  target[HOST_UNWATCH] && (target[HOST_UNWATCH].length = 0);
 
   // // clear next tick update setImmediate
   // target[UPDATE_NEXT_MAP]?.forEach((imm) => {

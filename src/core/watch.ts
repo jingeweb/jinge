@@ -1,15 +1,15 @@
 import { arrayEqual, throwErr, clearImmediate, setImmediate } from '../util';
 import type { PropertyPathItem, UnwatchFn, ViewModel } from '../vm';
 import { VM_WATCHER_VALUE, $$, getValueByPath, innerWatchPath } from '../vm';
-import { RELATED_WATCH } from './common';
+import { HOST_UNWATCH } from './common';
 import type { Component } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
 ////// 业务中请直接使用 `watch` 函数进行 Component 或 ViewModel 的监听。        /////
 
 function addRelated(c: Component, fn: UnwatchFn) {
-  let rw = c[RELATED_WATCH];
-  if (!rw) rw = c[RELATED_WATCH] = [];
+  let rw = c[HOST_UNWATCH];
+  if (!rw) rw = c[HOST_UNWATCH] = [];
   rw.push(fn);
 }
 export function watchForRender(
@@ -18,14 +18,14 @@ export function watchForRender(
     typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
   >,
   renderFn: (v: unknown) => void,
-  relatedComponent?: Component,
+  hostComponent?: Component,
 ) {
   watcher[VM_WATCHER_PARENT] = {
     [VM_WATCHER_NOTIFY]: renderFn,
   };
   renderFn(watcher[VM_WATCHER_VALUE]);
 
-  relatedComponent && addRelated(relatedComponent, () => watcher[VM_WATCHER_DESTROY]());
+  hostComponent && addRelated(hostComponent, () => watcher[VM_WATCHER_DESTROY]());
 }
 
 /**
@@ -37,7 +37,7 @@ export function watchPathForRender2(
   path: PropertyPathItem[],
   renderFn: (v: unknown) => void,
   notOp: number,
-  relatedComponent?: Component,
+  hostComponent?: Component,
 ) {
   const core = target[$$];
   if (!core) throwErr('watch-not-vm');
@@ -51,7 +51,7 @@ export function watchPathForRender2(
         : renderFn;
   innerRenderFn(val);
   const unwatchFn = innerWatchPath(target, core, val, innerRenderFn, path, true);
-  relatedComponent && addRelated(relatedComponent, unwatchFn);
+  hostComponent && addRelated(hostComponent, unwatchFn);
 }
 
 /**
@@ -61,9 +61,9 @@ export function watchPathForRender(
   target: ViewModel,
   path: PropertyPathItem[],
   renderFn: (v: unknown) => void,
-  relatedComponent?: Component,
+  hostComponent?: Component,
 ) {
-  watchPathForRender2(target, path, renderFn, 0, relatedComponent);
+  watchPathForRender2(target, path, renderFn, 0, hostComponent);
 }
 
 const VM_WATCHER_PARENT = Symbol('PARENT');

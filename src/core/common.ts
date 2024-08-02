@@ -34,4 +34,4 @@ export const CONTEXT_STATE = Symbol('CONTEXT_STATE');
 // export const RELATED_REFS_ORIGIN = Symbol('ORIGIN');
 // export const RELATED_REFS_KEY = Symbol('KEY');
 // export const RELATED_REFS_NODE = Symbol('NODE');
-export const RELATED_WATCH = Symbol('RELATED_WATCH');
+export const HOST_UNWATCH = Symbol('HOST_UNWATCH');
