@@ -156,3 +156,9 @@ export function setStyleAttribute($ele: Element, style?: string) {
   if (!style) $ele.removeAttribute('style');
   else $ele.setAttribute('style', style);
 }
+
+export function setTextContent($ele: Element, v: unknown) {
+  if (isObject(v)) v = JSON.stringify(v);
+  else if (!isString(v)) v = `${v}`;
+  $ele.textContent = v as string;
+}
