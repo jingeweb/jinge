@@ -12,7 +12,10 @@ export const CONTEXT_STATE_UNTOUCH_FREEZED = 2;
 export const CONTEXT_STATE_TOUCHED_FREEZED = 3;
 export type ContextState = 0 | 1 | 2 | 3;
 
-export type RenderFn<T extends Component = Component> = (containerComponent: T) => Node[];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RenderFn<T extends Component<any, any> = Component<any, any>> = (
+  containerComponent: T,
+) => Node[];
 export interface Slots {
   [DEFAULT_SLOT]?: RenderFn;
   [slotName: string]: RenderFn;

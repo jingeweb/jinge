@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { JNode } from 'src/jsx';
 import { innerWatchPath } from '../vm';
 import type { AnyFn } from '../util';
 import { appendChildren, replaceChildren, throwErr, isObject } from '../util';
@@ -50,25 +52,27 @@ export function isComponent<T extends Component>(v: unknown): v is T {
 export class Component<
   // eslint-disable-next-line @typescript-eslint/ban-types
   Props extends object = {},
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Children = any,
+  Children extends
+    | JNode
+    | ((...args: any[]) => JNode)
+    | {
+        [k: string]: ((...args: any[]) => JNode) | JNode;
+      } = never,
 > {
   /**
    * 用于判定是否是 Component 的属性。比 instanceof 要快很多。https://jsperf.app/bufamo
    */
   readonly [__] = true;
 
-  /**
-   * 专门用于 typescript jsx 类型校验的字段，请勿在 render() 函数之外使用。编译器会将 render() 函数里的 this.props.children 转换成 slots 传递。
-   */
-  get props(): {
+  get slots(): Children {
+    throw new Error('don not use it');
+  }
+
+  props?: {
     ref?: Ref | RefFn;
     key?: string | number;
     children?: Children;
-  } & Omit<Props, 'ref' | 'key' | 'children'> {
-    // props 专门用于 typescript 类型提示
-    throw 'do not use props';
-  }
+  } & Omit<Props, 'ref' | 'key' | 'children'>;
 
   readonly [$$]: ViewModelCore;
   /**

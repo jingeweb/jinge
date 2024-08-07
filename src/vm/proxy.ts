@@ -468,7 +468,8 @@ export function proxyAttributes<T extends object>(attrs: T) {
 //   _di.vms.push(vm);
 // }
 
-export function proxyComponent(component: Component) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function proxyComponent(component: Component<any, any>) {
   return new Proxy(component, {
     set: componentPropSetHandler,
   });
