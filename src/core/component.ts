@@ -538,9 +538,9 @@ export function newComponentWithDefaultSlot(
     new (attrs: object): Component;
   },
   attrs: object,
-  defaultSlot: Slots[typeof DEFAULT_SLOT],
+  defaultSlot?: Slots[typeof DEFAULT_SLOT],
 ) {
   const c = new Clazz(attrs);
-  c[SLOTS][DEFAULT_SLOT] = defaultSlot;
+  defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
   return c;
 }
