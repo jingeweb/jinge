@@ -1,4 +1,4 @@
-import { ROOT_NODES } from 'src/core';
+import { ROOT_NODES, UPDATE_RENDER } from '../core';
 import { Component } from '../core/component';
 import { createFragment } from '../util';
 
@@ -15,23 +15,25 @@ function renderHtml(content?: string): Node[] {
 }
 
 export interface BindHtmlAttrs {
+  className?: string;
   content: string;
 }
 
 const CONTENT = Symbol();
+
 export class BindHtml extends Component {
   [CONTENT]?: string;
 
   constructor(attrs: BindHtmlAttrs) {
     super();
-    this.__bindAttr(attrs, 'content', CONTENT);
+    this.bindAttr(attrs, 'content', CONTENT, () => this[UPDATE_RENDER]());
   }
 
-  __render() {
+  render() {
     return (this[ROOT_NODES] = renderHtml(this[CONTENT]));
   }
 
-  __update() {
+  [UPDATE_RENDER]() {
     const roots = this[ROOT_NODES];
     const oldFirstEl = roots[0] as Node;
     const $p = oldFirstEl.parentNode as HTMLElement;

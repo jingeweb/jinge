@@ -183,7 +183,7 @@ export class Component<
   bindAttr<A extends object, P extends keyof A>(
     attrs: A,
     attrName: keyof A,
-    onUpdate?: (v: A[P]) => void,
+    onUpdate?: (v: A[P], oldV: A[P]) => void,
   ): A[P];
 
   /**
@@ -193,7 +193,7 @@ export class Component<
     attrs: A,
     attrName: P,
     componentProp: BP,
-    onUpdate?: (v: A[P]) => void,
+    onUpdate?: (v: A[P], oldV: A[P]) => void,
   ): A[P];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -211,9 +211,9 @@ export class Component<
       attrs,
       core,
       val,
-      (v) => {
+      (v, oldV) => {
         this[(componentProp ?? attrName) as keyof typeof this] = v;
-        onUpdate?.(v);
+        onUpdate?.(v, oldV);
       },
       [attrName],
     );
@@ -371,7 +371,7 @@ export function getFirstDOM<T = Node>(component: Component): T {
  *
  * 按从右往左，从上到下的深度遍历，找到的第一个 DOM 节点（相对于从左到右的顺序是最后一个 DOM 节点）。
  */
-export function getLastDOM<T = Node>(component: Component): T {
+export function getLastDOM<T = Node>(component: Component<any, any>): T {
   const rns = component[ROOT_NODES];
   const el = rns[rns.length - 1];
   return isComponent(el) ? getLastDOM(el) : (el as T);
@@ -386,7 +386,11 @@ export function getLastDOM<T = Node>(component: Component): T {
  * But you can disable it by pass `replaceMode`=`false`,
  * which means component append to target as it's children.
  */
-export function renderToDOM(component: Component, targetEl: HTMLElement, replaceMode = true) {
+export function renderToDOM(
+  component: Component<any, any>,
+  targetEl: HTMLElement,
+  replaceMode = true,
+) {
   if (component[STATE] !== COMPONENT_STATE_INITIALIZE) {
     throwErr('dup-render');
   }
@@ -398,7 +402,7 @@ export function renderToDOM(component: Component, targetEl: HTMLElement, replace
   }
   handleRenderDone(component);
 }
-export function handleRenderDone(component: Component) {
+export function handleRenderDone(component: Component<any, any>) {
   /*
    * Set NOTIFIABLE=true to enable ViewModel notify.
    * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
@@ -426,7 +430,7 @@ export function handleRenderDone(component: Component) {
 /**
  * 销毁组件的内容，但不销毁组件本身。
  */
-export function destroyComponentContent(target: Component, removeDOM = false) {
+export function destroyComponentContent(target: Component<any, any>, removeDOM = false) {
   for (const component of target[NON_ROOT_COMPONENT_NODES]) {
     // it's not necessary to remove dom when destroy non-root component,
     // because those dom nodes will be auto removed when their parent dom is removed.
@@ -449,7 +453,7 @@ export function destroyComponentContent(target: Component, removeDOM = false) {
 /**
  * 销毁组件
  */
-export function destroyComponent(target: Component, removeDOM = true) {
+export function destroyComponent(target: Component<any, any>, removeDOM = true) {
   if (target[STATE] >= COMPONENT_STATE_WILLDESTROY) return;
   target[STATE] = COMPONENT_STATE_WILLDESTROY;
   /*

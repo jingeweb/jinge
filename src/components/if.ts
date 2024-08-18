@@ -9,6 +9,7 @@ import {
   destroyComponentContent,
   getLastDOM,
   handleRenderDone,
+  UPDATE_RENDER,
 } from '../core';
 import type { JNode } from '../jsx';
 
@@ -23,8 +24,11 @@ function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>
   return el;
 }
 
+export interface IfAttrs {
+  expect: boolean;
+}
 export class If extends Component<
-  { expect: boolean },
+  IfAttrs,
   | JNode
   | {
       true: JNode;
@@ -33,9 +37,9 @@ export class If extends Component<
 > {
   [EXPECT]: boolean;
 
-  constructor(attrs: If['props']) {
+  constructor(attrs: IfAttrs) {
     super();
-    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
+    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this[UPDATE_RENDER]());
   }
 
   render() {
@@ -54,7 +58,7 @@ export class If extends Component<
     }
   }
 
-  update() {
+  [UPDATE_RENDER]() {
     const lastNode = getLastDOM(this);
     const nextSib = lastNode.nextSibling;
     const $parent = lastNode.parentNode as Node;
@@ -88,31 +92,3 @@ export class If extends Component<
     }
   }
 }
-
-// function renderSwitch(component: Switch) {
-//   const slots = component[SLOTS];
-//   const e = component[EXPECT];
-//   const renderFn = slots[e] ?? slots[DEFAULT_SLOT];
-//   if (!renderFn) throwErr('switch-miss-slot', e);
-//   return doRender(component, renderFn, e);
-// }
-// export interface SwitchAttrs {
-//   expect: string;
-// }
-// export class Switch extends Component {
-//   [EXPECT]: string;
-
-//   constructor(attrs: SwitchAttrs) {
-//     super();
-//     this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this.update());
-//   }
-
-//   render() {
-//     return renderSwitch(this);
-//   }
-
-//   update() {
-//     destroyComponentContent(this, true);
-//     renderSwitch(this);
-//   }
-// }

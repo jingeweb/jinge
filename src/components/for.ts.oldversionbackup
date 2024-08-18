@@ -1,4 +1,3 @@
-import type { JNode } from 'src/jsx';
 import { CONTEXT, ROOT_NODES, SLOTS, __, type RenderFn } from '../core';
 import { isViewModel, notifyVmChange } from '../vm';
 import { Component, isComponent } from '../core/component';
@@ -133,26 +132,76 @@ function _parseIndexPath(p: string | number): string | number {
   return isString(p) && p !== 'length' && /^\d+$/.test(p as string) ? Number(p) : p;
 }
 
+export interface ForAttrs {
+  loop: unknown[];
+  key?: string;
+}
 export const LOOP_DATA = Symbol('LOOP_DATA');
 export const KEY_NAME = Symbol('KEY_NAME');
 export const LEN = Symbol('LEN');
 export const KEYS = Symbol('KEYS');
 export const WATING_UPDATE = Symbol('WATING_UPDATE');
-
-export interface ForProps<T> {
-  loop: T[];
-}
-export class For<T> extends Component<ForProps<T>, (item: T) => JNode> {
-  [LOOP_DATA]: T[];
+export class For extends Component {
+  [LOOP_DATA]: unknown[];
+  [KEY_NAME]: ForKeyName;
   [LEN]: number;
   [KEYS]?: unknown[];
   [WATING_UPDATE]?: boolean;
 
-  constructor(attrs: ForProps<T>) {
-    super();
+  constructor(attrs: ForAttrs) {
+    super(attrs);
 
-    this.bindAttr(attrs, 'loop', LOOP_DATA);
+    this.__bindAttr(attrs, 'loop', LOOP_DATA);
 
+    const kn = attrs.key ?? 'index'; // TODO: support handle attrs.key change
+    this[KEY_NAME] = kn;
+    this[LEN] = 0;
+
+    if (kn !== 'index' && kn !== 'each') {
+      /* eslint no-new-func:"off" */
+      this[KEY_NAME] = new Function('each', `return ${kn}`) as ForKeyNameFn;
+      // console.log('loop.*.' + kn.slice(5));
+      const propCount = kn.split('.').length + 1;
+      // console.log(propCount);
+
+      this[$$].__watch(`loop.*.${kn.slice(5)}`, (propPath: (string | number)[]) => {
+        if (propPath.length !== propCount || this._waitingUpdate) {
+          // ignore if it's parent path
+          // or is alreay waiting for update
+          // console.log('skip2', propPath);
+          return;
+        }
+        // console.log(propPath);
+        const items = this.loop;
+        if (!isArray(items) || items.length === 0) return;
+        const p = _parseIndexPath(propPath[1]);
+        if (!isNumber(p) || (p as number) >= items.length) {
+          return;
+        }
+        // console.log('update item key:', p);
+        this._keys[p as number] = (this._keyName as ForKeyNameFn)(items[p as number]);
+      });
+    }
+    this[$$].__watch('loop.*', (propPath: (string | number)[]) => {
+      if (
+        this[__].state !== ComponentStates.RENDERED ||
+        propPath.length !== 2 ||
+        this._waitingUpdate
+      ) {
+        // if propPath.length === 1 means loop variable changed, loop setter will handle it.
+        // ignore if is alreay waiting for update
+        // console.log('skip', propPath);
+        return;
+      }
+      // console.log(propPath);
+      const p = _parseIndexPath(propPath[1]);
+      if (p === 'length') {
+        this._waitingUpdate = true;
+        this.__updateNextTick();
+      } else if (isNumber(p)) {
+        this._updateItem(p as number);
+      }
+    });
   }
 
   __render() {

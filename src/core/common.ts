@@ -38,3 +38,4 @@ export const CONTEXT_STATE = Symbol('CONTEXT_STATE');
 // export const RELATED_REFS_KEY = Symbol('KEY');
 // export const RELATED_REFS_NODE = Symbol('NODE');
 export const HOST_UNWATCH = Symbol('HOST_UNWATCH');
+export const UPDATE_RENDER = Symbol('UPDATE_RENDER');

@@ -1,14 +1,4 @@
-import {
-  __,
-  Component,
-  type RenderFn,
-  ROOT_NODES,
-  emptyRenderFn,
-  CONTEXT,
-  SLOTS,
-  DESTROY,
-  HANDLE_RENDER_DONE,
-} from 'src/core';
+import { __, Component, type RenderFn, ROOT_NODES, emptyRenderFn, CONTEXT, SLOTS } from 'src/core';
 import { createFragment, type AnyObj } from 'src/util';
 
 interface ComponentConstructor {
