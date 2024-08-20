@@ -200,13 +200,17 @@ export class Component<
   bindAttr(attrs: ViewModel, attrName: string, componentProp?: any, onUpdate?: any) {
     if (!isPublicProperty(attrName)) throwErr('bind-attr-not-pub-prop');
 
-    const val = attrs[attrName];
-    const core = attrs[$$];
-    if (!core) return val;
     if (typeof componentProp === 'function') {
       onUpdate = componentProp;
       componentProp = undefined;
     }
+
+    const val = attrs[attrName];
+    this[(componentProp ?? attrName) as keyof typeof this] = val;
+
+    const core = attrs[$$];
+    if (!core) return val;
+
     const unwatchFn = innerWatchPath(
       attrs,
       core,

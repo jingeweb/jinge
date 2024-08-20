@@ -17,6 +17,8 @@ export type Context = Record<string | number | symbol, unknown>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RenderFn<T extends Component<any, any> = Component<any, any>> = (
   containerComponent: T,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...args: any[]
 ) => Node[];
 export interface Slots {
   [DEFAULT_SLOT]?: RenderFn;

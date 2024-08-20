@@ -6,7 +6,12 @@ import type { ForProps, Key, KeyFn } from './common';
 import { KEY_FN, KEYS, LOOP_DATA } from './common';
 import { renderItems } from './render';
 
-export type ForSlot<T> = (item: T, index: number) => JNode;
+export type ForSlot<T> = (item: {
+  data: T;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+}) => JNode;
 export class For<T> extends Component<ForProps<T>, ForSlot<T>> {
   [LOOP_DATA]?: T[];
   [KEYS]?: Key[];

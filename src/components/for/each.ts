@@ -1,4 +1,4 @@
-import { Component } from '../../core';
+import { Component, DEFAULT_SLOT, SLOTS } from '../../core';
 
 export const ELEMENT = Symbol('ELEMENT');
 export class ForEach<T> extends Component {
@@ -19,7 +19,11 @@ export class ForEach<T> extends Component {
     this.isLast = isLast;
   }
 
-  get each() {
+  get data() {
     return this[ELEMENT];
+  }
+
+  render() {
+    return this[SLOTS][DEFAULT_SLOT]?.(this, this) ?? [];
   }
 }
