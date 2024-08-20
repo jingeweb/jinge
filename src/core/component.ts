@@ -14,7 +14,7 @@ import {
   isPublicProperty,
 } from '../vm/core';
 import { proxyComponent } from '../vm/proxy';
-import type { ComponentState, ContextState, Slots } from './common';
+import type { ComponentState, Context, ContextState, Slots } from './common';
 import {
   DEFAULT_SLOT,
   HOST_UNWATCH,
@@ -72,7 +72,7 @@ export class Component<
     ref?: Ref | RefFn;
     key?: string | number;
     children?: Children;
-  } & Omit<Props, 'ref' | 'key' | 'children'>;
+  } & Omit<Props, 'ref' | 'children'>;
 
   readonly [$$]: ViewModelCore;
   /**
@@ -83,7 +83,7 @@ export class Component<
   /**
    * 组件的上下文对象
    */
-  [CONTEXT]?: Record<string | symbol, unknown>;
+  [CONTEXT]?: Context;
   [CONTEXT_STATE]: ContextState = CONTEXT_STATE_UNTOUCH;
   /**
    * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。

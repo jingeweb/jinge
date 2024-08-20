@@ -1,4 +1,4 @@
-// export * from './for';
+export * from './for';
 // export * from './show';
 // export * from './html';
 export * from './if';
