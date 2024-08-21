@@ -21,14 +21,22 @@ export interface Watcher<T = any> {
   [VM_WATCHER_VALUE]?: T;
   [VM_WATCHER_LISTENER]?: WatchHandler<T>;
   [VM_WATCHER_IS_DEEP]?: boolean;
-  [VM_WATCHER_IMM]: number;
+  [VM_WATCHER_IMM]: {
+    i: number;
+    /**
+     * 发生变更的路径，undefined 代表初始无变更，null 代表直接深度 watch 对象无变更 path。
+     */
+    p?: PropertyPathItem[] | null;
+  };
 }
 
 export function destoryWatcher(watcher: Watcher) {
   watcher[VM_TARGET] = undefined;
   watcher[VM_WATCHER_LISTENER] = undefined;
   watcher[VM_WATCHER_VALUE] = undefined;
-  clearImmediate(watcher[VM_WATCHER_IMM]);
+  const imm = watcher[VM_WATCHER_IMM];
+  clearImmediate(imm.i);
+  imm.p = undefined;
 }
 export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
   if (!path?.length) return target;
@@ -82,7 +90,7 @@ export function innerWatchPath(
     [VM_WATCHER_VALUE]: val,
     [VM_WATCHER_LISTENER]: handler,
     [VM_WATCHER_IS_DEEP]: deep,
-    [VM_WATCHER_IMM]: 0,
+    [VM_WATCHER_IMM]: { i: 0, p: undefined },
   };
   watchers.add(watcher);
   return () => {
@@ -130,12 +138,12 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
     const watchPath = watcher[VM_WATCHER_PATH];
     if (!watchPath?.length) {
       // 如果 watch 的 path 为空，说明是深度 watch 当前 ViewModel，直接触发 listener
-
       const imm = watcher[VM_WATCHER_IMM];
-      if (imm > 0) clearImmediate(imm);
-      watcher[VM_WATCHER_IMM] = setImmediate(() => {
+      if (imm.i > 0) clearImmediate(imm.i);
+      imm.i = setImmediate(() => {
         listener(vm, vm);
       });
+      imm.p = null;
       return;
     }
     const clen = changedPath?.length ?? 0;
@@ -159,14 +167,29 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
     }
 
     const imm = watcher[VM_WATCHER_IMM];
-    if (imm > 0) clearImmediate(imm);
-    watcher[VM_WATCHER_IMM] = setImmediate(() => {
+    if (imm.i > 0) clearImmediate(imm.i);
+    // 在某次 tick 中，如果只发生一次变更，则变更的 changedPath 就是对外 emit change 时的路径。
+    // 但如果发生多次变更，会通过 setImmediate 来 debounce，只对外 emit  一次变更，
+    //   这种情况下，始终保存路径最短的一次 changedPath 最终向外传递。如果两个 changedPath 的路径长度一样，
+    //   则使用最先发生变更的 changedPath。
+    // Vue 的 watch 没有 changedPath 这个属性，因此业界没有可参考的标准方案。
+    // Jinge 框架引入 changedPath 是为了提供更精细化的数据变更监控，特别是在深度监听的场景下，以支撑 For 组件，以及其它可能的应用场景。
+    if (!changedPath) {
+      imm.p = null;
+    } else if (imm.p === undefined) {
+      imm.p = changedPath;
+    } else if (imm.p !== null && changedPath.length < imm.p.length) {
+      imm.p = changedPath;
+    }
+    imm.i = setImmediate(() => {
       const deep = watcher[VM_WATCHER_IS_DEEP];
       const oldValue = watcher[VM_WATCHER_VALUE];
       const newValue = getValueByPath(vm, watchPath);
       newValue !== oldValue && (watcher[VM_WATCHER_VALUE] = newValue);
       // 如果是深度监听，则不论新旧数据的引用是否相同，都触发向外传递消息。
-      (deep || newValue !== oldValue) && listener(newValue, oldValue, changedPath);
+      (deep || newValue !== oldValue) && listener(newValue, oldValue, imm.p ?? undefined);
+      imm.i = 0;
+      imm.p = undefined;
     });
   });
   vmCore[VM_PARENTS]?.forEach((parents, prop) => {

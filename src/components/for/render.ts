@@ -1,22 +1,25 @@
+import { isViewModel } from '../../vm';
 import type { Context, Component, RenderFn } from '../../core';
 import { CONTEXT, DEFAULT_SLOT, SLOTS } from '../../core';
 import type { Key, KeyFn } from './common';
 import { ForEach } from './each';
 
 function newEach<T>(
+  vmMode: boolean,
   item: T,
   index: number,
   isLast: boolean,
   itemRenderFn: RenderFn,
   context?: Context,
 ) {
-  const el = new ForEach<T>(item, index, isLast);
+  const el = new ForEach<T>(vmMode, item, index, isLast);
   el[SLOTS][DEFAULT_SLOT] = itemRenderFn;
   context && (el[CONTEXT] = context);
   return el;
 }
 
 function appendRenderEach<T>(
+  vmMode: boolean,
   item: T,
   index: number,
   isLast: boolean,
@@ -24,7 +27,7 @@ function appendRenderEach<T>(
   roots: (Component | Node)[],
   context?: Context,
 ) {
-  const el = newEach(item, index, isLast, itemRenderFn, context);
+  const el = newEach(vmMode, item, index, isLast, itemRenderFn, context);
   roots.push(el);
   return el.render();
 }
@@ -38,11 +41,13 @@ export function renderItems<T>(
   context?: Context,
 ) {
   const result: Node[] = [];
+  const vmMode = isViewModel(items);
   items.forEach((item, index) => {
     if (keyFn) {
       (keys as Key[]).push(keyFn(item, index));
     }
     const els = appendRenderEach(
+      vmMode,
       item,
       index,
       index === items.length - 1,
