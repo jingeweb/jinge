@@ -4,7 +4,7 @@ import { CONTEXT, DEFAULT_SLOT, SLOTS } from '../../core';
 import type { Key, KeyFn } from './common';
 import { ForEach } from './each';
 
-function newEach<T>(
+export function newEach<T>(
   vmMode: boolean,
   item: T,
   index: number,
@@ -34,16 +34,14 @@ export function renderItems<T>(
   items: T[],
   itemRenderFn: RenderFn,
   roots: (Component | Node)[],
-  keys: Key[] | undefined,
+  keys: Map<Key, number> | undefined,
   keyFn: KeyFn<T> | undefined,
   context?: Context,
 ) {
   const result: Node[] = [];
   const vmMode = isViewModel(items);
   items.forEach((item, index) => {
-    if (keyFn) {
-      (keys as Key[]).push(keyFn(item, index));
-    }
+    keyFn && (keys as Map<Key, number>).set(keyFn(item, index), index);
     const els = appendRenderEach(vmMode, item, index, itemRenderFn, roots, context);
     result.push(...els);
   });

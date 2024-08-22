@@ -17,7 +17,7 @@ export type ForSlot<T> = (item: {
 
 export class For<T> extends Component<ForProps<T>, ForSlot<T>> {
   [LOOP_DATA]?: T[] | null;
-  [KEYS]?: Key[];
+  [KEYS]?: Map<Key, number>;
   [KEY_FN]?: KeyFn<T>;
   [RENDER_LEN] = 0;
 
@@ -26,6 +26,12 @@ export class For<T> extends Component<ForProps<T>, ForSlot<T>> {
 
     // this.bindAttr(attrs, 'loop', LOOP_DATA);
     this[LOOP_DATA] = attrs.loop;
+    this[KEY_FN] = attrs.key;
+
+    if (attrs.key) {
+      this[KEYS] = new Map();
+    }
+
     if (isViewModel(attrs)) {
       const unwatchFn = innerWatchPath(
         attrs,

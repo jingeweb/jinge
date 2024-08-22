@@ -70,7 +70,6 @@ export class Component<
 
   props?: {
     ref?: Ref | RefFn;
-    key?: string | number;
     children?: Children;
   } & Omit<Props, 'ref' | 'children'>;
 
