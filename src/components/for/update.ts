@@ -181,6 +181,7 @@ export function handleUpdate<T>(comp: For<T>, data: T[] | undefined | null) {
 
   // 前后都有数据
   if (keyFn) {
+    // 如果有 key 则复用 key 相同的元素
     updateWithKey(comp, itemRenderFn, data, roots as ForEach<T>[], keys as Map<Key, number>, keyFn);
   } else {
     // 如果没有 key 则直接原地更新

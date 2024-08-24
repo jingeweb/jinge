@@ -20,10 +20,6 @@ import {
   HOST_UNWATCH,
   UNMOUNT_FNS,
   REFS,
-  // RELATED_REFS,
-  // RELATED_REFS_KEY,
-  // RELATED_REFS_NODE,
-  // RELATED_REFS_ORIGIN,
   NON_ROOT_COMPONENT_NODES,
   ROOT_NODES,
   STATE,
@@ -54,9 +50,9 @@ export class Component<
   Props extends object = {},
   Children extends
     | JNode
-    | ((...args: any[]) => JNode)
+    | ((vm?: any) => JNode)
     | {
-        [k: string]: ((...args: any[]) => JNode) | JNode;
+        [k: string]: ((vm: any) => JNode) | JNode;
       } = never,
 > {
   /**
@@ -267,35 +263,6 @@ export class Component<
     return this[SLOTS][DEFAULT_SLOT]?.(this) ?? [];
   }
 
-  // /**
-  //  * 在 nextTick 时调用 update 函数。
-  //  */
-  // updateNextTick(handler?: AnyFn) {
-  //   const updateRenderFn = (this as unknown as { update: AnyFn }).update;
-  //   if (!updateRenderFn || this[STATE] !== COMPONENT_STATE_RENDERED) {
-  //     return;
-  //   }
-
-  //   if (!handler) {
-  //     handler = updateRenderFn;
-  //   }
-
-  //   let ntMap = this[UPDATE_NEXT_MAP];
-  //   if (!ntMap) ntMap = this[UPDATE_NEXT_MAP] = new Map();
-  //   if (ntMap.has(handler)) {
-  //     // already in queue.
-  //     return;
-  //   }
-  //   ntMap.set(
-  //     handler,
-  //     setImmediate(() => {
-  //       type F = () => void;
-  //       ntMap.delete(handler as F);
-  //       (handler as F).call(this);
-  //     }),
-  //   );
-  // }
-
   setContext(key: string | symbol, value: unknown, forceOverride = false) {
     const contextState = this[CONTEXT_STATE];
     if (
@@ -328,19 +295,6 @@ export class Component<
   getContext<T = any>(key: string | symbol): T {
     return this[CONTEXT]?.[key as string] as T;
   }
-
-  // /**
-  //  * Get child node(or nodes) marked by 'ref:' attribute in template
-  //  */
-  // getRef<T extends Component | Node | (Component | Node)[] = HTMLElement>(ref: string) {
-  //   if (this[STATE] !== COMPONENT_STATE_RENDERED) {
-  //     import.meta.env.DEV &&
-  //       console.error(
-  //         `Warning: call __getRef before component '${this.constructor.name}' rendered will get nothing.`,
-  //       );
-  //   }
-  //   return this[REFS]?.get(ref) as T;
-  // }
 
   /**
    * lifecycle hook, called after rendered.
@@ -530,9 +484,11 @@ export function newComponentWithSlots(
     new (attrs: object): Component;
   },
   attrs: object,
+  context: Context | undefined,
   slots: Slots,
 ) {
   const c = new Clazz(attrs);
+  c[CONTEXT] = context;
   Object.assign(c[SLOTS], slots);
   return c;
 }
@@ -545,9 +501,11 @@ export function newComponentWithDefaultSlot(
     new (attrs: object): Component;
   },
   attrs: object,
-  defaultSlot?: Slots[typeof DEFAULT_SLOT],
+  context: Context | undefined,
+  defaultSlot: Slots[typeof DEFAULT_SLOT] | undefined,
 ) {
   const c = new Clazz(attrs);
+  c[CONTEXT] = context;
   defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
   return c;
 }
