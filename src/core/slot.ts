@@ -11,7 +11,7 @@ export class SlotRenderComponent extends Component {
   }
 
   render() {
-    return this[SLOTS][DEFAULT_SLOT]?.(this, this[VM]);
+    return this[SLOTS][DEFAULT_SLOT]?.(this, this[VM]) ?? [];
   }
 }
 /**

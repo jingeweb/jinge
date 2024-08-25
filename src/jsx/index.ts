@@ -7,7 +7,15 @@ export type EmptyAttrs = {};
 export type Slot<VM extends object> = (vm: VM) => JNode;
 export type SlotNoVm = () => JNode;
 
-export type JNode = JSX.Element | Component<any, any> | Iterable<JNode> | string | number | boolean;
+export type JNode =
+  | JSX.Element
+  | Component<any, any>
+  | Iterable<JNode>
+  | string
+  | number
+  | boolean
+  | null
+  | undefined;
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;
