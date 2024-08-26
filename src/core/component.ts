@@ -10,8 +10,10 @@ import {
   VM_NOTIFIABLE,
   VM_PROXY,
   VM_TARGET,
+  addParent,
   destroyViewModelCore,
   isPublicProperty,
+  isViewModel,
 } from '../vm/core';
 import { proxyComponent } from '../vm/proxy';
 import type { ComponentState, Context, ContextState, Slots } from './common';
@@ -508,4 +510,41 @@ export function newComponentWithDefaultSlot(
   c[CONTEXT] = context;
   defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
   return c;
+}
+
+/**
+ * ES 最新的 class 可以在声明属性时直接初始化赋值，这种赋值是直接赋值到原始实例上，而不是经过 vm 包裹后的 Proxy，
+ * 因而无法绑定 vm 的父子关系，发生数据变更后无法向上传递。
+ *
+ * 编译器识别到这种属性时，会在 constructor() 尾部调用该绑定函数，从而建立正确的 vm 关系。
+ *
+ * 比如：
+ * ```tsx
+ * import { Component, vm } from 'jinge';
+ * class App extends Component {
+ *   arr = vm([1, 2, 3]);
+ *   render() {
+ *     return <div>{this.arr.length}</div>;
+ *   }
+ * }
+ * ```
+ * 会被转换成：
+ * ```tsx
+ * import { Component, vm, bindInitedClassMemberVmParent } from 'jinge';
+ * class App extends Component {
+ *   arr = vm([1, 2, 3]);
+ *   constructor() {
+ *     super();
+ *     bindInitedClassMemberVmParent(this, 'arr');
+ *   }
+ *   render() {
+ *     return <div>{this.arr.length}</div>;
+ *   }
+ * }
+ */
+export function bindInitedClassMemberVmParent(comp: ViewModel, prop: string) {
+  const v = comp[prop];
+  if (isViewModel(v)) {
+    addParent(v[$$], comp[$$], prop);
+  }
 }
