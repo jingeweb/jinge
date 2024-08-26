@@ -1,9 +1,10 @@
-import { Attributes, Component, __ } from '../core/component';
+import { ROOT_NODES, UPDATE_RENDER } from '../core';
+import { Component } from '../core/component';
 import { createFragment } from '../util';
 
-function renderHtml(content: string): Node[] {
+function renderHtml(content?: string): Node[] {
   const $d = document.createElement('div');
-  $d.innerHTML = content || '';
+  $d.innerHTML = content ?? '';
   let cn = $d.childNodes as unknown as Node[];
   if (cn.length === 0) {
     cn = [document.createComment('empty')];
@@ -13,39 +14,32 @@ function renderHtml(content: string): Node[] {
   return cn;
 }
 
-export interface BindHtmlComponentAttrs {
+export interface BindHtmlAttrs {
+  className?: string;
   content: string;
 }
-export class BindHtmlComponent extends Component {
-  _c: string;
 
-  constructor(attrs: Attributes<BindHtmlComponentAttrs>) {
-    if (!('content' in attrs)) throw new Error('<bind-html/> require "content" attribute');
-    super(attrs);
-    this.content = attrs.content;
+const CONTENT = Symbol();
+
+export class BindHtml extends Component {
+  [CONTENT]?: string;
+
+  constructor(attrs: BindHtmlAttrs) {
+    super();
+    this.bindAttr(attrs, 'content', CONTENT, () => this[UPDATE_RENDER]());
   }
 
-  get content() {
-    return this._c;
+  render() {
+    return (this[ROOT_NODES] = renderHtml(this[CONTENT]));
   }
 
-  set content(v) {
-    if (this._c === v) return;
-    this._c = v;
-    this.__updateIfNeed();
-  }
-
-  __render() {
-    return (this[__].rootNodes = renderHtml(this._c));
-  }
-
-  __update() {
-    const roots = this[__].rootNodes;
+  [UPDATE_RENDER]() {
+    const roots = this[ROOT_NODES];
     const oldFirstEl = roots[0] as Node;
-    const $p = oldFirstEl.parentNode;
-    const newEls = renderHtml(this._c);
+    const $p = oldFirstEl.parentNode as HTMLElement;
+    const newEls = renderHtml(this[CONTENT]);
     $p.insertBefore(newEls.length > 1 ? createFragment(newEls) : newEls[0], oldFirstEl);
     roots.forEach((oldEl) => $p.removeChild(oldEl as Node));
-    this[__].rootNodes = newEls;
+    this[ROOT_NODES] = newEls;
   }
 }

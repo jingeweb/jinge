@@ -1,11 +1,13 @@
-import { Component } from './component';
+import { renderToDOM, type Component } from './component';
 
-export function bootstrap<T extends typeof Component & { create(attrs: unknown): Component }, Props>(
-  ComponentClazz: T,
+export function bootstrap<A extends object, C extends Component<A>>(
+  ComponentClazz: {
+    new (attrs: A): C;
+  },
   dom: HTMLElement,
-  attrs?: Props,
-): InstanceType<T> {
-  const app = ComponentClazz.create(attrs);
-  app.__renderToDOM(dom, dom !== document.body);
-  return app as InstanceType<T>;
+  attrs?: A,
+) {
+  const app = new ComponentClazz(attrs as A);
+  renderToDOM(app, dom, dom !== document.body);
+  return app;
 }
