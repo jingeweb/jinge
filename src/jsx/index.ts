@@ -1576,6 +1576,7 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
 
 type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {
   ref?: Ref | RefFn;
+  key?: string | number | symbol;
 } & E;
 
 interface SVGProps<T> extends SVGAttributes<T> {

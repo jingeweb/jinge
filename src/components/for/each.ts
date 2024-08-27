@@ -1,4 +1,4 @@
-import { Component } from '../../core';
+import { Component, DEFAULT_SLOT, SLOTS } from '../../core';
 
 export const ELEMENT = Symbol('ELEMENT');
 export class ForEach<T> extends Component {
@@ -27,5 +27,9 @@ export class ForEach<T> extends Component {
 
   set data(v: T) {
     this[ELEMENT] = v;
+  }
+
+  render() {
+    return this[SLOTS][DEFAULT_SLOT]?.(this, this) ?? [];
   }
 }
