@@ -8,5 +8,5 @@ export type KeyFn<T> = (value: T, index: number) => Key;
 
 export interface ForProps<T> {
   loop: T[] | undefined | null;
-  key?: KeyFn<T>;
+  keyFn?: KeyFn<T>;
 }

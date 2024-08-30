@@ -26,9 +26,9 @@ export class For<T> extends Component<ForProps<T>, ForSlot<T>> {
 
     // this.bindAttr(attrs, 'loop', LOOP_DATA);
     this[LOOP_DATA] = attrs.loop;
-    this[KEY_FN] = attrs.key;
+    this[KEY_FN] = attrs.keyFn;
 
-    if (attrs.key) {
+    if (attrs.keyFn) {
       this[KEYS] = new Map();
     }
 

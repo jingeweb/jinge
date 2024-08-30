@@ -69,7 +69,8 @@ export class Component<
   props?: {
     ref?: Ref | RefFn;
     children?: Children;
-  } & Omit<Props, 'ref' | 'children'>;
+    key?: string | symbol | number;
+  } & Omit<Props, 'ref' | 'children' | 'key'>;
 
   readonly [$$]: ViewModelCore;
   /**
