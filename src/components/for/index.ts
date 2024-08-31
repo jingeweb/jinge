@@ -1,7 +1,6 @@
 import { $$, innerWatchPath, isViewModel } from '../../vm';
 import type { JNode } from '../../jsx';
 import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS } from '../../core';
-import { Component } from '../../core/component';
 
 import type { ForProps, Key, KeyFn } from './common';
 import { KEY_FN, KEYS, LOOP_DATA, RENDER_LEN } from './common';
@@ -15,7 +14,7 @@ export type ForSlot<T> = (item: {
   isLast: boolean;
 }) => JNode;
 
-export class For<T> extends Component<ForProps<T>, ForSlot<T>> {
+export function<T> For{
   [LOOP_DATA]?: T[] | null;
   [KEYS]?: Map<Key, number>;
   [KEY_FN]?: KeyFn<T>;

@@ -1,31 +1,25 @@
 import { arrayEqual, throwErr, clearImmediate, setImmediate } from '../util';
-import type { PropertyPathItem, UnwatchFn, ViewModel } from '../vm';
+import type { PropertyPathItem, ViewModel } from '../vm';
 import { VM_WATCHER_VALUE, $$, getValueByPath, innerWatchPath } from '../vm';
-import { HOST_UNWATCH } from './common';
-import type { Component } from './component';
+import { addUnmountFn, type ComponentHost } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
 ////// 业务中请直接使用 `watch` 函数进行 Component 或 ViewModel 的监听。        /////
 
-function addRelated(c: Component, fn: UnwatchFn) {
-  let rw = c[HOST_UNWATCH];
-  if (!rw) rw = c[HOST_UNWATCH] = [];
-  rw.push(fn);
-}
 export function watchForRender(
   watcher: Pick<
     ViewWatcher,
     typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
   >,
   renderFn: (v: unknown) => void,
-  hostComponent?: Component,
+  hostComponent: ComponentHost,
 ) {
   watcher[VM_WATCHER_PARENT] = {
     [VM_WATCHER_NOTIFY]: renderFn,
   };
   renderFn(watcher[VM_WATCHER_VALUE]);
 
-  hostComponent && addRelated(hostComponent, () => watcher[VM_WATCHER_DESTROY]());
+  addUnmountFn(hostComponent, () => watcher[VM_WATCHER_DESTROY]());
 }
 
 /**
@@ -37,7 +31,7 @@ export function watchPathForRender2(
   path: PropertyPathItem[],
   renderFn: (v: unknown) => void,
   notOp: number,
-  hostComponent?: Component,
+  hostComponent: ComponentHost,
 ) {
   const core = target[$$];
   if (!core) throwErr('watch-not-vm');
@@ -50,8 +44,7 @@ export function watchPathForRender2(
         ? (v: unknown) => renderFn(!!v)
         : renderFn;
   innerRenderFn(val);
-  const unwatchFn = innerWatchPath(target, core, val, innerRenderFn, path, true);
-  hostComponent && addRelated(hostComponent, unwatchFn);
+  addUnmountFn(hostComponent, innerWatchPath(target, core, val, innerRenderFn, path, true));
 }
 
 /**
@@ -61,7 +54,7 @@ export function watchPathForRender(
   target: ViewModel,
   path: PropertyPathItem[],
   renderFn: (v: unknown) => void,
-  hostComponent?: Component,
+  hostComponent: ComponentHost,
 ) {
   watchPathForRender2(target, path, renderFn, 0, hostComponent);
 }
@@ -77,7 +70,7 @@ interface ViewWatcher {
 }
 type ParentWatcher = Pick<ViewWatcher, typeof VM_WATCHER_NOTIFY>;
 export function PathWatcher(
-  target: Component,
+  target: ViewModel,
   path: PropertyPathItem[],
   deep = false,
 ): ViewWatcher {
@@ -147,7 +140,7 @@ export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => voi
 }
 
 export function DymPathWatcher(
-  target: Component,
+  target: ViewModel,
   path: (PropertyPathItem | ViewWatcher)[],
   renderFn?: (v: unknown) => void,
 ) {
@@ -208,13 +201,3 @@ export function DymPathWatcher(
   });
   return rtn;
 }
-
-// const w1 = PathWatcher(this, ['c']);
-// const w2 = PathWatcher(this, ['d']);
-// const w3 = ExprWatcher([w1, w2], (a, b) => a + b);
-// const w4 = PathWatcher(this, ['e']);
-// const w5 = DymPathWatcher(this, ['a', 'b', w3, w4], true);
-
-// watchForComponent(this, w5, (v) => {
-//   setAttribute(el, 'xx', v);
-// }, rel);

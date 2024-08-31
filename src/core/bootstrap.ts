@@ -1,13 +1,22 @@
-import { renderToDOM, type Component } from './component';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-export function bootstrap<A extends object, C extends Component<A>>(
-  ComponentClazz: {
-    new (attrs: A): C;
-  },
+import { appendChildren, replaceChildren } from '../util';
+import { ComponentHost, handleRenderDone, renderFunctionComponent } from './component';
+
+export function bootstrap<C extends object = never>(FC: () => any, dom: HTMLElement): C;
+export function bootstrap<A extends object = never, C extends object = never>(
+  FC: (props: A) => any,
   dom: HTMLElement,
-  attrs?: A,
-) {
-  const app = new ComponentClazz(attrs as A);
-  renderToDOM(app, dom, dom !== document.body);
+  props: A,
+): C;
+export function bootstrap(FC: any, dom: HTMLElement, props?: any) {
+  const app = new ComponentHost();
+  const nodes = renderFunctionComponent(app, FC, props);
+  if (dom !== document.body) {
+    replaceChildren(dom.parentNode as HTMLElement, nodes, dom);
+  } else {
+    appendChildren(dom, nodes);
+  }
+  handleRenderDone(app);
   return app;
 }

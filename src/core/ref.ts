@@ -1,33 +1,39 @@
 import { isObject } from '../util';
 import { REFS } from './common';
-import { type Component } from './component';
+import type { ComponentHost } from './component';
 
 export const REF = Symbol('REF');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface Ref<T extends Node | Component = any> {
+export interface Ref<T = Node> {
   value?: T;
 }
-export function ref<T extends Node | Component>(): Ref<T> {
+
+export function ref<T = Node>(): Ref<T> {
   return { [REF]: true, value: undefined } as unknown as Ref<T>;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function isRef<T extends Node | Component = any>(v: object): v is Ref<T> {
+export function isRef<T = Node>(v: object): v is Ref<T> {
   return (v as unknown as { [REF]: boolean })[REF] === true;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type RefFn<T extends Node | Component = any> = (el: T) => void;
+export type RefFn<T = Node> = (el: T) => void;
 
 /** 用于给编译器使用的 set ref 函数 */
-export function setRefForComponent(target: Component, ref: Ref | RefFn, el: Component | Node) {
+export function setRefForComponent(
+  target: ComponentHost,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ref: Ref<any> | RefFn<any>,
+  el: ComponentHost | Node,
+) {
   let rns = target[REFS];
   if (!rns) {
     target[REFS] = rns = [];
   }
   rns.push(ref);
   if (isObject<Ref>(ref)) {
-    ref.value = el;
+    (ref as Ref<Node | ComponentHost>).value = el;
   } else {
-    ref(el);
+    (ref as RefFn<Node | ComponentHost>)(el);
   }
   // let elOrArr = rns.get(ref);
   // if (!elOrArr) {

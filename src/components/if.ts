@@ -1,7 +1,6 @@
 import { createComment, createFragment } from '../util';
-import type { RenderFn } from '../core';
+import type { ComponentHost } from '../core';
 import {
-  Component,
   CONTEXT,
   ROOT_NODES,
   SLOTS,
@@ -9,56 +8,51 @@ import {
   destroyComponentContent,
   getLastDOM,
   handleRenderDone,
-  UPDATE_RENDER,
+  addUnmountFn,
+  newComponentWithDefaultSlot,
+  renderFunctionComponent,
 } from '../core';
-import type { JNode } from '../jsx';
-
-const EXPECT = Symbol('EXPECT');
-
-function createEl(renderFn: RenderFn, context?: Record<string | symbol, unknown>) {
-  const el = new Component();
-  el[CONTEXT] = context;
-  el[SLOTS] = {
-    [DEFAULT_SLOT]: renderFn,
-  };
-  return el;
-}
+import type { JNode, Props } from '../jsx';
+import { vmWatch } from '../vm';
 
 export interface IfAttrs {
   expect: boolean;
 }
-export class If extends Component<
-  IfAttrs,
-  | JNode
-  | {
-      true: JNode;
-      false: JNode;
-    }
-> {
-  [EXPECT]: boolean;
+export function If(
+  this: ComponentHost,
+  props: Props<
+    {
+      expect: boolean;
+    },
+    | JNode
+    | {
+        true: JNode;
+        false: JNode;
+      }
+  >,
+) {
+  /**
+   * if 组件的实现展示了不使用 hook 范式的高度自由化的组件实现。
+   * FunctionComponent 的 this 是 ComponentHost，代表当前组件的实例组件容器，而 FunctionComponent 本身可以理解成该实例组件的 render 函数。
+   */
 
-  constructor(attrs: IfAttrs) {
-    super();
-    this[EXPECT] = this.bindAttr(attrs, 'expect', EXPECT, () => this[UPDATE_RENDER]());
-  }
-
-  render() {
+  const render = () => {
     const slots = this[SLOTS];
-    const e = !!this[EXPECT];
+    const e = !!props.expect;
     const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
-    const el = renderFn ? createEl(renderFn, this[CONTEXT]) : null;
     const roots = this[ROOT_NODES];
-    if (el) {
+    if (renderFn) {
+      const el = newComponentWithDefaultSlot(this[CONTEXT]);
       roots.push(el);
-      return el.render();
+      return renderFunctionComponent(el, renderFn);
     } else {
       const cmt = createComment(e.toString());
       roots.push(cmt);
       return roots;
     }
-  }
+  };
 
-  [UPDATE_RENDER]() {
+  const update = (expect: boolean) => {
     const lastNode = getLastDOM(this);
     const nextSib = lastNode.nextSibling;
     const $parent = lastNode.parentNode as Node;
@@ -68,12 +62,12 @@ export class If extends Component<
     roots.length = 0;
 
     const slots = this[SLOTS];
-    const e = !!this[EXPECT];
-    const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
-    const el = renderFn ? createEl(renderFn, this[CONTEXT]) : null;
-    if (el) {
+
+    const renderFn = slots[expect.toString()] ?? (expect ? slots[DEFAULT_SLOT] : undefined);
+    if (renderFn) {
+      const el = newComponentWithDefaultSlot(this[CONTEXT]);
       roots.push(el);
-      const doms = el.render();
+      const doms = renderFunctionComponent(el, renderFn);
       const newNode = doms.length > 1 ? createFragment(doms) : doms[0];
       if (nextSib) {
         $parent.insertBefore(newNode, nextSib);
@@ -82,7 +76,7 @@ export class If extends Component<
       }
       handleRenderDone(el);
     } else {
-      const cmt = createComment(e.toString());
+      const cmt = createComment(expect.toString());
       roots.push(cmt);
       if (nextSib) {
         $parent.insertBefore(cmt, nextSib);
@@ -90,5 +84,13 @@ export class If extends Component<
         $parent.appendChild(cmt);
       }
     }
-  }
+  };
+
+  // 注意如果使用 vmWatch 则需要手动调用 addUnmountFn 来注册组件销毁时的取消监听。
+  addUnmountFn(
+    this,
+    vmWatch(props, 'expect', (v) => update(!!v)),
+  );
+
+  return render();
 }

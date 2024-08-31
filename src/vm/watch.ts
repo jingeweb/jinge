@@ -103,20 +103,20 @@ export interface WatchOptions {
   immediate?: boolean;
   deep?: boolean;
 }
-export function watch<T extends object, P extends keyof T>(
+export function vmWatch<T extends object, P extends keyof T>(
   vm: T,
   property: P,
   handler: WatchHandler<T[P]>,
   options?: WatchOptions,
 ): UnwatchFn;
-export function watch<T extends object>(vm: T, handler: WatchHandler<T>): UnwatchFn;
-export function watch<T extends object>(
+export function vmWatch<T extends object>(vm: T, handler: WatchHandler<T>): UnwatchFn;
+export function vmWatch<T extends object>(
   vm: T,
   propertyPath: PropertyPathItem[],
   handler: WatchHandler<any>,
   options?: WatchOptions,
 ): UnwatchFn;
-export function watch(vm: any, propOrPathOrHanlder: any, handler?: any, options?: any) {
+export function vmWatch(vm: any, propOrPathOrHanlder: any, handler?: any, options?: any) {
   if (isFunction(propOrPathOrHanlder)) {
     return watchPath(vm, propOrPathOrHanlder, undefined, true);
   } else if (Array.isArray(propOrPathOrHanlder)) {

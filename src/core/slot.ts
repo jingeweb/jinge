@@ -1,5 +1,5 @@
 import { CONTEXT, DEFAULT_SLOT, SLOTS, type Context, type RenderFn } from './common';
-import { Component } from './component';
+import { Component, ComponentHost } from './component';
 
 const VM = Symbol('vm');
 
@@ -28,7 +28,7 @@ export function newSlotRenderComponent(
   context: Context | undefined,
   renderFn?: RenderFn,
 ) {
-  const c = new SlotRenderComponent(vm);
+  const c = new ComponentHost();
   c[CONTEXT] = context;
   renderFn && (c[SLOTS][DEFAULT_SLOT] = renderFn);
   return c;

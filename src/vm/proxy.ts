@@ -1,6 +1,5 @@
-import { isRef, type Component } from '../core';
 import type { AnyFn } from '../util';
-import { isArray, isObject, isFunction, isPromise, isUndefined, isString, throwErr } from '../util';
+import { isArray, isObject, isPromise, isUndefined, isString, throwErr } from '../util';
 
 import type { PropertyPathItem, ViewModelCore, ViewModel } from './core';
 import {
@@ -14,7 +13,6 @@ import {
   VM_PROXY,
   VM_NOTIFIABLE,
   VM_TARGET,
-  VM_SETTERS,
 } from './core';
 import { notifyVmPropChange, notifyVmArrayChange } from './watch';
 
@@ -28,38 +26,38 @@ type ViewModelArray = ViewModel<ViewModel[]>;
  * 否则，返回 null。
  * 由于 obj 可能是有继承关系的类的实例，因此需要向上检测继承的类的 prototype。
  */
-function getSetterFnIfPropIsSetter(obj: ViewModel, prop: PropertyPathItem) {
-  let map = obj[$$][VM_SETTERS];
-  if (!map) {
-    obj[$$][VM_SETTERS] = map = new Map();
-  }
-  type Constructor = { prototype: unknown };
-  if (!map.has(prop)) {
-    let clazz: Constructor = obj.constructor as Constructor;
-    let desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
-    let fn: AnyFn | null;
-    if (desc) {
-      fn = isFunction(desc.set) ? desc.set : null;
-      map.set(prop, fn);
-      return fn;
-    }
-    // lookup to check parent classes
-    clazz = Object.getPrototypeOf(clazz) as Constructor;
-    while (clazz?.prototype) {
-      desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
-      if (desc) {
-        fn = isFunction(desc.set) ? desc.set : null;
-        map.set(prop, fn);
-        return fn;
-      }
-      clazz = Object.getPrototypeOf(clazz);
-    }
-    map.set(prop, null);
-    return null;
-  } else {
-    return map.get(prop);
-  }
-}
+// function getSetterFnIfPropIsSetter(obj: ViewModel, prop: PropertyPathItem) {
+//   let map = obj[$$][VM_SETTERS];
+//   if (!map) {
+//     obj[$$][VM_SETTERS] = map = new Map();
+//   }
+//   type Constructor = { prototype: unknown };
+//   if (!map.has(prop)) {
+//     let clazz: Constructor = obj.constructor as Constructor;
+//     let desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
+//     let fn: AnyFn | null;
+//     if (desc) {
+//       fn = isFunction(desc.set) ? desc.set : null;
+//       map.set(prop, fn);
+//       return fn;
+//     }
+//     // lookup to check parent classes
+//     clazz = Object.getPrototypeOf(clazz) as Constructor;
+//     while (clazz?.prototype) {
+//       desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
+//       if (desc) {
+//         fn = isFunction(desc.set) ? desc.set : null;
+//         map.set(prop, fn);
+//         return fn;
+//       }
+//       clazz = Object.getPrototypeOf(clazz);
+//     }
+//     map.set(prop, null);
+//     return null;
+//   } else {
+//     return map.get(prop);
+//   }
+// }
 
 function __propSetHandler(
   target: ViewModel,
@@ -76,7 +74,7 @@ function __propSetHandler(
   if (oldVal === value && !isUndefined(value)) {
     return true;
   }
-  const newValMaybeVM = isObject(value) && !isRef(value) && !isInnerObj(value);
+  const newValMaybeVM = isObject(value) && !isInnerObj(value);
   if (newValMaybeVM && isPubProp && !(value as ViewModel)[$$]) {
     throwErr('pub-prop-not-vm');
     // value = wrapVm(value as object);
@@ -97,23 +95,23 @@ function __objectPropSetFn(target: ViewModel, prop: PropertyPathItem, value: unk
   target[prop] = value;
 }
 
-function __componentPropSetFn(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-  /**
-   * we must ensure `this` in setter function to be `Proxy`
-   *
-   * 首先判断当前赋值的变量名，是否对应了一个 setter 函数，
-   * 如果是 setter 函数，则应该显式地调用，
-   *   并将 `this` 设置为该 target 的包装 Proxy，
-   *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
-   * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
-   */
-  const setterFn = getSetterFnIfPropIsSetter(target, prop);
-  if (setterFn) {
-    setterFn.call(target[$$][VM_PROXY], value);
-  } else {
-    target[prop] = value;
-  }
-}
+// function __componentPropSetFn(target: ViewModel, prop: PropertyPathItem, value: unknown) {
+//   /**
+//    * we must ensure `this` in setter function to be `Proxy`
+//    *
+//    * 首先判断当前赋值的变量名，是否对应了一个 setter 函数，
+//    * 如果是 setter 函数，则应该显式地调用，
+//    *   并将 `this` 设置为该 target 的包装 Proxy，
+//    *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
+//    * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
+//    */
+//   const setterFn = getSetterFnIfPropIsSetter(target, prop);
+//   if (setterFn) {
+//     setterFn.call(target[$$][VM_PROXY], value);
+//   } else {
+//     target[prop] = value;
+//   }
+// }
 
 function objectPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
   if (!target[$$]) {
@@ -131,17 +129,17 @@ function attrsPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: u
   return __propSetHandler(target as ViewModel, prop, value, __objectPropSetFn);
 }
 
-function componentPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-  if (!target[$$]) {
-    import.meta.env.DEV &&
-      console.error(
-        `Warning: call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
-        target,
-      );
-    return true;
-  }
-  return __propSetHandler(target, prop, value, __componentPropSetFn);
-}
+// function componentPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
+//   if (!target[$$]) {
+//     import.meta.env.DEV &&
+//       console.error(
+//         `Warning: call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
+//         target,
+//       );
+//     return true;
+//   }
+//   return __propSetHandler(target, prop, value, __componentPropSetFn);
+// }
 
 function arrayLengthSetHandler(target: ViewModelArray, value: number) {
   const oldLen = target.length;
@@ -469,11 +467,11 @@ export function proxyAttributes<T extends object>(attrs: T) {
 // }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function proxyComponent(component: Component<any, any>) {
-  return new Proxy(component, {
-    set: componentPropSetHandler,
-  });
-}
+// export function proxyComponent(component: Component<any, any>) {
+//   return new Proxy(component, {
+//     set: componentPropSetHandler,
+//   });
+// }
 
 export function vm<T extends object>(target: T): T {
   const p = (target as ViewModel)[$$];

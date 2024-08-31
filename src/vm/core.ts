@@ -1,4 +1,4 @@
-import type { AnyObj, AnyFn } from '../util';
+import type { AnyObj } from '../util';
 import { isString, isObject, isNumber } from '../util';
 import { destoryWatcher, type Watcher } from './watch';
 
@@ -8,7 +8,7 @@ export const VM_PARENTS = Symbol('PARENTS');
 export const VM_WATCHERS = Symbol('WATCHERS');
 export const VM_NOTIFIABLE = Symbol('NOTIFIABLE');
 // export const VM_RELATED = Symbol('RELATED');
-export const VM_SETTERS = Symbol('SETTERS');
+// export const VM_SETTERS = Symbol('SETTERS');
 
 export const VM_TARGET = Symbol('TARGET');
 export const VM_PROXY = Symbol('PROXY');
@@ -18,7 +18,7 @@ export interface ViewModelCore<T extends object = AnyObj> {
   [VM_WATCHERS]?: Set<Watcher>;
   [VM_NOTIFIABLE]: boolean;
   // [VM_RELATED]?: Set<AnyFn>;
-  [VM_SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
+  // [VM_SETTERS]?: Map<PropertyPathItem, AnyFn | null>;
   /** 指向当前 vm core 所属的原始数据 */
   [VM_TARGET]: T;
   /** 指向当前 vm core 所属的 Proxy */
@@ -95,20 +95,20 @@ export function destroyViewModelCore(vm: ViewModelCore) {
 
   const target = vm[VM_TARGET] as ViewModel;
 
-  /*
-   * 解除 ViewModel 之间的 VM_PARENTS 关联。
-   * 使用 getOwnPropertyNames 可以获取所有属性，但无法获取 setter 函数定义的属性。
-   */
-  vm[VM_SETTERS]?.forEach((fn, prop) => {
-    if (!fn) {
-      return;
-    }
-    const v = target[prop];
-    if (isViewModel(v)) {
-      removeParent(v[$$], vm, prop);
-    }
-  });
-  vm[VM_SETTERS]?.clear();
+  // /*
+  //  * 解除 ViewModel 之间的 VM_PARENTS 关联。
+  //  * 使用 getOwnPropertyNames 可以获取所有属性，但无法获取 setter 函数定义的属性。
+  //  */
+  // vm[VM_SETTERS]?.forEach((fn, prop) => {
+  //   if (!fn) {
+  //     return;
+  //   }
+  //   const v = target[prop];
+  //   if (isViewModel(v)) {
+  //     removeParent(v[$$], vm, prop);
+  //   }
+  // });
+  // vm[VM_SETTERS]?.clear();
   Object.getOwnPropertyNames(target).forEach((prop) => {
     const v = target[prop];
     if (isViewModel(v)) {

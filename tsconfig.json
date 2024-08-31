@@ -10,9 +10,7 @@
     "stripInternal": true,
     "alwaysStrict": true,
     "moduleResolution": "Bundler",
-    "noEmit": true,
-    "paths": {},
-    "baseUrl": "."
+    "noEmit": true
   },
   "include": ["src/**/*"]
 }

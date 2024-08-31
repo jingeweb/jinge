@@ -1,21 +1,34 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/ban-types */
 /* eslint-disable @typescript-eslint/no-namespace */
-import type { Component, Ref, RefFn } from '../core';
+import type { Ref, RefFn } from '../core';
 
 export type EmptyAttrs = {};
 export type Slot<VM extends object> = (vm: VM) => JNode;
 export type SlotNoVm = () => JNode;
-
+export type FunctionComponent = (...args: any) => JSX.Element | Node[];
 export type JNode =
   | JSX.Element
-  | Component<any, any>
+  | FunctionComponent
   | Iterable<JNode>
   | string
   | number
   | boolean
   | null
   | undefined;
+export type Props<
+  P extends object = {},
+  S extends
+    | JNode
+    | ((vm?: any) => JNode)
+    | {
+        [k: string]: ((vm: any) => JNode) | JNode;
+      } = never,
+> = Omit<P, 'key' | 'ref' | 'children'> & {
+  key?: string | undefined | null;
+  ref?: Ref<any>;
+  children?: S;
+};
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;
@@ -1575,12 +1588,12 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
 }
 
 type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {
-  ref?: Ref | RefFn;
+  ref?: Ref<T> | RefFn<T>;
   key?: string | number | symbol;
 } & E;
 
 interface SVGProps<T> extends SVGAttributes<T> {
-  ref?: Ref | RefFn;
+  ref?: Ref<T> | RefFn<T>;
 }
 
 interface SVGLineElementAttributes<T> extends SVGProps<T> {}
@@ -1771,14 +1784,14 @@ interface AllHTMLElements {
 }
 declare global {
   namespace JSX {
-    type ElementType = string | (new (props: any) => Component<any, any>);
+    type ElementType = string | ((props: any) => Element);
     interface Element {
       type: any;
       props: any;
     }
-    interface ElementClass extends Component {
-      render(): any;
-    }
+    // interface ElementClass extends Component {
+    //   render(): any;
+    // }
     interface ElementAttributesProperty {
       props: {}; // specify the property name to use
     }
