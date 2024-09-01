@@ -3,7 +3,6 @@
 /* eslint-disable @typescript-eslint/no-namespace */
 import type { Ref, RefFn } from '../core';
 
-export type EmptyAttrs = {};
 export type Slot<VM extends object> = (vm: VM) => JNode;
 export type SlotNoVm = () => JNode;
 export type FunctionComponent = (...args: any) => JSX.Element | Node[];
@@ -16,18 +15,29 @@ export type JNode =
   | boolean
   | null
   | undefined;
-export type Props<
-  P extends object = {},
+
+export type PropsOnlySlots<
   S extends
     | JNode
     | ((vm?: any) => JNode)
     | {
         [k: string]: ((vm: any) => JNode) | JNode;
-      } = never,
-> = Omit<P, 'key' | 'ref' | 'children'> & {
+      },
+> = {
+  children: S;
+};
+export type PropsWithSlots<
+  P extends object,
+  S extends
+    | JNode
+    | ((vm?: any) => JNode)
+    | {
+        [k: string]: ((vm: any) => JNode) | JNode;
+      },
+> = P & {
   key?: string | undefined | null;
   ref?: Ref<any>;
-  children?: S;
+  children: S;
 };
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };

@@ -275,3 +275,11 @@ export function renderFunctionComponent(host: ComponentHost, fc: AnyFn, attrs?: 
   setCurrentComponentHost(undefined);
   return nodes as Node[];
 }
+
+export function renderSlotFunction(host: ComponentHost, fc: AnyFn, attrs?: object) {
+  if (!fc) return [];
+  setCurrentComponentHost(host);
+  const nodes = fc(host, attrs);
+  setCurrentComponentHost(undefined);
+  return nodes as Node[];
+}

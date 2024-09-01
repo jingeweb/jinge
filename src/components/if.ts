@@ -10,9 +10,9 @@ import {
   handleRenderDone,
   addUnmountFn,
   newComponentWithDefaultSlot,
-  renderFunctionComponent,
+  renderSlotFunction,
 } from '../core';
-import type { JNode, Props } from '../jsx';
+import type { JNode, PropsWithSlots } from '../jsx';
 import { vmWatch } from '../vm';
 
 export interface IfAttrs {
@@ -20,7 +20,7 @@ export interface IfAttrs {
 }
 export function If(
   this: ComponentHost,
-  props: Props<
+  props: PropsWithSlots<
     {
       expect: boolean;
     },
@@ -44,7 +44,7 @@ export function If(
     if (renderFn) {
       const el = newComponentWithDefaultSlot(this[CONTEXT]);
       roots.push(el);
-      return renderFunctionComponent(el, renderFn);
+      return renderSlotFunction(el, renderFn);
     } else {
       const cmt = createComment(e.toString());
       roots.push(cmt);
@@ -67,7 +67,7 @@ export function If(
     if (renderFn) {
       const el = newComponentWithDefaultSlot(this[CONTEXT]);
       roots.push(el);
-      const doms = renderFunctionComponent(el, renderFn);
+      const doms = renderSlotFunction(el, renderFn);
       const newNode = doms.length > 1 ? createFragment(doms) : doms[0];
       if (nextSib) {
         $parent.insertBefore(newNode, nextSib);

@@ -1,4 +1,4 @@
-import type { Component, RenderFn } from '../../core';
+import type { ComponentHost, RenderFn } from '../../core';
 import {
   CONTEXT,
   DEFAULT_SLOT,
@@ -10,13 +10,10 @@ import {
   SLOTS,
 } from '../../core';
 import { appendChildren, createFragment } from '../../util';
-import { newEach, renderItems } from './render';
-import type { Key, KeyFn } from './common';
-import { KEY_FN, KEYS, LOOP_DATA, RENDER_LEN } from './common';
-import { ELEMENT, type ForEach } from './each';
-import type { For } from '.';
+import { renderItems } from './render';
+import type { ForEach, Key, KeyFn, KeyMap } from './common';
 
-function loopMoveRootDOMToFrag(el: Component, frag: DocumentFragment) {
+function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
   el[ROOT_NODES].forEach((c) => {
     if (isComponent(c)) {
       loopMoveRootDOMToFrag(c, frag);
@@ -26,12 +23,13 @@ function loopMoveRootDOMToFrag(el: Component, frag: DocumentFragment) {
   });
 }
 export function updateWithKey<T>(
-  comp: For<T>,
+  comp: ComponentHost,
   itemRenderFn: RenderFn,
   data: T[],
   roots: ForEach<T>[],
   keys: Map<Key, number>,
   keyFn: KeyFn<T>,
+  onKeysUpdated: (newKeys: KeyMap) => void,
 ) {
   const newLen = data.length;
   const newRoots: ForEach<T>[] = [];
@@ -77,11 +75,11 @@ export function updateWithKey<T>(
   }
 
   comp[ROOT_NODES] = newRoots;
-  comp[KEYS] = newKeys;
+  onKeysUpdated(newKeys);
 }
 
 export function updateWithoutKey<T>(
-  comp: For<T>,
+  comp: ForEach<T>,
   itemRenderFn: RenderFn,
   data: T[],
   oldLen: number,
@@ -127,24 +125,27 @@ export function updateWithoutKey<T>(
     }
   }
 }
-export function handleUpdate<T>(comp: For<T>, data: T[] | undefined | null) {
+export function handleUpdate<T>(
+  comp: ComponentHost,
+  oldLen: number,
+  data: T[] | undefined | null,
+  keys: KeyMap | undefined,
+  keyFn: KeyFn<T> | undefined,
+  onKeysUpdated: (newKeys: KeyMap) => void,
+) {
   const itemRenderFn = comp[SLOTS][DEFAULT_SLOT];
   if (!itemRenderFn) return;
 
-  const oldLen = comp[RENDER_LEN];
-  if (!oldLen && !data?.length) {
+  const newLen = data?.length ?? 0;
+  if (oldLen === 0 && newLen === 0) {
     // 数据前后都是空。比如从 null 变成 undefined 或空数组。
     return;
   }
-  const oldV = comp[LOOP_DATA];
-  comp[LOOP_DATA] = data;
-  comp[RENDER_LEN] = data?.length ?? 0;
 
   const roots = comp[ROOT_NODES];
-  const keys = comp[KEYS];
 
   // 从有数据变成没有数据，直接清空原来渲染的 ForEach 组件以及 keys，然后渲染 <!--empty-->
-  if (!data?.length) {
+  if (newLen === 0) {
     const lastNode = getLastDOM(comp);
     const nextSib = lastNode.nextSibling;
     const $parent = lastNode.parentNode as Node;
@@ -163,13 +164,12 @@ export function handleUpdate<T>(comp: For<T>, data: T[] | undefined | null) {
     return;
   }
 
-  const keyFn = comp[KEY_FN];
   // 从没有数据变成有数据。复用 renderItems 函数渲染 ForEach 列表。
-  if (!oldV?.length) {
+  if (oldLen === 0) {
     const el = roots[0] as Node; // 第 0 个元素一定是 <!--empty-->
     roots.length = 0;
     const $parent = el.parentNode as Node;
-    const doms = renderItems(data, itemRenderFn, roots, keys, keyFn, comp[CONTEXT]);
+    const doms = renderItems(data as T[], itemRenderFn, roots, keys, keyFn, comp[CONTEXT]);
     const dom = doms.length > 1 ? createFragment(doms) : doms[0];
     $parent.insertBefore(dom, el);
     $parent.removeChild(el);
@@ -182,9 +182,17 @@ export function handleUpdate<T>(comp: For<T>, data: T[] | undefined | null) {
   // 前后都有数据
   if (keyFn) {
     // 如果有 key 则复用 key 相同的元素
-    updateWithKey(comp, itemRenderFn, data, roots as ForEach<T>[], keys as Map<Key, number>, keyFn);
+    updateWithKey(
+      comp,
+      itemRenderFn,
+      data as T[],
+      roots as ForEach<T>[],
+      keys as Map<Key, number>,
+      keyFn,
+      onKeysUpdated,
+    );
   } else {
     // 如果没有 key 则直接原地更新
-    updateWithoutKey(comp, itemRenderFn, data, oldLen, roots as ForEach<T>[]);
+    updateWithoutKey(comp, itemRenderFn, data as T[], oldLen, roots as ForEach<T>[], onKeysUpdated);
   }
 }

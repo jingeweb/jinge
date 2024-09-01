@@ -1,12 +1,12 @@
-export const LOOP_DATA = Symbol('LOOP_DATA');
-export const KEY_FN = Symbol('KEY_FN');
-export const RENDER_LEN = Symbol('RENDER_LEN');
-export const KEYS = Symbol('KEYS');
+import type { ComponentHost } from '../../core';
 
 export type Key = string | number | symbol;
+export type KeyMap = Map<Key, number>;
 export type KeyFn<T> = (value: T, index: number) => Key;
 
-export interface ForProps<T> {
-  loop: T[] | undefined | null;
-  keyFn?: KeyFn<T>;
+export const EACH = Symbol('each');
+interface Each<T> {
+  data: T;
+  index: number;
 }
+export type ForEach<T> = ComponentHost & { [EACH]: Each<T> };

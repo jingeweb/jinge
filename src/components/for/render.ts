@@ -1,39 +1,27 @@
-import { isViewModel } from '../../vm';
-import type { Context, Component, RenderFn } from '../../core';
-import { CONTEXT, DEFAULT_SLOT, SLOTS } from '../../core';
-import type { Key, KeyFn } from './common';
-import { ForEach } from './each';
-
-export function newEach<T>(
-  vmMode: boolean,
-  item: T,
-  index: number,
-  itemRenderFn: RenderFn,
-  context?: Context,
-) {
-  const el = new ForEach<T>(vmMode, item, index);
-  el[SLOTS][DEFAULT_SLOT] = itemRenderFn;
-  context && (el[CONTEXT] = context);
-  return el;
-}
+import { isViewModel, vm } from '../../vm';
+import type { Context, RenderFn } from '../../core';
+import { newComponentWithDefaultSlot, renderSlotFunction } from '../../core';
+import { EACH, type ForEach, type Key, type KeyFn } from './common';
 
 function appendRenderEach<T>(
   vmMode: boolean,
   item: T,
   index: number,
   itemRenderFn: RenderFn,
-  roots: (Component | Node)[],
+  roots: (ForEach<T> | Node)[],
   context?: Context,
 ) {
-  const el = newEach(vmMode, item, index, itemRenderFn, context);
+  const el = newComponentWithDefaultSlot(context) as ForEach<T>;
+  const each = vmMode ? vm({ data: item, index }) : { data: item, index };
+  el[EACH] = each;
   roots.push(el);
-  return el.render();
+  return renderSlotFunction(el, itemRenderFn, each);
 }
 
 export function renderItems<T>(
   items: T[],
   itemRenderFn: RenderFn,
-  roots: (Component | Node)[],
+  roots: (ForEach<T> | Node)[],
   keys: Map<Key, number> | undefined,
   keyFn: KeyFn<T> | undefined,
   context?: Context,

@@ -33,8 +33,10 @@ export function watchPathForRender2(
   notOp: number,
   hostComponent: ComponentHost,
 ) {
-  const core = target[$$];
-  if (!core) throwErr('watch-not-vm');
+  if (!target) {
+    renderFn(undefined);
+    return;
+  }
 
   const val = getValueByPath(target, path);
   const innerRenderFn =
@@ -44,6 +46,10 @@ export function watchPathForRender2(
         ? (v: unknown) => renderFn(!!v)
         : renderFn;
   innerRenderFn(val);
+  const core = target[$$];
+  if (!core) {
+    return;
+  }
   addUnmountFn(hostComponent, innerWatchPath(target, core, val, innerRenderFn, path, true));
 }
 
@@ -75,25 +81,26 @@ export function PathWatcher(
   deep = false,
 ): ViewWatcher {
   const core = target[$$];
-  if (!core) throwErr('watch-not-vm');
-
   let val = getValueByPath(target, path);
+
   let parent: ParentWatcher | undefined = undefined;
-  const unwatchFn = innerWatchPath(
-    target,
-    core,
-    val,
-    (v) => {
-      val = v;
-      parent?.[VM_WATCHER_NOTIFY](v);
-    },
-    path,
-    deep,
-  );
+  const unwatchFn = core
+    ? innerWatchPath(
+        target,
+        core,
+        val,
+        (v) => {
+          val = v;
+          parent?.[VM_WATCHER_NOTIFY](v);
+        },
+        path,
+        deep,
+      )
+    : undefined;
   return {
     [VM_WATCHER_DESTROY]() {
       parent = undefined;
-      unwatchFn();
+      unwatchFn?.();
     },
     get [VM_WATCHER_VALUE]() {
       return val;
