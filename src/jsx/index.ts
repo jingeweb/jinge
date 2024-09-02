@@ -5,7 +5,7 @@ import type { Ref, RefFn } from '../core';
 
 export type Slot<VM extends object> = (vm: VM) => JNode;
 export type SlotNoVm = () => JNode;
-export type FunctionComponent = (...args: any) => JSX.Element | Node[];
+export type FunctionComponent = (...args: any) => any;
 export type JNode =
   | JSX.Element
   | FunctionComponent
@@ -1794,7 +1794,7 @@ interface AllHTMLElements {
 }
 declare global {
   namespace JSX {
-    type ElementType = string | ((props: any) => Element);
+    type ElementType = string | FunctionComponent;
     interface Element {
       type: any;
       props: any;

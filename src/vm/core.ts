@@ -35,6 +35,7 @@ export type PropertyPathItem = string | number | symbol;
 export function isInnerObj<T extends RegExp | Date | boolean = RegExp | Date | boolean>(
   v: unknown,
 ): v is T {
+  if (v instanceof Node) return true;
   const clazz = (
     v as {
       constructor: unknown;

@@ -11,6 +11,9 @@ const Errs = {
   'bind-attr-not-pub-prop': 'attrName of __bindAttr() requires public property.',
   'switch-miss-slot': 'Slot {0} or [DEFAULT_SLOT] of <Switch /> not found.',
   'hook-miss-component': 'Unexpect error, global component not found.',
+  'transition-require-element':
+    'Children of <Transition /> component must be one and only one html element',
+  'assert-failed': 'Assert failed, contact developer to report this error.',
 };
 
 export function throwErr(id: keyof typeof Errs, ...args: unknown[]): never {

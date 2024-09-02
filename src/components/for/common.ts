@@ -5,8 +5,9 @@ export type KeyMap = Map<Key, number>;
 export type KeyFn<T> = (value: T, index: number) => Key;
 
 export const EACH = Symbol('each');
-interface Each<T> {
+export interface EachVm<T> {
   data: T;
   index: number;
+  key?: Key;
 }
-export type ForEach<T> = ComponentHost & { [EACH]: Each<T> };
+export type ForEach<T> = ComponentHost & { [EACH]: EachVm<T> };

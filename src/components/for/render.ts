@@ -9,10 +9,11 @@ function appendRenderEach<T>(
   index: number,
   itemRenderFn: RenderFn,
   roots: (ForEach<T> | Node)[],
+  key: Key | undefined,
   context?: Context,
 ) {
   const el = newComponentWithDefaultSlot(context) as ForEach<T>;
-  const each = vmMode ? vm({ data: item, index }) : { data: item, index };
+  const each = vmMode ? vm({ data: item, index, key }) : { data: item, index, key };
   el[EACH] = each;
   roots.push(el);
   return renderSlotFunction(el, itemRenderFn, each);
@@ -29,8 +30,9 @@ export function renderItems<T>(
   const result: Node[] = [];
   const vmMode = isViewModel(items);
   items.forEach((item, index) => {
-    keyFn && (keys as Map<Key, number>).set(keyFn(item, index), index);
-    const els = appendRenderEach(vmMode, item, index, itemRenderFn, roots, context);
+    const key = keyFn?.(item, index);
+    keyFn && (keys as Map<Key, number>).set(key as Key, index);
+    const els = appendRenderEach(vmMode, item, index, itemRenderFn, roots, key, context);
     result.push(...els);
   });
   return result;

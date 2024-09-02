@@ -6,12 +6,15 @@ import {
   getLastDOM,
   handleRenderDone,
   isComponent,
+  newComponentWithDefaultSlot,
+  renderSlotFunction,
   ROOT_NODES,
   SLOTS,
 } from '../../core';
 import { appendChildren, createFragment } from '../../util';
+import { vm } from '../../vm';
 import { renderItems } from './render';
-import type { ForEach, Key, KeyFn, KeyMap } from './common';
+import { EACH, type EachVm, type ForEach, type Key, type KeyFn, type KeyMap } from './common';
 
 function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
   el[ROOT_NODES].forEach((c) => {
@@ -46,19 +49,22 @@ export function updateWithKey<T>(
     const oldIdx = keys.get(newKey);
     if (oldIdx === undefined) {
       // 没有匹配的旧的 key，创建新的组件。
-      const el = newEach(true, item, i, itemRenderFn, comp[CONTEXT]);
+      const el = newComponentWithDefaultSlot(comp[CONTEXT]) as ForEach<T>;
+      const each: EachVm<T> = vm({ data: item, index: i, key: newKey });
+      el[EACH] = each;
       newRoots.push(el);
-      appendChildren($doms, el.render());
+      appendChildren($doms, renderSlotFunction(el, itemRenderFn, each));
     } else {
       // 有匹配的旧的 key，复用旧的元素。
       const el = roots[oldIdx];
       keys.delete(newKey);
       newRoots.push(el);
-      if (el[ELEMENT] !== item) {
-        el.data = item;
+      const each = el[EACH];
+      if (each.data !== item) {
+        each.data = item;
       }
-      if (el.index !== i) {
-        el.index = i;
+      if (each.index !== i) {
+        each.index = i;
       }
       loopMoveRootDOMToFrag(el, $doms);
     }
@@ -79,7 +85,7 @@ export function updateWithKey<T>(
 }
 
 export function updateWithoutKey<T>(
-  comp: ForEach<T>,
+  comp: ComponentHost,
   itemRenderFn: RenderFn,
   data: T[],
   oldLen: number,
@@ -90,13 +96,13 @@ export function updateWithoutKey<T>(
   const dropLen = oldLen - updateLen;
   const appendLen = newLen - updateLen;
   for (let i = 0; i < updateLen; i++) {
-    const el = roots[i];
-    const pv = el[ELEMENT];
+    const each = roots[i][EACH];
+    const pv = each.data;
     const nv = data[i];
     if (nv === pv) {
       continue;
     }
-    el.data = nv;
+    each.data = nv;
   }
   if (dropLen > 0) {
     for (let i = 0; i < dropLen; i++) {
@@ -151,7 +157,7 @@ export function handleUpdate<T>(
     const $parent = lastNode.parentNode as Node;
 
     roots.forEach((el) => {
-      destroyComponent(el as Component);
+      destroyComponent(el as ComponentHost);
     });
     roots.length = 0;
     keys?.clear();
@@ -169,12 +175,19 @@ export function handleUpdate<T>(
     const el = roots[0] as Node; // 第 0 个元素一定是 <!--empty-->
     roots.length = 0;
     const $parent = el.parentNode as Node;
-    const doms = renderItems(data as T[], itemRenderFn, roots, keys, keyFn, comp[CONTEXT]);
+    const doms = renderItems(
+      data as T[],
+      itemRenderFn,
+      roots as ForEach<T>[],
+      keys,
+      keyFn,
+      comp[CONTEXT],
+    );
     const dom = doms.length > 1 ? createFragment(doms) : doms[0];
     $parent.insertBefore(dom, el);
     $parent.removeChild(el);
     roots.forEach((el) => {
-      handleRenderDone(el as Component);
+      handleRenderDone(el as ComponentHost);
     });
     return;
   }
@@ -193,6 +206,6 @@ export function handleUpdate<T>(
     );
   } else {
     // 如果没有 key 则直接原地更新
-    updateWithoutKey(comp, itemRenderFn, data as T[], oldLen, roots as ForEach<T>[], onKeysUpdated);
+    updateWithoutKey(comp, itemRenderFn, data as T[], oldLen, roots as ForEach<T>[]);
   }
 }

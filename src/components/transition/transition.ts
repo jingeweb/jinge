@@ -1,103 +1,198 @@
-import { ROOT_NODES, UPDATE_RENDER } from '../../core';
-import type { JNode } from '../../jsx';
-import { createComment } from '../../util';
+import type { ComponentHost } from '../../core';
+import {
+  addUnmountFn,
+  CONTEXT,
+  DEFAULT_SLOT,
+  destroyComponent,
+  newComponentWithDefaultSlot,
+  renderSlotFunction,
+  ROOT_NODES,
+  SLOTS,
+} from '../../core';
+import type { JNode, PropsWithSlots } from '../../jsx';
+import { addEvent, createComment, createFragment, removeEvent, throwErr } from '../../util';
 import { vmWatch } from '../../vm';
 
 export interface TransitionCallbacks {
-  onAfterEnter?(el: HTMLElement): void;
-  onEnterCancelled?(): void;
-  onAfterLeave?(el: HTMLElement): void;
-  onLeaveCancelled?(): void;
+  onBeforeEnter?(el?: Element): void;
+  onAfterEnter?(el?: Element): void;
+  onEnterCancelled?(el?: Element): void;
+  onBeforeLeave?(el?: Element): void;
+  onAfterLeave?(el?: Element): void;
+  onLeaveCancelled?(el?: Element): void;
+}
+
+export interface TransitionClassnames {
+  /** enter 的目标 html class。默认为空。该属性为单向属性。*/
+  enterClass?: string;
+  /** leave 的目标 html class。默认为空。该属性为单向属性。 */
+  leaveClass?: string;
+  /** enter 开始后的激发 html class。默认和 leaveActiveClass 一致（二者都没配置则为空）。该属性为单向属性。 */
+  enterActiveClass?: string;
+  /** leave 开始后的激发 html class。默认和 enterActiveClass 一致（二者都没配置则为空）。该属性为单向属性。 */
+  leaveActiveClass?: string;
 }
 
 export type TransitionInnerProps = {
+  /** 当动画 leave 完成后，是否销毁渲染内容。默认为 false。该属性为单向属性。 */
   destroyAfterLeave?: boolean;
+  /** 控制 transiton 的状态是 enter 还是 leave 状态。切换状态可触发 transition 动画。 */
   isEnter?: boolean;
-  enter?: string;
-  leave?: string;
-  enterActive?: string;
-  leaveActive?: string;
+  /** 是否在首次渲染时应用动画。默认为 false。该属性为单向属性。 */
   appear?: boolean;
 };
 
-export type TransitionProps = TransitionInnerProps & TransitionCallbacks;
+export type TransitionProps = TransitionInnerProps & TransitionClassnames & TransitionCallbacks;
 
-enum TState {
-  Entering,
-  Entered,
-  Leaving,
-  Leaved,
-}
+const TStateEntering = 0;
+const TStateEntered = 1;
+const TStateLeaving = 2;
+const TStateLeaved = 3;
+const TS_END = 'transitionend';
 
-const STATE = Symbol();
-const CLSTOKENS = Symbol();
-const MOUNTED = Symbol();
-const REAL_ENTER = Symbol('realEnter');
 function parseCls(cls?: string) {
   return cls ? cls.trim().split(/\s+/) : [];
 }
-export class Transition extends Component<TransitionProps, JNode> {
-  [MOUNTED]: boolean;
-  [STATE]: TState;
-  [REAL_ENTER]: boolean;
-  [CLSTOKENS]: string[][];
-  constructor(attrs: TransitionProps) {
-    super();
 
-    this[MOUNTED] = !attrs.destroyAfterLeave || (attrs.appear ? !attrs.isEnter : !!attrs.isEnter);
-    this[REAL_ENTER] = attrs.appear ? !attrs.isEnter : !!attrs.isEnter;
-    this[STATE] = (attrs.appear ? !attrs.isEnter : !!attrs.isEnter)
-      ? TState.Entered
-      : TState.Leaved;
-    // 提前将四种状态的 class 字符串转成 Element.classList 支持的 tokens
-    this[CLSTOKENS] = [
-      parseCls(attrs.enter), // enter 进入后的 class
-      parseCls(attrs.enterActive), // enter active 开始进入（激活）的 class
-      parseCls(attrs.leave), // leave 离开后的 class
-      parseCls(attrs.leaveActive),
-    ];
-    vmWatch(attrs, 'isEnter', (v) => {
-      if (!attrs.destroyAfterLeave) {
-        this[REAL_ENTER] = !!v;
-        return; // important to return;
+export function Transition(this: ComponentHost, props: PropsWithSlots<TransitionProps, JNode>) {
+  const destroyAfterLeave = !!props.destroyAfterLeave;
+  let realEnter = props.appear ? !props.isEnter : !!props.isEnter;
+  let rootEl: Element | undefined = undefined;
+  let state = realEnter ? TStateEntered : TStateLeaved;
+  let tm = 0;
+
+  // 提前将四种状态的 class 字符串转成 Element.classList 支持的 tokens
+  const classTokens = [
+    parseCls(props.enterClass), // enter 进入后的 class
+    parseCls(props.enterActiveClass ?? props.leaveActiveClass), // enter active 开始进入（激活）的 class
+    parseCls(props.leaveClass), // leave 离开后的 class
+    parseCls(props.leaveActiveClass ?? props.enterActiveClass),
+  ];
+  const toggleClass = () => {
+    if (!rootEl) return;
+    const clist = rootEl.classList;
+    const ir = realEnter ? 2 : 0;
+    const ia = realEnter ? 0 : 2;
+    clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
+    clist.add(...classTokens[ia], ...classTokens[ia + 1]);
+    realEnter ? props.onBeforeEnter?.(rootEl) : props.onBeforeLeave?.(rootEl);
+  };
+
+  const destroyMount = () => {
+    if (!rootEl) return;
+    const roots = this[ROOT_NODES];
+    const el = roots[0] as ComponentHost;
+    const cmt = createComment('leaved');
+    const pa = rootEl.parentElement as HTMLElement;
+    pa.insertBefore(cmt, rootEl);
+    destroyComponent(el);
+    rootEl = undefined; // rootEl 是 el 组件的渲染元素，销毁 el 组件时 rootEl 也会被移除，不需要主动处理。
+    roots[0] = cmt;
+  };
+
+  const onTransEnd = () => {
+    if (state === TStateEntering) {
+      state = TStateEntered;
+      props.onAfterEnter?.(rootEl);
+    } else if (state === TStateLeaving) {
+      state = TStateLeaved;
+      props.onAfterLeave?.(rootEl);
+      if (destroyAfterLeave) {
+        destroyMount();
       }
-      if (v) {
-        if (this[STATE] === TState.Leaving) {
-          attrs.onLeaveCancelled?.();
-          this[STATE] = TState.Entering;
-          this[REAL_ENTER] = true;
-        } else {
-          this[MOUNTED] = true;
-        }
-      } else {
-        if (this[STATE] === TState.Entering || this[STATE] === TState.Entered) {
-          if (this[STATE] === TState.Entering) {
-            attrs.onEnterCancelled?.();
-          }
-          this[STATE] = TState.Leaving;
-          this[REAL_ENTER] = false;
-        }
-      }
-    });
-  }
-
-  [UPDATE_RENDER]() {
-    if (this[REAL_ENTER]) {
-      this[STATE] = TState.Entering;
-    }
-  }
-
-  render() {
-    if (!this[MOUNTED]) {
-      this[ROOT_NODES] = [createComment('transition-leaved')];
-      return this[ROOT_NODES];
     } else {
-      const nodes = super.render() as HTMLElement[];
-      const cls = this[REAL_ENTER] ? this[CLSTOKENS][0] : this[CLSTOKENS][2];
-      nodes.forEach((n) => {
-        n.classList.add(...cls);
-      });
-      return nodes;
+      throwErr('assert-failed');
     }
+  };
+
+  const renderMount = () => {
+    const el = newComponentWithDefaultSlot(this[CONTEXT]);
+    this[ROOT_NODES] = [el];
+    const nodes = renderSlotFunction(el, this[SLOTS][DEFAULT_SLOT]);
+    if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
+      throwErr('transition-require-element');
+    }
+    if (rootEl) {
+      removeEvent(rootEl, TS_END, onTransEnd);
+    }
+    rootEl = nodes[0];
+    rootEl.classList.add(...(realEnter ? classTokens[0] : classTokens[2]));
+    addEvent(rootEl, TS_END, onTransEnd);
+    return nodes;
+  };
+
+  const updateMount = () => {
+    const cmt = this[ROOT_NODES][0] as Node;
+    const nodes = renderMount();
+    const pa = cmt.parentNode as Node;
+    const cn = nodes.length > 0 ? createFragment(nodes) : nodes[0];
+    pa.insertBefore(cn, cmt);
+    pa.removeChild(cmt);
+    tm = window.setTimeout(() => {
+      // mount 元素渲染之后，进入 entering，触发动画。
+      state = TStateEntering;
+      realEnter = true;
+      toggleClass();
+    }, 10);
+  };
+
+  const handleUpdate = (isEnter: boolean) => {
+    if (tm) {
+      clearTimeout(tm);
+      tm = 0;
+    }
+    if (isEnter) {
+      // isEnter === true，说明之前的 isEnter 一定是 false，则 state 只可能是 Leaving 或 Leaved 状态。
+      if (state === TStateLeaving) {
+        props.onLeaveCancelled?.(rootEl);
+        state = TStateEntering;
+        realEnter = true;
+        // 状态是 Leaving，则一定有 mount 元素 ，直接触发动画。
+        toggleClass();
+      } else {
+        if (destroyAfterLeave) {
+          // 状态是 Leaved，并且 destroyAfterLeave 是 true，则说明还未 mount 元素 ，先 mount 后再触发动画。
+          updateMount();
+        } else {
+          state = TStateEntering;
+          realEnter = true;
+          // 否则直接触发动画
+          toggleClass();
+        }
+      }
+    } else {
+      // isEnter === true，说明之前的 isEnter 一定是 false，则 state 只可能是 Entering 或 Entered 状态。
+      if (state === TStateEntering || state === TStateEntered) {
+        if (state === TStateEntering) {
+          props.onEnterCancelled?.(rootEl);
+        }
+        state = TStateLeaving;
+        realEnter = false;
+        // 不论是 Entering 还是 Entered 状态，都一定有 mount 元素，直接触发动画。
+        toggleClass();
+      }
+    }
+  };
+
+  vmWatch(props, 'isEnter', (v) => {
+    handleUpdate(!!v);
+  });
+
+  addUnmountFn(this, () => {
+    if (rootEl) removeEvent(rootEl, TS_END, onTransEnd);
+    if (tm) clearTimeout(tm);
+  });
+
+  if (props.appear) {
+    tm = window.setTimeout(() => {
+      handleUpdate(!realEnter);
+    }, 10);
+  }
+
+  if (destroyAfterLeave && !realEnter) {
+    this[ROOT_NODES].push(createComment('leaved'));
+    return this[ROOT_NODES];
+  } else {
+    return renderMount();
   }
 }

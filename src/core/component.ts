@@ -276,7 +276,7 @@ export function renderFunctionComponent(host: ComponentHost, fc: AnyFn, attrs?: 
   return nodes as Node[];
 }
 
-export function renderSlotFunction(host: ComponentHost, fc: AnyFn, attrs?: object) {
+export function renderSlotFunction(host: ComponentHost, fc?: AnyFn, attrs?: object) {
   if (!fc) return [];
   setCurrentComponentHost(host);
   const nodes = fc(host, attrs);
