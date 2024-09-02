@@ -3,6 +3,7 @@ import {
   CONTEXT,
   DEFAULT_SLOT,
   destroyComponent,
+  getFirstDOM,
   getLastDOM,
   handleRenderDone,
   isComponent,
@@ -11,7 +12,7 @@ import {
   ROOT_NODES,
   SLOTS,
 } from '../../core';
-import { appendChildren, createFragment } from '../../util';
+import { createFragment } from '../../util';
 import { vm } from '../../vm';
 import { renderItems } from './render';
 import { EACH, type EachVm, type ForEach, type Key, type KeyFn, type KeyMap } from './common';
@@ -36,12 +37,11 @@ export function updateWithKey<T>(
 ) {
   const newLen = data.length;
   const newRoots: ForEach<T>[] = [];
-  const $doms = createFragment();
   const newKeys: Map<Key, number> = new Map();
-  const lastNode = getLastDOM(comp);
-  const nextSib = lastNode.nextSibling;
-  const $parent = lastNode.parentNode as Node;
 
+  let pi = 0;
+  let pe: Node | null = getFirstDOM(comp);
+  const $parent = pe?.parentNode as Node;
   for (let i = 0; i < newLen; i++) {
     const item = data[i];
     const newKey = keyFn(item, i);
@@ -53,7 +53,11 @@ export function updateWithKey<T>(
       const each: EachVm<T> = vm({ data: item, index: i, key: newKey });
       el[EACH] = each;
       newRoots.push(el);
-      appendChildren($doms, renderSlotFunction(el, itemRenderFn, each));
+      const doms = renderSlotFunction(el, itemRenderFn, each);
+      const d = doms.length > 1 ? createFragment(doms) : doms[0];
+      if (pe) $parent.insertBefore(d, pe);
+      else $parent.appendChild(d);
+      // console.log('append', pe, newKey);
     } else {
       // 有匹配的旧的 key，复用旧的元素。
       const el = roots[oldIdx];
@@ -66,19 +70,22 @@ export function updateWithKey<T>(
       if (each.index !== i) {
         each.index = i;
       }
-      loopMoveRootDOMToFrag(el, $doms);
+      if (oldIdx < pi) {
+        const frag = createFragment();
+        loopMoveRootDOMToFrag(el, frag);
+        if (pe) $parent.insertBefore(frag, pe);
+        else $parent.appendChild(frag);
+        // console.log('move', newKey, pe);
+      } else {
+        pi = oldIdx;
+        pe = getLastDOM(el).nextSibling;
+      }
     }
   }
   keys.forEach((index) => {
     // 剩下的是未被复用的元素，需要销毁
     destroyComponent(roots[index]);
   });
-
-  if (nextSib) {
-    $parent.insertBefore($doms, nextSib);
-  } else {
-    $parent.appendChild($doms);
-  }
 
   comp[ROOT_NODES] = newRoots;
   onKeysUpdated(newKeys);

@@ -12,6 +12,7 @@ import {
 import type { JNode, PropsWithSlots } from '../../jsx';
 import { addEvent, createComment, createFragment, removeEvent, throwErr } from '../../util';
 import { vmWatch } from '../../vm';
+import { classnames2tokens, TRANSITION_END } from './helper';
 
 export interface TransitionCallbacks {
   onBeforeEnter?(el?: Element): void;
@@ -48,11 +49,6 @@ const TStateEntering = 0;
 const TStateEntered = 1;
 const TStateLeaving = 2;
 const TStateLeaved = 3;
-const TS_END = 'transitionend';
-
-function parseCls(cls?: string) {
-  return cls ? cls.trim().split(/\s+/) : [];
-}
 
 export function Transition(this: ComponentHost, props: PropsWithSlots<TransitionProps, JNode>) {
   const destroyAfterLeave = !!props.destroyAfterLeave;
@@ -62,12 +58,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
   let tm = 0;
 
   // 提前将四种状态的 class 字符串转成 Element.classList 支持的 tokens
-  const classTokens = [
-    parseCls(props.enterClass), // enter 进入后的 class
-    parseCls(props.enterActiveClass ?? props.leaveActiveClass), // enter active 开始进入（激活）的 class
-    parseCls(props.leaveClass), // leave 离开后的 class
-    parseCls(props.leaveActiveClass ?? props.enterActiveClass),
-  ];
+  const classTokens = classnames2tokens(props);
   const toggleClass = () => {
     if (!rootEl) return;
     const clist = rootEl.classList;
@@ -113,11 +104,11 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
       throwErr('transition-require-element');
     }
     if (rootEl) {
-      removeEvent(rootEl, TS_END, onTransEnd);
+      removeEvent(rootEl, TRANSITION_END, onTransEnd);
     }
     rootEl = nodes[0];
     rootEl.classList.add(...(realEnter ? classTokens[0] : classTokens[2]));
-    addEvent(rootEl, TS_END, onTransEnd);
+    addEvent(rootEl, TRANSITION_END, onTransEnd);
     return nodes;
   };
 
@@ -179,7 +170,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
   });
 
   addUnmountFn(this, () => {
-    if (rootEl) removeEvent(rootEl, TS_END, onTransEnd);
+    if (rootEl) removeEvent(rootEl, TRANSITION_END, onTransEnd);
     if (tm) clearTimeout(tm);
   });
 

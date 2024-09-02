@@ -47,7 +47,7 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@types/node": "^22.5.1",
+    "@types/node": "^22.5.2",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "esbuild": "^0.23.1",
@@ -57,7 +57,7 @@
     "eslint-plugin-import": "npm:eslint-plugin-i@^2.29.1",
     "eslint-plugin-prettier": "^5.2.1",
     "husky": "^9.1.5",
-    "lint-staged": "^15.2.9",
+    "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vite": "^5.4.2"

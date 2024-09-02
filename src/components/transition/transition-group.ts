@@ -1,103 +1,114 @@
+/**
+ * `transition-group` 使用了取巧地实现方式。对 <For> 组件的每一个 Slot 包装进 TransitionGroupItem，
+ * `TransitionGroupItem` 在 `onUnmount` 也就是实际销毁前，先将自身状态主动变更为已销毁，从而欺骗框架层跳过对该组件的销毁，
+ * 也就保留了 dom 不被移除，直到 leave 动画结束后，才又将状态变为正常后调用 `destroyComponent` 函数执行实际的销毁。
+ */
+
+import type { ComponentHost } from '../../core';
 import {
+  addUnmountFn,
+  COMPONENT_STATE_DESTROIED,
+  COMPONENT_STATE_RENDERED,
   CONTEXT,
   DEFAULT_SLOT,
+  destroyComponent,
   newComponentWithDefaultSlot,
   renderFunctionComponent,
+  renderSlotFunction,
   ROOT_NODES,
   SLOTS,
-  type ComponentHost,
+  STATE,
 } from '../../core';
-
-import type { PropsWithSlots } from '../../jsx';
-import { vm, vmWatch } from '../../vm';
+import type { JNode, PropsWithSlots } from '../../jsx';
+import { addEvent, throwErr } from '../../util';
 import { For, type ForSlot } from '../for';
-import type { KeyMap, type EachVm, type Key } from '../for/common';
-import type { TransitionClassnames, TransitionProps } from './transition';
-import { Transition } from './transition';
+import type { EachVm, Key } from '../for/common';
+
+import { classnames2tokens, TRANSITION_END } from './helper';
+import type { TransitionClassnames } from './transition';
+
+const CLASSNAMES = Symbol('classnames');
+const APPEAR = Symbol('appear');
+
+function TransitionGroupItem(
+  this: ComponentHost,
+  props: PropsWithSlots<
+    {
+      [CLASSNAMES]: string[][];
+      [APPEAR]: boolean;
+    },
+    JNode
+  >,
+) {
+  const toggleClass = (el: Element, enter: boolean, init = false) => {
+    const clist = el.classList;
+    const ir = enter ? 2 : 0;
+    const ia = enter ? 0 : 2;
+    !init && clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
+    clist.add(...classTokens[ia], ...classTokens[ia + 1]);
+  };
+
+  const classTokens = props[CLASSNAMES];
+  const el = newComponentWithDefaultSlot(this[CONTEXT]);
+  const nodes = renderSlotFunction(el, this[SLOTS][DEFAULT_SLOT]);
+  if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
+    throwErr('transition-require-element');
+  }
+  const rootEl = nodes[0] as Element;
+
+  let tm = 0;
+
+  if (props[APPEAR]) {
+    toggleClass(rootEl, false, true);
+    tm = window.setTimeout(() => {
+      toggleClass(rootEl, true);
+    }, 10);
+  } else {
+    toggleClass(rootEl, true, true);
+  }
+
+  addUnmountFn(this, () => {
+    if (tm) clearTimeout(tm);
+    // 在实际销毁前，先将自身状态主动变更为已销毁，从而欺骗框架层跳过对该组件的销毁，也就保留了 dom 不被移除。
+    el[STATE] = COMPONENT_STATE_DESTROIED;
+    toggleClass(rootEl, false);
+    addEvent(rootEl, TRANSITION_END, () => {
+      // leave 动画结束后，才又将状态变为正常后调用 `destroyComponent` 函数执行实际的销毁。
+      el[STATE] = COMPONENT_STATE_RENDERED;
+      destroyComponent(el);
+    });
+  });
+
+  this[ROOT_NODES].push(el);
+  return nodes;
+}
 
 export type TransitionGroupProps<T> = {
-  loop: T[];
+  loop: T[] | null | undefined;
   /** TransitionGroup 必须指定 keyFn */
   keyFn: (v: T, index: number) => Key;
   appear?: boolean;
-  classnames: TransitionClassnames;
 };
 
 export function TransitionGroup<T>(
   this: ComponentHost,
-  props: PropsWithSlots<TransitionGroupProps<T>, ForSlot<T>>,
+  props: PropsWithSlots<TransitionGroupProps<T> & TransitionClassnames, ForSlot<T>>,
 ) {
-  const classnames = Object.fromEntries(Object.entries(props.classnames));
-  const appear = !!props.appear;
-  const keyFn = props.keyFn;
-  const state = vm({
-    loop: appear ? [] : props.loop.slice(),
-    keyFn,
-  });
-  const oldStates = new Map<Key, TransitionProps>();
-
-  const renderEachFn = (host: ComponentHost, forEach: EachVm<T>) => {
-    const eachKey = forEach.key as Key;
-    const eachState: TransitionProps = vm({
-      ...classnames,
-      isEnter: true,
-      destroyAfterLeave: false,
-      appear: true,
-      onAfterLeave: () => {
-        //
-        console.log(forEach, 'leaved');
-      },
-    });
-    oldStates.set(eachKey, eachState);
-    console.log(eachState);
+  const itemProps = {
+    [CLASSNAMES]: classnames2tokens(props),
+    [APPEAR]: !!props.appear,
+  };
+  const renderEachFn = (host: ComponentHost, forEachVm: EachVm<T>) => {
     const el = newComponentWithDefaultSlot(host[CONTEXT], (tranHost) => {
-      return this[SLOTS][DEFAULT_SLOT]?.(tranHost, forEach) ?? [];
+      return this[SLOTS][DEFAULT_SLOT]?.(tranHost, forEachVm) ?? [];
     });
     host[ROOT_NODES].push(el);
-    return renderFunctionComponent(el, Transition, eachState);
-  };
-  const render = () => {
-    // state.loop.forEach((it, i) => oldKeys.set(keyFn(it, i), i));
-    const el = newComponentWithDefaultSlot(this[CONTEXT], renderEachFn);
-    const nodes = renderFunctionComponent(el, For, state);
-    return nodes;
+    return renderFunctionComponent(el, TransitionGroupItem, itemProps);
   };
 
-  vmWatch(
-    props,
-    'loop',
-    (v, _, path) => {
-      if (!path || path.length <= 1) {
-        // continue
-      } else {
-        // 如果发生变更的路径 cp.length > 1，说明是数组里某个具体的元素发生变更，
-        // 这种情况下 For 组件不需要响应和更新渲染。render 模板中有依赖到这个具体元素的地方，会在
-        // ForEach 组件中自动被更新（因为会在这个具体元素上建立监听）
-        return;
-      }
-      const newKeys = new Map();
-      v.forEach((it, i) => newKeys.set(keyFn(it, i), i));
-      const oldKeys = new Set();
-      state.loop.forEach((old, i) => {
-        const oldKey = keyFn(old, i);
-        oldKeys.add(oldKey);
-        const newIdx = newKeys.get(oldKey);
-        const oldState = oldStates.get(oldKey) as TransitionProps;
-        if (newIdx === undefined) {
-          oldState.isEnter = false;
-        } else {
-          oldState.isEnter = true;
-        }
-        newKeys.delete(oldKey);
-      });
-      newKeys.forEach((i) => {
-        state.loop.push(v[i]);
-      });
-    },
-    {
-      deep: true,
-    },
-  );
-
-  return render();
+  const el = newComponentWithDefaultSlot(this[CONTEXT], renderEachFn);
+  this[ROOT_NODES].push(el);
+  const nodes = renderFunctionComponent(el, For, props);
+  itemProps[APPEAR] = true;
+  return nodes;
 }
