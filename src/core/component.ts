@@ -269,6 +269,12 @@ export function newComponentWithDefaultSlot(
 }
 
 export function renderFunctionComponent(host: ComponentHost, fc: AnyFn, attrs?: object) {
+  // BEGIN_HMR
+  // BEGIN_HMR 和 END_HMR 之间的代码会在构建 production 版本时删除。
+  // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__JINGE_HMR__?.register(fc, host, attrs, host[CONTEXT]);
+  // END_HMR
   setCurrentComponentHost(host);
   const nodes = fc.call(host, attrs);
   setCurrentComponentHost(undefined);

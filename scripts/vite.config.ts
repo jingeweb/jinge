@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { defineConfig } from 'vite';
 
 const PROD = process.env.NODE_ENV === 'production';
-
+const CORE_COMPONENT_FILE = resolve(__dirname, '../src/core/component.ts');
 export default defineConfig({
   plugins: PROD
     ? [
@@ -11,6 +11,9 @@ export default defineConfig({
           name: 'PLUGIN',
           load(id) {
             return fs.readFile(id, 'utf-8').then((res) => {
+              if (id === CORE_COMPONENT_FILE) {
+                res = res.replace(/\/\/ BEGIN_HMR[\d\D]+?\/\/ END_HMR/g, '');
+              }
               return res.replace(/\bSymbol\([^)]+\)/g, 'Symbol()');
             });
           },
