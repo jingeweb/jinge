@@ -2,13 +2,13 @@ import { createComment, createFragment } from '../util';
 import type { ComponentHost } from '../core';
 import {
   CONTEXT,
+  DEFAULT_SLOT,
   ROOT_NODES,
   SLOTS,
-  DEFAULT_SLOT,
+  addUnmountFn,
   destroyComponentContent,
   getLastDOM,
   handleRenderDone,
-  addUnmountFn,
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';

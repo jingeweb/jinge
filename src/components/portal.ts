@@ -1,13 +1,13 @@
 import {
-  addUnmountFn,
   CONTEXT,
+  type ComponentHost,
   DEFAULT_SLOT,
+  ROOT_NODES,
+  SLOTS,
+  addUnmountFn,
   destroyComponent,
   newComponentWithDefaultSlot,
   renderSlotFunction,
-  ROOT_NODES,
-  SLOTS,
-  type ComponentHost,
 } from '../core';
 import type { JNode, PropsWithSlots } from '../jsx';
 import { appendChildren, createComment } from '../util';

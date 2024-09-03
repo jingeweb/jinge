@@ -1,7 +1,7 @@
 /**
  * setImmediate polyfill only for modern browsers
  */
-import { isUndefined, isString } from './type';
+import { isString, isUndefined } from './type';
 declare global {
   interface Window {
     setImmediate(callback: () => void): number;
@@ -12,7 +12,7 @@ declare global {
 isUndefined(window.setImmediate) &&
   (function setImmediatePolyfill() {
     let nextHandle = 1; // Spec says greater than zero
-    const tasksByHandle: Map<number, () => void> = new Map();
+    const tasksByHandle = new Map<number, () => void>();
 
     function runIfPresent(handle: number): void {
       try {

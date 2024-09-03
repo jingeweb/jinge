@@ -4,12 +4,12 @@ import type { PropertyPathItem, WatchHandler, WatchOptions } from '../vm';
 import { vmWatch } from '../vm';
 import { CONTEXT } from './common';
 import {
+  type ComponentHost,
   addMountFn,
   addUnmountFn,
   getFirstDOM,
   getLastDOM,
   setComponentContext,
-  type ComponentHost,
 } from './component';
 
 const MISS_KEY = 'hook-miss-component';
@@ -59,7 +59,6 @@ export function context(key: string | symbol, value?: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
 export function exportInstance<E extends {}>(instance: E) {
   if (!componentHost) throwErr(MISS_KEY);
   Object.assign(componentHost, instance);

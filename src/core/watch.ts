@@ -1,7 +1,7 @@
-import { arrayEqual, throwErr, clearImmediate, setImmediate } from '../util';
+import { arrayEqual, clearImmediate, setImmediate, throwErr } from '../util';
 import type { PropertyPathItem, ViewModel } from '../vm';
-import { VM_WATCHER_VALUE, $$, getValueByPath, innerWatchPath } from '../vm';
-import { addUnmountFn, type ComponentHost } from './component';
+import { $$, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
+import { type ComponentHost, addUnmountFn } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
 ////// 业务中请直接使用 `watch` 函数进行 Component 或 ViewModel 的监听。        /////
@@ -113,7 +113,7 @@ export function PathWatcher(
 export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => void) {
   let val = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
   let parent: ParentWatcher | undefined = undefined;
-  let imm: number = 0;
+  let imm = 0;
   const update = () => {
     imm = 0;
     const newVal = fn(...path.map((w) => w[VM_WATCHER_VALUE]));

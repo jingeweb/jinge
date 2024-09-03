@@ -31,7 +31,7 @@ export function renderItems<T>(
   const vmMode = isViewModel(items);
   items.forEach((item, index) => {
     const key = keyFn?.(item, index);
-    keyFn && (keys as Map<Key, number>).set(key as Key, index);
+    keyFn && keys!.set(key!, index);
     const els = appendRenderEach(vmMode, item, index, itemRenderFn, roots, key, context);
     result.push(...els);
   });

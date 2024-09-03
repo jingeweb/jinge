@@ -1,20 +1,20 @@
 import type { AnyFn } from '../util';
-import { isArray, isObject, isPromise, isUndefined, isString, throwErr } from '../util';
+import { isArray, isObject, isPromise, isString, isUndefined, throwErr } from '../util';
 
-import type { PropertyPathItem, ViewModelCore, ViewModel } from './core';
+import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
 import {
+  $$,
+  VM_NOTIFIABLE,
+  VM_PROXY,
+  VM_TARGET,
   addParent,
+  isInnerObj,
+  isPublicProperty,
   isViewModel,
   removeParent,
   shiftParent,
-  isPublicProperty,
-  isInnerObj,
-  $$,
-  VM_PROXY,
-  VM_NOTIFIABLE,
-  VM_TARGET,
 } from './core';
-import { notifyVmPropChange, notifyVmArrayChange } from './watch';
+import { notifyVmArrayChange, notifyVmPropChange } from './watch';
 
 type ViewModelArray = ViewModel<ViewModel[]>;
 
@@ -223,7 +223,6 @@ function wrapSubArray(arr: ViewModelArray, wrapEachItem = false) {
     if (isViewModel(it)) {
       addParent(it[$$], (arr as ViewModelArray)[$$], i);
     } else if (wrapEachItem) {
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       arr[i] = wrapVm(it as ViewModel);
     }
   });
@@ -466,7 +465,6 @@ export function proxyAttributes<T extends object>(attrs: T) {
 //   _di.vms.push(vm);
 // }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 // export function proxyComponent(component: Component<any, any>) {
 //   return new Proxy(component, {
 //     set: componentPropSetHandler,

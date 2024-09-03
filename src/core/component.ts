@@ -1,28 +1,27 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AnyFn } from '../util';
-import { throwErr, isObject, isFunction } from '../util';
+import { isFunction, isObject, throwErr } from '../util';
 
 import type { ComponentState, Context, ContextState, Slots } from './common';
 import {
-  DEFAULT_SLOT,
-  UNMOUNT_FNS,
-  REFS,
-  NON_ROOT_COMPONENT_NODES,
-  ROOT_NODES,
-  STATE,
+  COMPONENT_STATE_DESTROIED,
+  COMPONENT_STATE_INITIALIZE,
+  COMPONENT_STATE_RENDERED,
+  COMPONENT_STATE_WILLDESTROY,
   CONTEXT,
   CONTEXT_STATE,
-  SLOTS,
-  __,
-  COMPONENT_STATE_INITIALIZE,
-  COMPONENT_STATE_DESTROIED,
-  COMPONENT_STATE_WILLDESTROY,
-  COMPONENT_STATE_RENDERED,
-  CONTEXT_STATE_UNTOUCH,
-  CONTEXT_STATE_TOUCHED_FREEZED,
-  CONTEXT_STATE_UNTOUCH_FREEZED,
   CONTEXT_STATE_TOUCHED,
+  CONTEXT_STATE_TOUCHED_FREEZED,
+  CONTEXT_STATE_UNTOUCH,
+  CONTEXT_STATE_UNTOUCH_FREEZED,
+  DEFAULT_SLOT,
+  NON_ROOT_COMPONENT_NODES,
   ONMOUNT,
+  REFS,
+  ROOT_NODES,
+  SLOTS,
+  STATE,
+  UNMOUNT_FNS,
+  __,
 } from './common';
 import { setCurrentComponentHost } from './hook';
 import type { Ref, RefFn } from './ref';
@@ -191,7 +190,7 @@ export function destroyComponentContent(target: ComponentHost, removeDOM = false
       if (!$parent) {
         $parent = (node as Node).parentNode;
       }
-      ($parent as Node).removeChild(node as Node);
+      $parent!.removeChild(node as Node);
     }
   }
 }

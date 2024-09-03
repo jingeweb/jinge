@@ -1,16 +1,16 @@
 import { $$, innerWatchPath, isViewModel } from '../../vm';
 import type { JNode, PropsWithSlots } from '../../jsx';
 import type { ComponentHost } from '../../core';
-import { addUnmountFn, CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS } from '../../core';
+import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS, addUnmountFn } from '../../core';
 
 import type { ForEach, KeyFn, KeyMap } from './common';
 import { renderItems } from './render';
 import { handleUpdate } from './update';
 
-export type ForProps<T> = {
+export interface ForProps<T> {
   loop: T[] | undefined | null;
   keyFn?: KeyFn<T>;
-};
+}
 export type ForSlot<T> = (each: {
   data: T;
   index: number;

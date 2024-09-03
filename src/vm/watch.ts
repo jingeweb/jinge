@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { AnyObj } from '../util';
-import { isFunction, isObject, setImmediate, clearImmediate, throwErr } from '../util';
+import { clearImmediate, isFunction, isObject, setImmediate, throwErr } from '../util';
 import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
-import { VM_TARGET, $$, VM_PARENTS, VM_WATCHERS } from './core';
+import { $$, VM_PARENTS, VM_TARGET, VM_WATCHERS } from './core';
 
 export const VM_WATCHER_PATH = Symbol('PATH');
 export const VM_WATCHER_VALUE = Symbol('VALUE');
@@ -20,7 +20,7 @@ export interface Watcher<T = any> {
   [VM_WATCHER_PATH]?: PropertyPathItem[];
   [VM_WATCHER_VALUE]?: T;
   [VM_WATCHER_LISTENER]?: WatchHandler<T>;
-  [VM_WATCHER_IS_DEEP]?: boolean;
+  [VM_WATCHER_IS_DEEP]: boolean;
   [VM_WATCHER_IMM]: {
     i: number;
     /**
@@ -89,7 +89,7 @@ export function innerWatchPath(
     [VM_WATCHER_PATH]: path,
     [VM_WATCHER_VALUE]: val,
     [VM_WATCHER_LISTENER]: handler,
-    [VM_WATCHER_IS_DEEP]: deep,
+    [VM_WATCHER_IS_DEEP]: !!deep,
     [VM_WATCHER_IMM]: { i: 0, p: undefined },
   };
   watchers.add(watcher);

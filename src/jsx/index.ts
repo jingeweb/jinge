@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/ban-types */
-/* eslint-disable @typescript-eslint/no-namespace */
+
 import type { Ref, RefFn } from '../core';
 
 export type Slot<VM extends object> = (vm: VM) => JNode;
@@ -16,24 +15,14 @@ export type JNode =
   | null
   | undefined;
 
-export type PropsOnlySlots<
-  S extends
-    | JNode
-    | ((vm?: any) => JNode)
-    | {
-        [k: string]: ((vm: any) => JNode) | JNode;
-      },
-> = {
+export interface PropsOnlySlots<
+  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
+> {
   children: S;
-};
+}
 export type PropsWithSlots<
   P extends object,
-  S extends
-    | JNode
-    | ((vm?: any) => JNode)
-    | {
-        [k: string]: ((vm: any) => JNode) | JNode;
-      },
+  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
 > = P & {
   key?: string | undefined | null;
   ref?: Ref<any>;

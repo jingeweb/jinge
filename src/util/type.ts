@@ -2,7 +2,6 @@ export function typeOf(v: unknown): string {
   return typeof v;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isObject<T extends object = AnyObj>(v: unknown): v is T {
   return v !== null && typeOf(v) === 'object';
 }

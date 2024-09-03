@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { appendChildren, replaceChildren } from '../util';
 import { ComponentHost, handleRenderDone, renderFunctionComponent } from './component';
+import { appendChildren, replaceChildren } from '../util';
 
 export function bootstrap<C extends object = never>(FC: () => any, dom: HTMLElement): C;
 export function bootstrap<A extends object = never, C extends object = never>(

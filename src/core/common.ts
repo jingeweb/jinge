@@ -14,7 +14,6 @@ export type ContextState = 0 | 1 | 2 | 3;
 
 export type Context = Record<string | number | symbol, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RenderFn<T extends ComponentHost = ComponentHost> = (
   containerComponent: T,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

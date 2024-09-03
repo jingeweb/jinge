@@ -2,6 +2,8 @@ import type { ComponentHost, RenderFn } from '../../core';
 import {
   CONTEXT,
   DEFAULT_SLOT,
+  ROOT_NODES,
+  SLOTS,
   destroyComponent,
   getFirstDOM,
   getLastDOM,
@@ -9,8 +11,6 @@ import {
   isComponent,
   newComponentWithDefaultSlot,
   renderSlotFunction,
-  ROOT_NODES,
-  SLOTS,
 } from '../../core';
 import { createFragment } from '../../util';
 import { vm } from '../../vm';
@@ -37,7 +37,7 @@ export function updateWithKey<T>(
 ) {
   const newLen = data.length;
   const newRoots: ForEach<T>[] = [];
-  const newKeys: Map<Key, number> = new Map();
+  const newKeys = new Map<Key, number>();
 
   let pi = 0;
   let pe: Node | null = getFirstDOM(comp);
@@ -183,7 +183,7 @@ export function handleUpdate<T>(
     roots.length = 0;
     const $parent = el.parentNode as Node;
     const doms = renderItems(
-      data as T[],
+      data!,
       itemRenderFn,
       roots as ForEach<T>[],
       keys,
@@ -205,7 +205,7 @@ export function handleUpdate<T>(
     updateWithKey(
       comp,
       itemRenderFn,
-      data as T[],
+      data!,
       roots as ForEach<T>[],
       keys as Map<Key, number>,
       keyFn,
@@ -213,6 +213,6 @@ export function handleUpdate<T>(
     );
   } else {
     // 如果没有 key 则直接原地更新
-    updateWithoutKey(comp, itemRenderFn, data as T[], oldLen, roots as ForEach<T>[]);
+    updateWithoutKey(comp, itemRenderFn, data!, oldLen, roots as ForEach<T>[]);
   }
 }

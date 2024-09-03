@@ -1,4 +1,4 @@
-import { isString, isUndefined, isObject } from './type';
+import { isObject, isString, isUndefined } from './type';
 
 export function setText($element: Node, text: unknown): void {
   if (isObject(text)) {

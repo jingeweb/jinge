@@ -6,25 +6,25 @@
 
 import type { ComponentHost } from '../../core';
 import {
-  addUnmountFn,
   COMPONENT_STATE_DESTROIED,
   COMPONENT_STATE_RENDERED,
   CONTEXT,
   DEFAULT_SLOT,
+  ROOT_NODES,
+  SLOTS,
+  STATE,
+  addUnmountFn,
   destroyComponent,
   newComponentWithDefaultSlot,
   renderFunctionComponent,
   renderSlotFunction,
-  ROOT_NODES,
-  SLOTS,
-  STATE,
 } from '../../core';
 import type { JNode, PropsWithSlots } from '../../jsx';
 import { addEvent, throwErr } from '../../util';
 import { For, type ForSlot } from '../for';
 import type { EachVm, Key } from '../for/common';
 
-import { classnames2tokens, TRANSITION_END } from './helper';
+import { TRANSITION_END, classnames2tokens } from './helper';
 import type { TransitionClassnames } from './transition';
 
 const CLASSNAMES = Symbol('classnames');
@@ -83,12 +83,12 @@ function TransitionGroupItem(
   return nodes;
 }
 
-export type TransitionGroupProps<T> = {
+export interface TransitionGroupProps<T> {
   loop: T[] | null | undefined;
   /** TransitionGroup 必须指定 keyFn */
   keyFn: (v: T, index: number) => Key;
   appear?: boolean;
-};
+}
 
 export function TransitionGroup<T>(
   this: ComponentHost,

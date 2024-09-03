@@ -25,8 +25,8 @@
     "build-dev": "NODE_ENV=development vite build --mode development -c scripts/vite.config.ts",
     "build-prod": "vite build -c scripts/vite.config.ts",
     "build": "rm -rf dist && pnpm build-dev && pnpm build-prod",
-    "lint-fix": "eslint './{src,scripts}/**/*.{js,mjs,ts}' --fix && prettier --write .",
-    "lint": "tsc --noEmit && eslint './{src,scripts}/**/*.{js,mjs,ts}' && prettier --check .",
+    "lint-fix": "eslint '**/*.{js,mjs,ts}' --fix && prettier . --write --log-level=warn",
+    "lint": "tsc --noEmit && eslint '**/*.{js,mjs,ts}' && prettier --check .",
     "lint-staged": "lint-staged",
     "prepare": "husky"
   },
@@ -47,7 +47,17 @@
   },
   "keywords": [
     "mvvm",
-    "spa"
+    "web",
+    "framework"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "package.json",
+    "tsconfig.json",
+    "README_zh-cn.md",
+    "README.md",
+    "LICENSE"
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
@@ -57,6 +67,7 @@
     "esbuild": "^0.23.1",
     "eslint": "^9.9.1",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import-x": "^4.1.1",
     "husky": "^9.1.5",
     "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",

@@ -1,6 +1,6 @@
 import type { AnyObj } from '../util';
-import { isString, isObject, isNumber } from '../util';
-import { destoryWatcher, type Watcher } from './watch';
+import { isNumber, isObject, isString } from '../util';
+import { type Watcher, destoryWatcher } from './watch';
 
 export const $$ = Symbol('$$');
 

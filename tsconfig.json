@@ -2,6 +2,7 @@
   "compilerOptions": {
     "module": "ESNext",
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
     "strict": true,
@@ -12,5 +13,5 @@
     "moduleResolution": "Bundler",
     "noEmit": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/**/*", "*.mjs", "*.js"]
 }

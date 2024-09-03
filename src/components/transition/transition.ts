@@ -1,18 +1,18 @@
 import type { ComponentHost } from '../../core';
 import {
-  addUnmountFn,
   CONTEXT,
   DEFAULT_SLOT,
+  ROOT_NODES,
+  SLOTS,
+  addUnmountFn,
   destroyComponent,
   newComponentWithDefaultSlot,
   renderSlotFunction,
-  ROOT_NODES,
-  SLOTS,
 } from '../../core';
 import type { JNode, PropsWithSlots } from '../../jsx';
 import { addEvent, createComment, createFragment, removeEvent, throwErr } from '../../util';
 import { vmWatch } from '../../vm';
-import { classnames2tokens, TRANSITION_END } from './helper';
+import { TRANSITION_END, classnames2tokens } from './helper';
 
 export interface TransitionCallbacks {
   onBeforeEnter?(el?: Element): void;
@@ -34,14 +34,14 @@ export interface TransitionClassnames {
   leaveActiveClass?: string;
 }
 
-export type TransitionInnerProps = {
+export interface TransitionInnerProps {
   /** 当动画 leave 完成后，是否销毁渲染内容。默认为 false。该属性为单向属性。 */
   destroyAfterLeave?: boolean;
   /** 控制 transiton 的状态是 enter 还是 leave 状态。切换状态可触发 transition 动画。 */
   isEnter?: boolean;
   /** 是否在首次渲染时应用动画。默认为 false。该属性为单向属性。 */
   appear?: boolean;
-};
+}
 
 export type TransitionProps = TransitionInnerProps & TransitionClassnames & TransitionCallbacks;
 
@@ -74,7 +74,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
     const roots = this[ROOT_NODES];
     const el = roots[0] as ComponentHost;
     const cmt = createComment('leaved');
-    const pa = rootEl.parentElement as HTMLElement;
+    const pa = rootEl.parentElement!;
     pa.insertBefore(cmt, rootEl);
     destroyComponent(el);
     rootEl = undefined; // rootEl 是 el 组件的渲染元素，销毁 el 组件时 rootEl 也会被移除，不需要主动处理。
