@@ -12,7 +12,7 @@ import {
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
-import { createFragment } from '../../util';
+import { createFragment, insertBefore } from '../../util';
 import { vm } from '../../vm';
 import { renderItems } from './render';
 import { EACH, type EachVm, type ForEach, type Key, type KeyFn, type KeyMap } from './common';
@@ -54,9 +54,7 @@ export function updateWithKey<T>(
       el[EACH] = each;
       newRoots.push(el);
       const doms = renderSlotFunction(el, itemRenderFn, each);
-      const d = doms.length > 1 ? createFragment(doms) : doms[0];
-      if (pe) $parent.insertBefore(d, pe);
-      else $parent.appendChild(d);
+      insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], pe);
       // console.log('append', pe, newKey);
     } else {
       // 有匹配的旧的 key，复用旧的元素。
@@ -73,9 +71,7 @@ export function updateWithKey<T>(
       if (oldIdx < pi) {
         const frag = createFragment();
         loopMoveRootDOMToFrag(el, frag);
-        if (pe) $parent.insertBefore(frag, pe);
-        else $parent.appendChild(frag);
-        // console.log('move', newKey, pe);
+        insertBefore($parent, frag, pe);
       } else {
         pi = oldIdx;
         pe = getLastDOM(el).nextSibling;
@@ -130,9 +126,8 @@ export function updateWithoutKey<T>(
       undefined,
       comp[CONTEXT],
     );
-    const dom = doms.length > 1 ? createFragment(doms) : doms[0];
-    if (nextSib) $parent.insertBefore(dom, nextSib);
-    else $parent.appendChild(dom);
+    insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], nextSib);
+
     for (let i = 0; i < appendLen; i++) {
       handleRenderDone(roots[updateLen + i] as ForEach<T>);
     }
@@ -169,10 +164,7 @@ export function handleUpdate<T>(
     roots.length = 0;
     keys?.clear();
     const el = document.createComment('empty');
-    if (nextSib) $parent.insertBefore(el, nextSib);
-    else {
-      $parent.appendChild(el);
-    }
+    insertBefore($parent, el, nextSib);
     roots.push(el);
     return;
   }
@@ -190,8 +182,7 @@ export function handleUpdate<T>(
       keyFn,
       comp[CONTEXT],
     );
-    const dom = doms.length > 1 ? createFragment(doms) : doms[0];
-    $parent.insertBefore(dom, el);
+    insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], el);
     $parent.removeChild(el);
     roots.forEach((el) => {
       handleRenderDone(el as ComponentHost);

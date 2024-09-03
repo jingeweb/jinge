@@ -10,7 +10,14 @@ import {
   renderSlotFunction,
 } from '../../core';
 import type { JNode, PropsWithSlots } from '../../jsx';
-import { addEvent, createComment, createFragment, removeEvent, throwErr } from '../../util';
+import {
+  addEvent,
+  createComment,
+  createFragment,
+  insertBefore,
+  removeEvent,
+  throwErr,
+} from '../../util';
 import { vmWatch } from '../../vm';
 import { TRANSITION_END, classnames2tokens } from './helper';
 
@@ -74,8 +81,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
     const roots = this[ROOT_NODES];
     const el = roots[0] as ComponentHost;
     const cmt = createComment('leaved');
-    const pa = rootEl.parentElement!;
-    pa.insertBefore(cmt, rootEl);
+    insertBefore(rootEl.parentNode!, cmt, rootEl);
     destroyComponent(el);
     rootEl = undefined; // rootEl 是 el 组件的渲染元素，销毁 el 组件时 rootEl 也会被移除，不需要主动处理。
     roots[0] = cmt;
@@ -92,7 +98,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
         destroyMount();
       }
     } else {
-      throwErr('assert-failed');
+      // transition end 可能在多个 property 动画结束时都触发。忽略除第一个之外的其它 propery 的事件。
     }
   };
 
@@ -116,8 +122,7 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
     const cmt = this[ROOT_NODES][0] as Node;
     const nodes = renderMount();
     const pa = cmt.parentNode as Node;
-    const cn = nodes.length > 0 ? createFragment(nodes) : nodes[0];
-    pa.insertBefore(cn, cmt);
+    insertBefore(pa, nodes.length > 0 ? createFragment(nodes) : nodes[0], cmt);
     pa.removeChild(cmt);
     tm = window.setTimeout(() => {
       // mount 元素渲染之后，进入 entering，触发动画。

@@ -96,13 +96,12 @@ export function createSVGEle(tag: string, ...children: Node[]) {
   return createSVGEleA(tag, undefined, ...children);
 }
 
-export function insertAfter($parent: Node, newNode: Node, referenceNode: Node): void {
-  const rn = referenceNode.nextSibling;
-  if (!rn) {
-    $parent.appendChild(newNode);
-  } else {
-    $parent.insertBefore(newNode, rn);
-  }
+export function insertAfter($parent: Node, newNode: Node, referenceNode?: Node | null) {
+  $parent.insertBefore(newNode, referenceNode ? referenceNode.nextSibling : null);
+}
+
+export function insertBefore($parent: Node, newNode: Node, referenceNode?: Node | null) {
+  $parent.insertBefore(newNode, referenceNode ?? null);
 }
 
 export function addEvent(

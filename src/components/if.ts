@@ -1,4 +1,4 @@
-import { createComment, createFragment } from '../util';
+import { createComment, createFragment, insertAfter, insertBefore } from '../util';
 import type { ComponentHost } from '../core';
 import {
   CONTEXT,
@@ -54,8 +54,9 @@ export function If(
 
   const update = (expect: boolean) => {
     const lastNode = getLastDOM(this);
-    const nextSib = lastNode.nextSibling;
     const $parent = lastNode.parentNode as Node;
+    const placeholder = createComment(expect.toString());
+    insertAfter($parent, placeholder, lastNode);
 
     destroyComponentContent(this, true);
     const roots = this[ROOT_NODES];
@@ -68,21 +69,12 @@ export function If(
       const el = newComponentWithDefaultSlot(this[CONTEXT]);
       roots.push(el);
       const doms = renderSlotFunction(el, renderFn);
-      const newNode = doms.length > 1 ? createFragment(doms) : doms[0];
-      if (nextSib) {
-        $parent.insertBefore(newNode, nextSib);
-      } else {
-        $parent.appendChild(newNode);
-      }
+      insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], placeholder);
+      // 为了让渲染后的 dom 尽可能简洁，如果 slot 不为空，则删除掉占位注释，因为后续能从 slot 取到 dom。
+      $parent.removeChild(placeholder);
       handleRenderDone(el);
     } else {
-      const cmt = createComment(expect.toString());
-      roots.push(cmt);
-      if (nextSib) {
-        $parent.insertBefore(cmt, nextSib);
-      } else {
-        $parent.appendChild(cmt);
-      }
+      roots.push(placeholder);
     }
   };
 
