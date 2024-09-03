@@ -25,8 +25,8 @@
     "build-dev": "NODE_ENV=development vite build --mode development -c scripts/vite.config.ts",
     "build-prod": "vite build -c scripts/vite.config.ts",
     "build": "rm -rf dist && pnpm build-dev && pnpm build-prod",
-    "lint-fix": "eslint '**/*.{js,mjs,ts}' --fix && prettier . --write --log-level=warn",
-    "lint": "tsc --noEmit && eslint '**/*.{js,mjs,ts}' && prettier --check .",
+    "lint-fix": "eslint '**/*.{js,mjs,ts}' --fix && prettier --log-level=warn --write . !*.yaml",
+    "lint": "tsc --noEmit && eslint '**/*.{js,mjs,ts}' && prettier --check . !*.yaml",
     "lint-staged": "lint-staged",
     "prepare": "husky"
   },
