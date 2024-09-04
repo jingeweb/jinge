@@ -31,7 +31,7 @@ const CLASSNAMES = Symbol('classnames');
 const APPEAR = Symbol('appear');
 const ONDESTROY = Symbol('onDestroy');
 
-function TransitionGroupItem(
+export function TransitionGroupItem(
   this: ComponentHost,
   props: PropsWithSlots<
     {

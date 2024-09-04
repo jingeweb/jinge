@@ -213,12 +213,19 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
     else (ref as RefFn<undefined>)(undefined);
   });
   target[REFS] && (target[REFS].length = 0);
-  // clear properties
   target[STATE] = COMPONENT_STATE_DESTROIED;
-  // unlink all symbol properties. maybe unnecessary.
   target[ROOT_NODES].length = 0;
   target[NON_ROOT_COMPONENT_NODES].length = 0;
   target[CONTEXT] = undefined;
+}
+
+/** 重置组件，销毁旧的，重置为全新。目前此函数仅用于 hmr 时更新组件。 */
+export function resetComponent(target: ComponentHost, context: Context) {
+  destroyComponent(target);
+  target[STATE] = COMPONENT_STATE_INITIALIZE;
+  target[SLOTS] = {};
+  target[CONTEXT] = context;
+  target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }
 
 export function setComponentContext(
@@ -272,8 +279,15 @@ export function renderFunctionComponent(host: ComponentHost, fc: AnyFn, attrs?: 
   // BEGIN_HMR
   // BEGIN_HMR 和 END_HMR 之间的代码会在构建 production 版本时删除。
   // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。
+
+  // 渲染逻辑执行时，fc 有可能是内存中的旧版本，新版本通过 hmr 已经被更新，
+  // 因此先通过 getLatestFunctionComponent 拿到最版本的组件。
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__JINGE_HMR__?.register(fc, host, attrs, host[CONTEXT]);
+  const __HMR__ = (window as any).__JINGE_HMR__;
+  if (__HMR__) {
+    fc = __HMR__.getLatestFunctionComponent(fc);
+    __HMR__.registerComponentInstance(fc, host, attrs, host[CONTEXT]);
+  }
   // END_HMR
   setCurrentComponentHost(host);
   const nodes = fc.call(host, attrs);
