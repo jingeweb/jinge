@@ -6,6 +6,7 @@ import {
   SLOTS,
   addUnmountFn,
   destroyComponent,
+  handleRenderDone,
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
@@ -104,7 +105,6 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
 
   const renderMount = () => {
     const el = newComponentWithDefaultSlot(this[CONTEXT]);
-    this[ROOT_NODES] = [el];
     const nodes = renderSlotFunction(el, this[SLOTS][DEFAULT_SLOT]);
     if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
       throwErr('transition-require-element');
@@ -115,15 +115,17 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
     rootEl = nodes[0];
     rootEl.classList.add(...(realEnter ? classTokens[0] : classTokens[2]));
     addEvent(rootEl, TRANSITION_END, onTransEnd);
-    return nodes;
+    return { el, nodes };
   };
 
   const updateMount = () => {
     const cmt = this[ROOT_NODES][0] as Node;
-    const nodes = renderMount();
+    const { el, nodes } = renderMount();
+    this[ROOT_NODES][0] = el;
     const pa = cmt.parentNode as Node;
     insertBefore(pa, nodes.length > 0 ? createFragment(nodes) : nodes[0], cmt);
     pa.removeChild(cmt);
+    handleRenderDone(el);
     tm = window.setTimeout(() => {
       // mount 元素渲染之后，进入 entering，触发动画。
       state = TStateEntering;
@@ -189,6 +191,8 @@ export function Transition(this: ComponentHost, props: PropsWithSlots<Transition
     this[ROOT_NODES].push(createComment('leaved'));
     return this[ROOT_NODES];
   } else {
-    return renderMount();
+    const { el, nodes } = renderMount();
+    this[ROOT_NODES].push(el);
+    return nodes;
   }
 }

@@ -4,6 +4,7 @@ import {
   type Context,
   addUnmountFn,
   getLastDOM,
+  handleRenderDone,
   renderFunctionComponent,
   resetComponent,
 } from '../core';
@@ -74,6 +75,7 @@ export function initHmr() {
       resetComponent(item.comp, item.context);
       const nodes = renderFunctionComponent(item.comp, fc, item.props);
       insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], placeholder);
+      handleRenderDone(item.comp);
       $parent.removeChild(placeholder);
     });
   }

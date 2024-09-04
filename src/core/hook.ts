@@ -18,6 +18,10 @@ let componentHost: ComponentHost | undefined = undefined;
 export function setCurrentComponentHost(component: ComponentHost | undefined) {
   componentHost = component;
 }
+export function getCurrentComponentHost() {
+  if (!componentHost) throwErr(MISS_KEY);
+  return componentHost;
+}
 
 export function watch<T extends object, P extends keyof T>(
   vm: T,
@@ -37,7 +41,7 @@ export function watch(vm: any, propOrPathOrHanlder: any, handler?: any, options?
   addUnmountFn(componentHost, vmWatch(vm, propOrPathOrHanlder, handler, options));
 }
 
-export function onMount(fn: () => () => void | void) {
+export function onMount(fn: () => (() => void) | void) {
   if (!componentHost) throwErr(MISS_KEY);
   addMountFn(componentHost, fn);
 }

@@ -55,6 +55,7 @@ export function updateWithKey<T>(
       newRoots.push(el);
       const doms = renderSlotFunction(el, itemRenderFn, each);
       insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], pe);
+      handleRenderDone(el);
       // console.log('append', pe, newKey);
     } else {
       // 有匹配的旧的 key，复用旧的元素。

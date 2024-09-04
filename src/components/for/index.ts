@@ -49,17 +49,13 @@ export function For<T>(this: ComponentHost, props: PropsWithSlots<ForProps<T>, F
     addUnmountFn(this, unwatchFn);
   }
 
-  const render = () => {
-    const roots = this[ROOT_NODES] as (ForEach<T> | Node)[];
-    const itemRenderFn = this[SLOTS][DEFAULT_SLOT];
-    const items = props.loop;
-    if (!itemRenderFn || !items?.length) {
-      roots.push(document.createComment('empty'));
-      return roots as Node[];
-    }
-    renderLen = items.length;
-    return renderItems(items, itemRenderFn, roots, keys, keyFn, this[CONTEXT]);
-  };
-
-  return render();
+  const roots = this[ROOT_NODES] as (ForEach<T> | Node)[];
+  const itemRenderFn = this[SLOTS][DEFAULT_SLOT];
+  const items = props.loop;
+  if (!itemRenderFn || !items?.length) {
+    roots.push(document.createComment('empty'));
+    return roots as Node[];
+  }
+  renderLen = items.length;
+  return renderItems(items, itemRenderFn, roots, keys, keyFn, this[CONTEXT]);
 }

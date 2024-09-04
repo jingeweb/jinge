@@ -228,6 +228,9 @@ export function resetComponent(target: ComponentHost, context: Context) {
   target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }
 
+export function getComponentContext<T = unknown>(component: ComponentHost, key: string | symbol) {
+  return component[CONTEXT]?.[key] as T;
+}
 export function setComponentContext(
   component: ComponentHost,
   key: string | symbol,

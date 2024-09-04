@@ -4,8 +4,10 @@ import {
   DEFAULT_SLOT,
   ROOT_NODES,
   SLOTS,
+  addMountFn,
   addUnmountFn,
   destroyComponent,
+  handleRenderDone,
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';
@@ -22,6 +24,9 @@ export function Portal(this: ComponentHost, props: PropsWithSlots<PortalProps, J
     const el = newComponentWithDefaultSlot(this[CONTEXT]);
     const nodes = renderSlotFunction(el, renderFn);
     appendChildren(props.target ?? document.body, nodes);
+    addMountFn(this, () => {
+      handleRenderDone(el);
+    });
     addUnmountFn(this, () => {
       destroyComponent(el, true);
     });
