@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AnyObj } from '../util';
-import { isObject } from '../util';
+import { isArray, isObject } from '../util';
 import { type Watcher, destoryWatcher } from './watch';
 
 export const VM_PARENTS = Symbol('PARENTS');
@@ -9,18 +9,23 @@ export const VM_RAW = Symbol('TARGET');
 export const VM_PROXY = Symbol('PROXY');
 export const VM_IGNORED = Symbol('IGNORED');
 
-export interface ViewModel<T extends object = any> {
+export type ViewModel<T extends object = AnyObj> = {
   [VM_PARENTS]?: Map<PropertyPathItem, Set<ViewModel>>;
   [VM_WATCHERS]?: Set<Watcher>;
   /** 指向当前 vm core 所属的原始数据 */
-  [VM_RAW]: T;
+  [VM_RAW]: ViewModelRaw<T>;
   /** 指向当前 vm core 所属的 Proxy */
-  [VM_PROXY]: any;
-}
+  [VM_PROXY]: ViewModel<T>;
+} & T;
 
-export interface ViewModelRaw {
-  [VM_PROXY]: any;
-}
+export type ViewModelRaw<T extends object = AnyObj> = T & {
+  [VM_PROXY]: ViewModel<T>;
+};
+export type ViewModelIgnore<T extends object = AnyObj> = T & {
+  [VM_IGNORED]: boolean;
+};
+export type ViewModelArray<T extends object = AnyObj> = ViewModel<T>[] &
+  ViewModel<ViewModelRaw<T>[]>;
 
 export type PropertyPathItem = string | number | symbol;
 
@@ -36,6 +41,10 @@ export function isInnerObj<T extends object>(v: unknown): v is T {
 
 export function isViewModel<T extends object = AnyObj>(v: unknown): v is ViewModel<T> {
   return isObject(v) && v[VM_PROXY];
+}
+
+export function mayBeVm(v: unknown): v is ViewModel {
+  return isObject(v) && !isInnerObj(v) && !v[VM_IGNORED];
 }
 
 export function addParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
@@ -54,12 +63,10 @@ export function removeParent(child: ViewModel, parent: ViewModel, property: Prop
   child[VM_PARENTS]?.get(property)?.delete(parent);
 }
 
-export function shiftParent(child: ViewModel, parent: ViewModel, property: number, delta: number) {
-  removeParent(child, parent, property);
-  addParent(child, parent, property + delta);
-}
-
 export function destroyViewModelCore(vm: ViewModel) {
+  vm[VM_PARENTS]?.forEach((pset) => {
+    pset.clear();
+  });
   vm[VM_PARENTS]?.clear();
   // clear listeners
   vm[VM_WATCHERS]?.forEach((watcher) => {
@@ -67,18 +74,19 @@ export function destroyViewModelCore(vm: ViewModel) {
   });
   vm[VM_WATCHERS]?.clear();
   // unlink wrapper proxy
-  vm[VM_PROXY] = undefined;
+  vm[VM_PROXY] = undefined as any;
 
-  const target = vm[VM_RAW] as ViewModelRaw;
-
-  for (const prop in vm) {
-    const v = (vm as unknown as Record<string, unknown>)[prop];
-    if (isViewModel(v)) {
-      removeParent(v, vm, prop);
+  if (isArray(vm)) {
+    vm.forEach((v, i) => {
+      isViewModel(v) && removeParent(v, vm, i);
+    });
+  } else {
+    for (const prop in vm) {
+      const v = vm[prop];
+      isViewModel(v) && removeParent(v, vm, prop);
     }
   }
 
-  target[VM_PROXY] = undefined as any; // unlink vm target
-
+  vm[VM_RAW][VM_PROXY] = undefined as any;
   vm[VM_RAW] = undefined as any;
 }

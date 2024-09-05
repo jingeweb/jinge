@@ -62,7 +62,7 @@ export function watchPath(
   deep?: boolean,
   immediate?: boolean,
 ) {
-  if (!vm[VM_PROXY]) throwErr('watch-not-vm');
+  if (!(vm = vm[VM_PROXY])) throwErr('watch-not-vm');
 
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 
