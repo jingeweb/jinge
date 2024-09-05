@@ -1,63 +1,21 @@
-import type { AnyFn } from '../util';
-import { isArray, isObject, isPromise, isString, isUndefined, throwErr } from '../util';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { AnyFn, AnyObj } from '../util';
+import { isArray, isObject, isPromise, isString, isSymbol, isUndefined, throwErr } from '../util';
 
-import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
+import type { PropertyPathItem, ViewModel, ViewModelRaw } from './core';
 import {
-  $$,
-  VM_NOTIFIABLE,
+  VM_IGNORED,
   VM_PROXY,
-  VM_TARGET,
+  VM_RAW,
   addParent,
   isInnerObj,
-  isPublicProperty,
   isViewModel,
   removeParent,
   shiftParent,
 } from './core';
 import { notifyVmArrayChange, notifyVmPropChange } from './watch';
 
-type ViewModelArray = ViewModel<ViewModel[]>;
-
-/**
- * check if property named "prop" is setter of instance "obj",
- * if it's setter, return setter function, otherwise return null.
- *
- * 检测名称为 "prop" 的属性是否是 setter，如果是，返回该 setter 函数，
- * 否则，返回 null。
- * 由于 obj 可能是有继承关系的类的实例，因此需要向上检测继承的类的 prototype。
- */
-// function getSetterFnIfPropIsSetter(obj: ViewModel, prop: PropertyPathItem) {
-//   let map = obj[$$][VM_SETTERS];
-//   if (!map) {
-//     obj[$$][VM_SETTERS] = map = new Map();
-//   }
-//   type Constructor = { prototype: unknown };
-//   if (!map.has(prop)) {
-//     let clazz: Constructor = obj.constructor as Constructor;
-//     let desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
-//     let fn: AnyFn | null;
-//     if (desc) {
-//       fn = isFunction(desc.set) ? desc.set : null;
-//       map.set(prop, fn);
-//       return fn;
-//     }
-//     // lookup to check parent classes
-//     clazz = Object.getPrototypeOf(clazz) as Constructor;
-//     while (clazz?.prototype) {
-//       desc = Object.getOwnPropertyDescriptor(clazz.prototype, prop);
-//       if (desc) {
-//         fn = isFunction(desc.set) ? desc.set : null;
-//         map.set(prop, fn);
-//         return fn;
-//       }
-//       clazz = Object.getPrototypeOf(clazz);
-//     }
-//     map.set(prop, null);
-//     return null;
-//   } else {
-//     return map.get(prop);
-//   }
-// }
+type ViewModelArray = any[] & ViewModel<ViewModel[]>;
 
 function __propSetHandler(
   target: ViewModel,
@@ -65,29 +23,52 @@ function __propSetHandler(
   value: unknown,
   setFn: (target: ViewModel, prop: PropertyPathItem, value: unknown) => void,
 ) {
-  const isPubProp = isPublicProperty(prop);
-  if (!isPubProp) {
-    target[prop] = value;
-    return true;
+  if (isObject(value)) {
+    let valueViewModel = value[VM_PROXY];
+    if (valueViewModel) {
+      if (isSymbol(prop)) {
+        target[VM_RAW][prop] = valueViewModel[VM_RAW];
+      } else {
+      }
+    } else {
+      if (!isInnerObj(value) && !value[VM_IGNORED]) {
+        valueViewModel = wrapObj(value);
+        const oldViewModel = (target as AnyObj)[prop] as ViewModel;
+        if (oldViewModel) {
+          removeParent(oldViewModel, target, prop);
+        }
+        target[prop] = valueViewModel;
+        target[VM_RAW][prop] = value;
+        addParent(valueViewModel, target, prop);
+        notifyVmPropChange(target, prop);
+      } else {
+        const oldVal = (target as AnyObj)[prop] ?? target[VM_RAW][prop];
+        if (oldVal === value) {
+          return true;
+        }
+      }
+    }
+  } else {
+    if (isSymbol(prop)) {
+      // 如果 prop 是 symbol，value 又不是 object（也就不可能是 ViewModel）, 则直接赋值到原始数据上。
+      target[VM_RAW][prop] = value;
+      return true;
+    }
+    const oldViewModel = (target as AnyObj)[prop] as ViewModel;
+    if (oldViewModel) {
+      // value 不是 object 就不可能是 viewmodel，老的 viewmodel 一定需要卸载。
+      (target as AnyObj)[prop] = undefined;
+      removeParent(oldViewModel, target, prop);
+    }
+    const oldVal = oldViewModel ?? target[VM_RAW][prop];
+    if (oldVal !== value) {
+      target[VM_RAW][prop] = value;
+      notifyVmPropChange(target, prop);
+    } else {
+      // 如果新旧数据完全相同，则不需要做任何响应。
+    }
   }
-  const oldVal = target[prop];
-  if (oldVal === value && !isUndefined(value)) {
-    return true;
-  }
-  const newValMaybeVM = isObject(value) && !isInnerObj(value);
-  if (newValMaybeVM && isPubProp && !(value as ViewModel)[$$]) {
-    throwErr('pub-prop-not-vm');
-    // value = wrapVm(value as object);
-  }
-  // console.log(`'${prop}' changed from ${store[prop]} to ${value}`);
-  if (isViewModel(oldVal)) {
-    removeParent(oldVal[$$], target[$$], prop);
-  }
-  setFn(target, prop, value);
-  if (newValMaybeVM) {
-    addParent((value as ViewModel)[$$], target[$$], prop);
-  }
-  notifyVmPropChange(target, prop);
+
   return true;
 }
 
@@ -95,51 +76,13 @@ function __objectPropSetFn(target: ViewModel, prop: PropertyPathItem, value: unk
   target[prop] = value;
 }
 
-// function __componentPropSetFn(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-//   /**
-//    * we must ensure `this` in setter function to be `Proxy`
-//    *
-//    * 首先判断当前赋值的变量名，是否对应了一个 setter 函数，
-//    * 如果是 setter 函数，则应该显式地调用，
-//    *   并将 `this` 设置为该 target 的包装 Proxy，
-//    *   这样才能保正 setter 函数中其它赋值语句能触发 notify。
-//    * 如果不是 setter 函数，则简单地使用 target\[prop\] 赋值即可。
-//    */
-//   const setterFn = getSetterFnIfPropIsSetter(target, prop);
-//   if (setterFn) {
-//     setterFn.call(target[$$][VM_PROXY], value);
-//   } else {
-//     target[prop] = value;
-//   }
-// }
-
 function objectPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-  if (!target[$$]) {
+  if (!target[VM_PROXY]) {
     // ViewModel has been destroied.
     return true;
   }
   return __propSetHandler(target, prop, value, __objectPropSetFn);
 }
-
-function attrsPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-  if (!target[$$]) {
-    // ViewModel has been destroied.
-    return true;
-  }
-  return __propSetHandler(target as ViewModel, prop, value, __objectPropSetFn);
-}
-
-// function componentPropSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-//   if (!target[$$]) {
-//     import.meta.env.DEV &&
-//       console.error(
-//         `Warning: call setter "${prop.toString()}" after destroied, resources such as setInterval maybe not released before destroy. component:`,
-//         target,
-//       );
-//     return true;
-//   }
-//   return __propSetHandler(target, prop, value, __componentPropSetFn);
-// }
 
 function arrayLengthSetHandler(target: ViewModelArray, value: number) {
   const oldLen = target.length;
@@ -174,23 +117,26 @@ function arrayPropSetHandler(target: ViewModelArray, prop: PropertyPathItem, val
   return __propSetHandler(target as ViewModel, prop, value, __objectPropSetFn);
 }
 
-const ObjectProxyHandler = {
-  set: objectPropSetHandler,
-};
-
-const PromiseProxyHandler = {
-  get(target: ViewModel, prop: PropertyPathItem): unknown {
-    if (prop === 'then' || prop === 'catch') {
-      const v = target[prop];
-      return function (...args: unknown[]): unknown {
-        return v.call(target, ...args);
-      };
-    } else {
-      return target[prop];
-    }
+const ObjectProxyHandler: ProxyHandler<any> = {
+  get(target, prop) {
+    return target[prop] ?? target[VM_RAW][prop];
   },
   set: objectPropSetHandler,
 };
+
+// const PromiseProxyHandler = {
+//   get(target: ViewModelPromise, prop: PropertyPathItem): unknown {
+//     if (prop === 'then' || prop === 'catch') {
+//       const v = target[prop];
+//       return function (...args: unknown[]): unknown {
+//         return v.call(target, ...args);
+//       };
+//     } else {
+//       return target[prop];
+//     }
+//   },
+//   set: objectPropSetHandler,
+// };
 
 function _arrayReverseSort(target: ViewModelArray, fn: () => void): ViewModelArray {
   const prev = target.slice();
@@ -214,16 +160,18 @@ function _arrayReverseSort(target: ViewModelArray, fn: () => void): ViewModelArr
 function wrapSubArray(arr: ViewModelArray, wrapEachItem = false) {
   const proxy = new Proxy(arr, ArrayProxyHandler);
   arr[$$] = {
-    [VM_NOTIFIABLE]: true,
-    [VM_TARGET]: arr,
+    [VM_RAW]: arr,
     [VM_PROXY]: proxy,
   };
   // handleVMDebug(arr);
   arr.forEach((it, i) => {
-    if (isViewModel(it)) {
+    if (!isObject(it) || isInnerObj(it)) {
+      return;
+    }
+    if (it[$$]) {
       addParent(it[$$], (arr as ViewModelArray)[$$], i);
     } else if (wrapEachItem) {
-      arr[i] = wrapVm(it as ViewModel);
+      arr[i] = wrapObj(it as ViewModel);
     }
   });
   return proxy;
@@ -370,7 +318,7 @@ const ArrayProxyHandler = {
   get(target: ViewModelArray, prop: PropertyPathItem): unknown {
     if (prop in ArrayFns) {
       const fn = ArrayFns[prop as keyof typeof ArrayFns];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return (...args: any[]) => (fn as AnyFn)(target, ...args);
     } else {
       return target[prop as number];
@@ -380,99 +328,76 @@ const ArrayProxyHandler = {
 };
 
 function wrapProp(parent: ViewModel, child: unknown, property: PropertyPathItem) {
-  if (!isObject(child) || isInnerObj(child)) {
+  if (!isObject(child) || isInnerObj(child) || child[VM_IGNORED]) {
     return;
   }
-  if (!child[$$]) {
-    parent[property] = child = wrapVm(child);
+  let vm = child[VM_PROXY];
+  if (!vm) {
+    (parent as unknown as Record<PropertyPathItem, ViewModel>)[property] = vm = wrapObj(child);
   }
-  addParent((child as ViewModel)[$$], parent[$$], property);
+  addParent(vm, parent, property);
 }
 
-export function wrapVm<T extends object>(target: T) {
-  if (isObject(target)) {
-    // directly return if alreay is ViewModel or inner object(Date/RegExp/Boolean).
-    if (isInnerObj(target)) {
-      return target;
+function wrapObj<T extends object>(target: T) {
+  if (isArray(target)) {
+    const viewModel = [] as unknown as ViewModel;
+    viewModel[VM_RAW] = target;
+    const proxy = new Proxy(viewModel, ArrayProxyHandler);
+    viewModel[VM_PROXY] = (target as unknown as ViewModelRaw)[VM_PROXY] = proxy;
+    for (let i = 0; i < target.length; i++) {
+      wrapProp(viewModel, target[i], i);
     }
-
-    let proxy = (target as ViewModel)[$$]?.[VM_PROXY];
-    if (proxy) return proxy;
-
-    const isArr = isArray(target);
-    if (isArr) {
-      proxy = new Proxy(target as unknown as ViewModelArray, ArrayProxyHandler);
-      (target as unknown as ViewModel)[$$] = {
-        [VM_NOTIFIABLE]: true,
-        [VM_TARGET]: target,
-        [VM_PROXY]: proxy,
-      };
-      for (let i = 0; i < target.length; i++) {
-        wrapProp(target as ViewModel<T>, target[i], i);
-      }
-    } else {
-      proxy = new Proxy(
-        target as ViewModel,
-        isPromise(target) ? PromiseProxyHandler : ObjectProxyHandler,
-      );
-      (target as unknown as ViewModel)[$$] = {
-        [VM_NOTIFIABLE]: true,
-        [VM_TARGET]: target,
-        [VM_PROXY]: proxy,
-      };
-      for (const k in target) {
-        if (isPublicProperty(k)) {
-          wrapProp(target as ViewModel<T>, target[k], k);
-        }
-      }
-    }
-    return proxy;
+    return proxy as T;
   } else {
-    return target;
+    const viewModel: ViewModel = {
+      [VM_RAW]: target,
+      [VM_PROXY]: undefined,
+    };
+    const proxy = new Proxy(viewModel, ObjectProxyHandler);
+    viewModel[VM_PROXY] = (target as ViewModelRaw)[VM_PROXY] = proxy;
+    for (const k in target) {
+      wrapProp(viewModel as ViewModel<T>, target[k], k);
+    }
+    return proxy as T;
   }
 }
 
-export function proxyAttributes<T extends object>(attrs: T) {
-  const p = (attrs as ViewModel<T>)[$$];
-  if (p) return p[VM_PROXY];
-  const proxy = new Proxy(attrs as ViewModel, {
-    set: attrsPropSetHandler,
-  });
-  // 初始化时默认的 notifiable 为 false，
-  // 待 RENDER 结束后才修改为 true，用于避免无谓的消息通知。
-  (attrs as unknown as ViewModel)[$$] = {
-    [VM_NOTIFIABLE]: false,
-    [VM_TARGET]: attrs,
-    [VM_PROXY]: proxy,
-  };
-  return proxy;
+/**
+ * 将给定的 target 对象进行 ViewModel 包裹，返回 Proxy。后续可对 ViewModel 进行 watch 监听变更。
+ * 该绑定为深度递归绑定，属性值如果是 object/array 也会进行递归包裹。
+ *
+ * 对于同一个 target 对象，多次调用 vm() 返回拿到的是同一个 ViewModel。比如：
+ * ```ts
+ * import { vm } from 'jinge';
+ * const someData = { a: 10 };
+ * const v1 = vm(someData);
+ * const v2 = vm(someData);
+ * console.log(v1 === v2, v1 === someData); // true, false
+ * ```
+ *
+ * 需要注意的是，如果 target 对象的属性 key 是 Symbol，则不会进行包裹。赋值时同理。
+ */
+export function vm<T extends object>(target: T): T {
+  if (!isObject(target) || isInnerObj(target) || target[VM_IGNORED]) return target;
+  return target[VM_PROXY] ?? wrapObj(target);
 }
 
-// function handleVMDebug(vm) {
-//   if (!config[CFG_VM_DEBUG]) {
-//     return;
-//   }
-//   let _di = window._VM_DEBUG;
-//   if (!_di) {
-//     _di = window._VM_DEBUG = {
-//       id: 0, vms: []
-//     };
-//   }
-//   vm[VM_DEBUG_ID] = _di.id++;
-//   // if (isComponent(vm) && !(VM_DEBUG_NAME in vm)) {
-//   //   vm[VM_DEBUG_NAME] = `<${vm.constructor.name}>`;
-//   // }
-//   _di.vms.push(vm);
-// }
-
-// export function proxyComponent(component: Component<any, any>) {
-//   return new Proxy(component, {
-//     set: componentPropSetHandler,
-//   });
-// }
-
-export function vm<T extends object>(target: T): T {
-  const p = (target as ViewModel)[$$];
-  if (p) return p[VM_PROXY];
-  return wrapVm(target);
+/**
+ * 拿到目标 ViewModel 上的原始数据。目标 ViewModel 是深度递归包裹的 Proxy 树，拿到其原始数据。
+ */
+export function vmRaw<T extends object>(target: T): T {
+  if (!isObject(target)) return target;
+  return (target as ViewModel)[VM_RAW] ?? target;
+}
+/**
+ * 标记目标对象数据为 vm ignored。被忽略后的数据，在赋予到其它 ViewModel 属性上时，不会被转换成 ViewModel
+ */
+export function vmIgnore<T extends object>(target: T) {
+  if (
+    isObject<{
+      [VM_IGNORED]: boolean;
+    }>(target)
+  ) {
+    target[VM_IGNORED] = true;
+  }
 }

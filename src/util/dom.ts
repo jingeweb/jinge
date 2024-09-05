@@ -1,14 +1,19 @@
 import { isObject, isString, isUndefined } from './type';
 
-export function setText($element: Node, text: unknown): void {
-  if (isObject(text)) {
-    text = JSON.stringify(text);
-  }
-  $element.textContent = text as string;
+function toText(v: unknown) {
+  if (v === null) return 'null';
+  else if (v === undefined) return 'undefined';
+  else if (v instanceof Error) return v.message;
+  else if (isObject(v)) return JSON.stringify(v);
+  else return `${v}`;
 }
 
-export function createTextNode(text: unknown = ''): Text {
-  return document.createTextNode(isObject(text) ? JSON.stringify(text) : (text as string));
+export function setTextContent($ele: Node, v: unknown) {
+  $ele.textContent = toText(v);
+}
+
+export function createTextNode(text = ''): Text {
+  return document.createTextNode(text);
 }
 
 export function createFragment(children?: (Node | string)[]): DocumentFragment {
@@ -154,10 +159,4 @@ export function setClassAttribute($ele: Element, className?: string) {
 export function setStyleAttribute($ele: Element, style?: string) {
   if (!style) $ele.removeAttribute('style');
   else $ele.setAttribute('style', style);
-}
-
-export function setTextContent($ele: Element, v: unknown) {
-  if (isObject(v)) v = JSON.stringify(v);
-  else if (!isString(v)) v = `${v}`;
-  $ele.textContent = v as string;
 }

@@ -1,4 +1,4 @@
-import { $$, innerWatchPath, isViewModel } from '../../vm';
+import { innerWatchPath, isViewModel } from '../../vm';
 import type { JNode, PropsWithSlots } from '../../jsx';
 import type { ComponentHost } from '../../core';
 import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS, addUnmountFn } from '../../core';
@@ -26,7 +26,6 @@ export function For<T>(this: ComponentHost, props: PropsWithSlots<ForProps<T>, F
   if (isViewModel(props)) {
     const unwatchFn = innerWatchPath(
       props,
-      props[$$],
       props.loop,
       (data, _, cp) => {
         // console.log('PATH:', cp);

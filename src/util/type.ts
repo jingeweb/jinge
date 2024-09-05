@@ -2,6 +2,10 @@ export function typeOf(v: unknown): string {
   return typeof v;
 }
 
+export function isSymbol<T extends Symbol = Symbol>(v: unknown): v is T {
+  return typeof v === 'symbol';
+}
+
 export function isObject<T extends object = AnyObj>(v: unknown): v is T {
   return v !== null && typeOf(v) === 'object';
 }

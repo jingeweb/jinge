@@ -134,8 +134,6 @@ export function handleRenderDone(component: ComponentHost) {
    * Don't forgot to add these code if you override HANDLE_AFTER_RENDER
    */
 
-  // this[PASSED_ATTRIBUTES] && (this[PASSED_ATTRIBUTES][$$][VM_NOTIFIABLE] = true);
-
   for (const n of component[ROOT_NODES]) {
     if (isComponent(n)) {
       handleRenderDone(n);
@@ -278,7 +276,11 @@ export function newComponentWithDefaultSlot(
   return c;
 }
 
-export function renderFunctionComponent(host: ComponentHost, fc: AnyFn, attrs?: object) {
+export function renderFunctionComponent<T extends AnyFn>(
+  host: ComponentHost,
+  fc: T,
+  attrs?: Omit<Parameters<T>[0], 'children'>,
+) {
   // BEGIN_HMR
   // BEGIN_HMR 和 END_HMR 之间的代码会在构建 production 版本时删除。
   // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。

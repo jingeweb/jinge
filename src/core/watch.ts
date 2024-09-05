@@ -1,6 +1,6 @@
-import { arrayEqual, clearImmediate, setImmediate, throwErr } from '../util';
+import { arrayEqual, clearImmediate, setImmediate } from '../util';
 import type { PropertyPathItem, ViewModel } from '../vm';
-import { $$, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
+import { VM_PROXY, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
 import { type ComponentHost, addUnmountFn } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
@@ -46,11 +46,10 @@ export function watchPathForRender2(
         ? (v: unknown) => renderFn(!!v)
         : renderFn;
   innerRenderFn(val);
-  const core = target[$$];
-  if (!core) {
+  if (!target[VM_PROXY]) {
     return;
   }
-  addUnmountFn(hostComponent, innerWatchPath(target, core, val, innerRenderFn, path, true));
+  addUnmountFn(hostComponent, innerWatchPath(target, val, innerRenderFn, path, true));
 }
 
 /**
@@ -80,14 +79,12 @@ export function PathWatcher(
   path: PropertyPathItem[],
   deep = false,
 ): ViewWatcher {
-  const core = target[$$];
   let val = getValueByPath(target, path);
 
   let parent: ParentWatcher | undefined = undefined;
-  const unwatchFn = core
+  const unwatchFn = target[VM_PROXY]
     ? innerWatchPath(
         target,
-        core,
         val,
         (v) => {
           val = v;
@@ -151,8 +148,6 @@ export function DymPathWatcher(
   path: (PropertyPathItem | ViewWatcher)[],
   renderFn?: (v: unknown) => void,
 ) {
-  const core = target[$$];
-  if (!core) throwErr('watch-not-vm');
   let innerPath = path.map((p) => (typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p));
   let val = getValueByPath(target, innerPath);
   renderFn?.(val);
@@ -160,7 +155,6 @@ export function DymPathWatcher(
   const __innerW = () => {
     return innerWatchPath(
       target,
-      core,
       val,
       (v) => {
         val = v;
@@ -171,11 +165,11 @@ export function DymPathWatcher(
       renderFn !== undefined,
     );
   };
-  let unwatchFn = __innerW();
+  let unwatchFn = target[VM_PROXY] ? __innerW() : undefined;
   const rtn = {
     [VM_WATCHER_DESTROY]() {
       parent = undefined;
-      unwatchFn();
+      unwatchFn?.();
     },
     get [VM_WATCHER_VALUE]() {
       return val;
@@ -184,6 +178,7 @@ export function DymPathWatcher(
       parent = v;
     },
     [VM_WATCHER_NOTIFY]() {
+      if (!unwatchFn) return;
       const newPath = path.map((p) =>
         typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p,
       );

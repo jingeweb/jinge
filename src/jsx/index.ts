@@ -28,6 +28,14 @@ export type PropsWithSlots<
   ref?: Ref<any>;
   children: S;
 };
+export type PropsWithOptionalSlots<
+  P extends object,
+  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
+> = P & {
+  key?: string | undefined | null;
+  ref?: Ref<any>;
+  children?: S;
+};
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;

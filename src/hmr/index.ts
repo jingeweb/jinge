@@ -1,4 +1,12 @@
-import { For, If, Portal, Transition, TransitionGroup, TransitionGroupItem } from '../components';
+import {
+  For,
+  If,
+  Lazy,
+  Portal,
+  Transition,
+  TransitionGroup,
+  TransitionGroupItem,
+} from '../components';
 import {
   type ComponentHost,
   type Context,
@@ -20,9 +28,11 @@ export function initHmr() {
     ComponentStore.set(__hmrId__, fc);
   }
 
-  [If, For, Transition, TransitionGroup, Transition, TransitionGroupItem, Portal].forEach((fc) => {
-    registerFunctionComponent(fc as FC, `jinge::core::${fc.name}`);
-  });
+  [If, For, Transition, TransitionGroup, Transition, TransitionGroupItem, Portal, Lazy].forEach(
+    (fc) => {
+      registerFunctionComponent(fc as FC, `jinge::core::${fc.name}`);
+    },
+  );
 
   function getLatestFunctionComponent(fc: FC) {
     const __hmrId__ = fc.__hmrId__;

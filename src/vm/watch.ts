@@ -2,8 +2,8 @@
 
 import type { AnyObj } from '../util';
 import { clearImmediate, isFunction, isObject, setImmediate, throwErr } from '../util';
-import type { PropertyPathItem, ViewModel, ViewModelCore } from './core';
-import { $$, VM_PARENTS, VM_TARGET, VM_WATCHERS } from './core';
+import type { PropertyPathItem, ViewModel } from './core';
+import { VM_PARENTS, VM_PROXY, VM_RAW, VM_WATCHERS } from './core';
 
 export const VM_WATCHER_PATH = Symbol('PATH');
 export const VM_WATCHER_VALUE = Symbol('VALUE');
@@ -16,7 +16,7 @@ export type WatchHandler<T = any> = (
   propertyPath?: PropertyPathItem[],
 ) => void;
 export interface Watcher<T = any> {
-  [VM_TARGET]?: ViewModel;
+  [VM_RAW]?: ViewModel;
   [VM_WATCHER_PATH]?: PropertyPathItem[];
   [VM_WATCHER_VALUE]?: T;
   [VM_WATCHER_LISTENER]?: WatchHandler<T>;
@@ -31,7 +31,7 @@ export interface Watcher<T = any> {
 }
 
 export function destoryWatcher(watcher: Watcher) {
-  watcher[VM_TARGET] = undefined;
+  watcher[VM_RAW] = undefined;
   watcher[VM_WATCHER_LISTENER] = undefined;
   watcher[VM_WATCHER_VALUE] = undefined;
   const imm = watcher[VM_WATCHER_IMM];
@@ -62,30 +62,28 @@ export function watchPath(
   deep?: boolean,
   immediate?: boolean,
 ) {
-  const core = vm[$$];
-  if (!core) throwErr('watch-not-vm');
+  if (!vm[VM_PROXY]) throwErr('watch-not-vm');
 
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 
   if (immediate) {
     handler(val, undefined);
   }
-  return innerWatchPath(vm, core, val, handler, propertyPath, deep);
+  return innerWatchPath(vm, val, handler, propertyPath, deep);
 }
 export function innerWatchPath(
   vm: ViewModel,
-  core: ViewModelCore,
   val: unknown,
   handler: WatchHandler,
   path?: PropertyPathItem[],
   deep?: boolean,
 ) {
-  let watchers = core[VM_WATCHERS];
+  let watchers = vm[VM_WATCHERS];
   if (!watchers) {
-    watchers = core[VM_WATCHERS] = new Set();
+    watchers = vm[VM_WATCHERS] = new Set();
   }
   const watcher: Watcher = {
-    [VM_TARGET]: vm,
+    [VM_RAW]: vm,
     [VM_WATCHER_PATH]: path,
     [VM_WATCHER_VALUE]: val,
     [VM_WATCHER_LISTENER]: handler,
@@ -126,10 +124,10 @@ export function vmWatch(vm: any, propOrPathOrHanlder: any, handler?: any, option
   }
 }
 
-function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[]) {
-  vmCore[VM_WATCHERS]?.forEach((watcher) => {
+function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
+  vm[VM_WATCHERS]?.forEach((watcher) => {
     const listener = watcher[VM_WATCHER_LISTENER];
-    const vm = watcher[VM_TARGET];
+    const vm = watcher[VM_RAW];
     if (!vm || !listener) {
       // 如果 Watcher 已经被销毁，忽略
       return;
@@ -192,7 +190,7 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
       imm.p = undefined;
     });
   });
-  vmCore[VM_PARENTS]?.forEach((parents, prop) => {
+  vm[VM_PARENTS]?.forEach((parents, prop) => {
     const parentPath = changedPath ? [prop, ...changedPath] : [prop];
     parents.forEach((parentVmCore) => {
       handleVmChange(parentVmCore, parentPath);
@@ -200,8 +198,8 @@ function handleVmChange(vmCore: ViewModelCore, changedPath?: PropertyPathItem[])
   });
 }
 export function notifyVmPropChange(vm: ViewModel, prop: PropertyPathItem) {
-  handleVmChange(vm[$$], [prop]);
+  handleVmChange(vm, [prop]);
 }
 export function notifyVmArrayChange(vm: ViewModel) {
-  handleVmChange(vm[$$]);
+  handleVmChange(vm);
 }
