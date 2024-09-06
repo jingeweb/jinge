@@ -6,7 +6,7 @@ import {
   addParent,
   mayBeVm,
 } from '../core';
-import { wrapObj } from '../proxy';
+import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
 
 export function arrayPush(target: ViewModelArray, ...args: ViewModelRaw[]): number {
@@ -20,7 +20,7 @@ export function arrayPush(target: ViewModelArray, ...args: ViewModelRaw[]): numb
       if (viewModel) {
         rawArr.push(viewModel[VM_RAW]);
       } else {
-        viewModel = wrapObj(arg);
+        viewModel = wrapViewModel(arg);
         rawArr.push(arg);
       }
       target[rawArr.length - 1] = viewModel;

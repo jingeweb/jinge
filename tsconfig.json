@@ -4,14 +4,15 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "target": "ES2022",
+    "target": "ESNext",
     "strict": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "stripInternal": true,
     "alwaysStrict": true,
     "moduleResolution": "Bundler",
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": "."
   },
-  "include": ["src/**/*", "scripts/**/*", "*.mjs", "*.js"]
+  "include": ["src/**/*", "test/**/*", "scripts/**/*", "*.mjs", "*.js"]
 }

@@ -10,3 +10,4 @@ node_modules
 dist/
 lib/
 types/
+coverage/

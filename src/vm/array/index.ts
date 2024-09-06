@@ -1,6 +1,7 @@
 import { type AnyFn, isString } from '../../util';
-import { VM_RAW, type ViewModelArray } from '../core';
-import { propSetHandler } from '../proxy';
+import { ONLY_DEV_TARGET, VM_PROXY, VM_RAW, type ViewModelArray, type ViewModelRaw } from '../core';
+import { propSetHandler } from '../object';
+import { wrapPropChildViewModel } from '../proxy';
 import { arraySetLength } from './length';
 import { arrayPop } from './pop';
 import { arrayPush } from './push';
@@ -41,3 +42,17 @@ export const ArrayProxyHandler: ProxyHandler<ViewModelArray> = {
     return propSetHandler(target, wrapProp(prop), value);
   },
 };
+
+export function wrapViewModelArr(target: ViewModelRaw<ViewModelRaw[]>) {
+  const viewModel = [] as unknown as ViewModelArray;
+  // BEGIN_DROP_IN_PRODUCTION
+  viewModel[ONLY_DEV_TARGET] = viewModel;
+  // END_DROP_IN_PRODUCTION
+  viewModel[VM_RAW] = target;
+  const proxy = new Proxy(viewModel, ArrayProxyHandler);
+  viewModel[VM_PROXY] = (target as unknown as ViewModelRaw)[VM_PROXY] = proxy;
+  for (let i = 0; i < target.length; i++) {
+    wrapPropChildViewModel(viewModel, target[i], i);
+  }
+  return proxy;
+}

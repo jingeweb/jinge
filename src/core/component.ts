@@ -281,8 +281,7 @@ export function renderFunctionComponent<T extends AnyFn>(
   fc: T,
   attrs?: Omit<Parameters<T>[0], 'children'>,
 ) {
-  // BEGIN_HMR
-  // BEGIN_HMR 和 END_HMR 之间的代码会在构建 production 版本时删除。
+  // BEGIN_DROP_IN_PRODUCTION
   // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。
 
   // 渲染逻辑执行时，fc 有可能是内存中的旧版本，新版本通过 hmr 已经被更新，
@@ -293,7 +292,8 @@ export function renderFunctionComponent<T extends AnyFn>(
     fc = __HMR__.getLatestFunctionComponent(fc);
     __HMR__.registerComponentInstance(fc, host, attrs, host[CONTEXT]);
   }
-  // END_HMR
+  // END_DROP_IN_PRODUCTION
+
   setCurrentComponentHost(host);
   const nodes = fc.call(host, attrs);
   setCurrentComponentHost(undefined);

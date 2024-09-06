@@ -1,6 +1,7 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import importX from 'eslint-plugin-import-x';
+import jest from 'eslint-plugin-jest';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import { builtinModules } from 'node:module';
 export default tseslint.config(
@@ -52,6 +53,15 @@ export default tseslint.config(
     files: ['scripts/**', '*.{js,mjs,ts}'],
     rules: {
       'no-console': 'off',
+    },
+  },
+  // Jest
+  {
+    files: ['test/**'],
+    ...jest.configs['flat/recommended'],
+    rules: {
+      ...jest.configs['flat/recommended'].rules,
+      'jest/prefer-expect-assertions': 'off',
     },
   },
   {

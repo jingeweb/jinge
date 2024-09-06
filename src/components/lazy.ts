@@ -88,9 +88,9 @@ export function Lazy(
   }
 }
 
-// BEGIN_HMR
+// BEGIN_ONLY_PRODUCTION
 let dymIncId = 0;
-// END_HMR
+// END_ONLY_PRODUCTION
 
 export function lazy(
   loader: () => Promise<AnyFn>,
@@ -115,14 +115,14 @@ export function lazy(
     return nodes;
   }
 
-  // BEGIN_HMR
+  // BEGIN_DROP_IN_PRODUCTION
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const __HMR__ = (window as any).__JINGE_HMR__;
   if (__HMR__) {
     // DymLazy 是动态生成的 Lazy 组件，每一个的 __hmrId__ 都应该是唯一的。
     __HMR__.registerFunctionComponent(DymLazy, `jinge::core::DymLazy::${dymIncId++}`);
   }
-  // END_HMR
+  // END_DROP_IN_PRODUCTION
 
   return DymLazy;
 }

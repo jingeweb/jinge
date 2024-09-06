@@ -7,7 +7,7 @@ import {
   mayBeVm,
   removeParent,
 } from '../core';
-import { wrapObj } from '../proxy';
+import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
 
 export function arrayUnshift(target: ViewModelArray, ...args: ViewModel[]) {
@@ -29,7 +29,7 @@ export function arrayUnshift(target: ViewModelArray, ...args: ViewModel[]) {
       if (viewModel) {
         rawArr.unshift(viewModel[VM_RAW]);
       } else {
-        viewModel = wrapObj(arg);
+        viewModel = wrapViewModel(arg);
         rawArr.unshift(arg);
       }
       target.unshift(viewModel);

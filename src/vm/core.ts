@@ -3,19 +3,43 @@ import type { AnyObj } from '../util';
 import { isArray, isObject } from '../util';
 import { type Watcher, destoryWatcher } from './watch';
 
-export const VM_PARENTS = Symbol('PARENTS');
-export const VM_WATCHERS = Symbol('WATCHERS');
-export const VM_RAW = Symbol('TARGET');
-export const VM_PROXY = Symbol('PROXY');
-export const VM_IGNORED = Symbol('IGNORED');
+export const VM_PARENTS = Symbol('VM_PARENTS');
+export const VM_WATCHERS = Symbol('VM_WATCHERS');
+export const VM_RAW = Symbol('VM_RAW');
+export const VM_PROXY = Symbol('VM_PROXY');
+export const VM_IGNORED = Symbol('VM_IGNORED');
+
+// BEGIN_DROP_IN_PRODUCTION
+export const ONLY_DEV_TARGET = Symbol('VM_ONLY_DEV_TARGET');
+// END_DROP_IN_PRODUCTION
 
 export type ViewModel<T extends object = AnyObj> = {
   [VM_PARENTS]?: Map<PropertyPathItem, Set<ViewModel>>;
   [VM_WATCHERS]?: Set<Watcher>;
-  /** 指向当前 vm core 所属的原始数据 */
+  /**
+   * 指向当前 ViewModel 所属的原始数据。vm() 函数包裹后返回的是 ViewModel 的 Proxy，不论是 ViewModel 还是它的 Proxy 都和原始数据是完全独立的两套。
+   * 并且原始数据会挂在 [VM_RAW] 属性上，通过 vmRaw() 函数可以直接拿到这个属性，快速且高效地获取完整的原始数据。
+   *
+   * 为了保证数据的一致性，任何在 ViewModel 上的操作，都会同时在其原始数据上也操作。比如：
+   * ```ts
+   * const a = { a: 10 }; const b = { b: 10 };
+   * const va = vm(a);
+   * va.b = b;
+   * console.log(a) // a 这个原始数据上，也会有 b 的原始数据，即： { a: 10, b: { 10 }}
+   * console.log(toRaw(va) === a) // true
+   * ```
+   */
   [VM_RAW]: ViewModelRaw<T>;
-  /** 指向当前 vm core 所属的 Proxy */
+  /**
+   * 指向当前 ViewModel 所属的 Proxy，即 vm() 函数包裹后返回的 Proxy。从返回的 Proxy 上取 [VM_PROXY] 拿到的就还是这个 Proxy，不严格地话可以认为这是一个自引用属性。
+   * 这个属性主要是用于快速判定一个 object 是否是一个包裹过的 ViewModel。
+   */
   [VM_PROXY]: ViewModel<T>;
+
+  // BEGIN_DROP_IN_PRODUCTION
+  /** vm() 函数包裹后返回的 ViewModel 是 Proxy，研发测试版本需要能够拿到 Proxy 内部的实际 ViewModel 对象，即 Proxy 代理的 target，用于进行单元测试或排查问题。 */
+  [ONLY_DEV_TARGET]?: any;
+  // END_DROP_IN_PRODUCTION
 } & T;
 
 export type ViewModelRaw<T extends object = AnyObj> = T & {
@@ -61,6 +85,12 @@ export function addParent(child: ViewModel, parent: ViewModel, property: Propert
 
 export function removeParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
   child[VM_PARENTS]?.get(property)?.delete(parent);
+  const ps = child[VM_PARENTS];
+  if (!ps) return;
+  const p = ps.get(property);
+  if (!p) return;
+  p.delete(parent);
+  if (!p.size) ps.delete(property);
 }
 
 export function destroyViewModelCore(vm: ViewModel) {

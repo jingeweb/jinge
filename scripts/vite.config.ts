@@ -12,8 +12,8 @@ export default defineConfig({
             return fs.readFile(id, 'utf-8').then((res) => {
               return (
                 res
-                  // BEGIN_HMR 和 END_HMR 之间的代码会在构建 production 版本时删除。
-                  .replace(/\/\/ BEGIN_HMR[\d\D]+?\/\/ END_HMR/g, '')
+                  // BEGIN_DROP_IN_PRODUCTION 和 END_DROP_IN_PRODUCTION 之间的代码会在构建 production 版本时删除。
+                  .replace(/\/\/ BEGIN_DROP_IN_PRODUCTION[\d\D]+?\/\/ END_DROP_IN_PRODUCTION/g, '')
                   // Symbol() 的描述文本会在构建 production 版本时删除
                   .replace(/\bSymbol\([^)]+\)/g, 'Symbol()')
               );

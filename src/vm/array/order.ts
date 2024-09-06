@@ -9,7 +9,7 @@ import {
   isInnerObj,
   removeParent,
 } from '../core';
-import { wrapObj } from '../proxy';
+import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
 
 function resetArray(rawArr: ViewModelRaw<ViewModelRaw[]>, target: ViewModelArray) {
@@ -25,7 +25,7 @@ function resetArray(rawArr: ViewModelRaw<ViewModelRaw[]>, target: ViewModelArray
       if (isInnerObj(v) || v[VM_IGNORED]) {
         return;
       }
-      viewModel = wrapObj(v);
+      viewModel = wrapViewModel(v);
     }
     target[i] = viewModel;
     addParent(viewModel, target, i);
