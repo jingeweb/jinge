@@ -32,7 +32,7 @@ export type ViewModel<T extends object = AnyObj> = {
 export type ViewModelIgnore<T extends object = AnyObj> = T & {
   [VM_IGNORED]: boolean;
 };
-export type ViewModelArray<T extends object = AnyObj> = ViewModel<T>[] & ViewModel<T>[];
+export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> & ViewModel<T>[];
 
 export type PropertyPathItem = string | number | symbol;
 

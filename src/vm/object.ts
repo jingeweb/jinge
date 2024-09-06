@@ -15,7 +15,7 @@ import {
 import { wrapPropChildViewModel, wrapViewModel } from './proxy';
 import { type Watcher, notifyVmPropChange } from './watch';
 
-function getVmAndRaw(value: ViewModel): [ViewModel | undefined, unknown] {
+export function getVmAndRaw(value: ViewModel): [ViewModel | undefined, unknown] {
   if (!isObject(value)) return [undefined, value];
   const rawValue = value[VM_RAW];
   if (rawValue) return [value, rawValue];

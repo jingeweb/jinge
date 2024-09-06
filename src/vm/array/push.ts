@@ -1,33 +1,33 @@
 import {
-  VM_PROXY,
+  GlobalViewModelWeakMap,
   VM_RAW,
   type ViewModelArray,
-  type ViewModelRaw,
   addParent,
   shouldBeVm,
 } from '../core';
 import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
 
-export function arrayPush(target: ViewModelArray, ...args: ViewModelRaw[]): number {
-  const rawArr = target[VM_RAW];
-  if (args.length === 0) return rawArr.length;
+export function arrayPush(
+  targetViewModel: ViewModelArray,
+  target: unknown[],
+  ...args: unknown[]
+): number {
+  if (args.length === 0) return target.length;
   args.forEach((arg) => {
     if (shouldBeVm(arg)) {
-      rawArr.push(arg);
-    } else {
-      let viewModel = arg[VM_PROXY];
+      let viewModel = arg[VM_RAW] ? arg : GlobalViewModelWeakMap.get(arg);
       if (viewModel) {
-        rawArr.push(viewModel[VM_RAW]);
+        target.push(viewModel[VM_RAW]);
       } else {
         viewModel = wrapViewModel(arg);
-        rawArr.push(arg);
+        target.push(arg);
       }
-      target[rawArr.length - 1] = viewModel;
-      addParent(viewModel, target, rawArr.length - 1);
+      addParent(viewModel, targetViewModel, target.length - 1);
+    } else {
+      target.push(arg);
     }
   });
-  notifyVmArrayChange(target);
-
-  return rawArr.length;
+  notifyVmArrayChange(targetViewModel);
+  return target.length;
 }

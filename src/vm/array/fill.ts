@@ -1,37 +1,46 @@
+import { isObject } from 'src/util';
 import {
-  VM_PROXY,
+  GlobalViewModelWeakMap,
   VM_RAW,
+  type ViewModel,
   type ViewModelArray,
-  type ViewModelRaw,
   addParent,
-  shouldBeVm,
   removeParent,
+  shouldBeVm,
 } from '../core';
 import { wrapViewModel } from '../proxy';
 
-export function arrayFill(target: ViewModelArray, v: ViewModelRaw) {
-  const rawArr = target[VM_RAW];
-  const len = rawArr.length;
-  if (len === 0) return rawArr[VM_PROXY];
+export function arrayFill(targetViewModel: ViewModelArray, target: unknown[], v: unknown) {
+  const len = target.length;
+  if (len === 0) return targetViewModel;
 
   if (shouldBeVm(v)) {
-    let viewModel = v[VM_PROXY];
-    const rawValue = viewModel ?? v;
-    if (!viewModel) viewModel = wrapViewModel(v);
+    let newVm = v[VM_RAW] ? v : GlobalViewModelWeakMap.get(v);
+    const newRawV = newVm ? v[VM_RAW] : v;
+    if (!newVm) newVm = wrapViewModel(v);
     for (let i = 0; i < len; i++) {
-      rawArr[i] = rawValue;
-      const oldViewModel = target[i];
-      oldViewModel && removeParent(oldViewModel, target, i);
-      target[i] = viewModel;
-      addParent(viewModel, target, i);
+      const val = target[i];
+      const valVm = isObject(val)
+        ? val[VM_RAW]
+          ? (val as ViewModel)
+          : GlobalViewModelWeakMap.get(val)
+        : undefined;
+      valVm && removeParent(valVm, targetViewModel, i);
+
+      target[i] = newRawV;
+      addParent(newVm, targetViewModel, i);
     }
   } else {
     for (let i = 0; i < len; i++) {
-      rawArr[i] = v;
-      const oldViewModel = target[i];
-      oldViewModel && removeParent(oldViewModel, target, i);
-      (target as unknown[])[i] = undefined;
+      const val = target[i];
+      const valVm = isObject(val)
+        ? val[VM_RAW]
+          ? (val as ViewModel)
+          : GlobalViewModelWeakMap.get(val)
+        : undefined;
+      valVm && removeParent(valVm, targetViewModel, i);
+      target[i] = v;
     }
   }
-  return rawArr[VM_PROXY];
+  return targetViewModel;
 }

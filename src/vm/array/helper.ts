@@ -1,13 +1,17 @@
 import { ArrayProxyHandler } from './index';
 import {
+  GlobalViewModelWeakMap,
   VM_PROXY,
   VM_RAW,
+  type ViewModel,
   type ViewModelArray,
   type ViewModelRaw,
   addParent,
+  removeParent,
   shouldBeVm,
 } from '../core';
 import { wrapViewModel } from '../proxy';
+import { isObject } from 'src/util';
 
 export function wrapArray(arr: ViewModelRaw<ViewModelRaw[]>) {
   const viewModel = [] as unknown as ViewModelArray;
@@ -22,6 +26,16 @@ export function wrapArray(arr: ViewModelRaw<ViewModelRaw[]>) {
     }
   });
   return proxy;
+}
+
+export function removeArrayItemVmParent(val: unknown, targetViewModel: ViewModel, index: number) {
+  const valVm = isObject(val)
+    ? val[VM_RAW]
+      ? (val as ViewModel)
+      : GlobalViewModelWeakMap.get(val)
+    : undefined;
+  valVm && removeParent(valVm, targetViewModel, index);
+  return valVm;
 }
 
 // const ArrayFns = {
