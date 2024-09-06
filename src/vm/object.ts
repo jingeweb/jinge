@@ -2,107 +2,111 @@
 import type { AnyObj } from '../util';
 import { isObject, isSymbol } from '../util';
 
-import type { PropertyPathItem, ViewModel, ViewModelRaw } from './core';
+import type { PropertyPathItem, ViewModel } from './core';
 import {
-  ONLY_DEV_TARGET,
-  VM_IGNORED,
-  VM_PROXY,
+  GlobalViewModelWeakMap,
+  VM_PARENTS,
   VM_RAW,
+  VM_WATCHERS,
   addParent,
-  isInnerObj,
   removeParent,
+  shouldBeVm,
 } from './core';
 import { wrapPropChildViewModel, wrapViewModel } from './proxy';
-import { notifyVmPropChange } from './watch';
+import { type Watcher, notifyVmPropChange } from './watch';
 
-export function propSetHandler(target: ViewModel, prop: PropertyPathItem, value: unknown) {
-  if (isObject(value)) {
-    let valueViewModel = value[VM_PROXY];
-    if (valueViewModel) {
-      // 如果新的数据已经是 ViewModel，则需要把新数据的 VM_RAW 原始数据赋予到 target[VM_RAW][prop] 上。
-      if (isSymbol(prop)) {
-        // symbol 属性直接赋值且不需要通知变更。
-        target[VM_RAW][prop] = valueViewModel[VM_RAW];
-      } else {
-        const oldViewModel = (target as AnyObj)[prop] as ViewModel;
-        if (oldViewModel === valueViewModel) {
-          // 前后 object 的 ViewModel 都没变，直接退出。
-          return true;
-        }
-        oldViewModel && removeParent(oldViewModel, target, prop);
-        (target as AnyObj)[prop] = valueViewModel;
-        target[VM_RAW][prop] = valueViewModel[VM_RAW];
-        addParent(valueViewModel, target, prop);
-        notifyVmPropChange(target, prop);
-      }
-    } else {
-      if (isSymbol(prop)) {
-        target[VM_RAW][prop] = value;
-        return true;
-      }
-      if (!isInnerObj(value) && !value[VM_IGNORED]) {
-        // 如果新的数据不是 ViewModel，则需要转换成 ViewModel
-        valueViewModel = wrapViewModel(value);
-        const oldViewModel = (target as AnyObj)[prop] as ViewModel;
-        if (oldViewModel) removeParent(oldViewModel, target, prop);
-        (target as AnyObj)[prop] = valueViewModel;
-        target[VM_RAW][prop] = value;
-        addParent(valueViewModel, target, prop);
-        notifyVmPropChange(target, prop);
-      } else {
-        // 新的数据是不需要转 ViewModel 的 object，比如 Boolean 等，则直接赋值。
-        const oldViewModel = (target as AnyObj)[prop] as ViewModel;
-        if (oldViewModel) removeParent(oldViewModel, target, prop);
-        const oldVal = oldViewModel ?? target[VM_RAW][prop];
-        // 如果新旧数据完全相同，则不需要做任何响应。
-        if (oldVal !== value) {
-          target[VM_RAW][prop] = value;
-          notifyVmPropChange(target, prop);
-        }
-      }
-    }
-  } else {
-    if (isSymbol(prop)) {
-      // 如果 prop 是 symbol，value 又不是 object（也就不可能是 ViewModel）, 则直接赋值到原始数据上。
-      target[VM_RAW][prop] = value;
-      return true;
-    }
-    const oldViewModel = (target as AnyObj)[prop] as ViewModel;
-    if (oldViewModel) {
-      // value 不是 object 就不可能是 viewmodel，老的 viewmodel 一定需要卸载。
-      (target as AnyObj)[prop] = undefined;
-      removeParent(oldViewModel, target, prop);
-    }
-    const oldVal = oldViewModel ?? target[VM_RAW][prop];
-    // 如果新旧数据完全相同，则不需要做任何响应。
-    if (oldVal !== value) {
-      target[VM_RAW][prop] = value;
-      notifyVmPropChange(target, prop);
-    }
-  }
-
-  return true;
+function getVmAndRaw(value: ViewModel): [ViewModel | undefined, unknown] {
+  if (!isObject(value)) return [undefined, value];
+  const rawValue = value[VM_RAW];
+  if (rawValue) return [value, rawValue];
+  const vm = GlobalViewModelWeakMap.get(value);
+  return [vm, vm ? vm[VM_RAW] : value];
 }
 
-const ObjectProxyHandler: ProxyHandler<any> = {
-  get(target, prop) {
-    return target[prop] ?? target[VM_RAW][prop];
-  },
-  set: propSetHandler,
-};
+export function propSetHandler(
+  targetViewModel: ViewModel,
+  target: AnyObj,
+  prop: PropertyPathItem,
+  value: unknown,
+) {
+  const [valueVm, rawValue] = getVmAndRaw(value as ViewModel);
+  if (valueVm) {
+    // 如果新的数据已经是 ViewModel，则需要把新数据的 VM_RAW 原始数据赋予到 target[prop] 上。
+    if (isSymbol(prop)) {
+      // symbol 属性直接赋值且不需要通知变更。
+      target[prop] = rawValue;
+    } else {
+      const [oldValueVm, oldRawValue] = getVmAndRaw(target[prop]);
+      if (oldValueVm === valueVm || oldRawValue === rawValue) {
+        // 前后都没变，直接退出。
+        return;
+      }
+      oldValueVm && removeParent(oldValueVm, targetViewModel, prop);
+      target[prop] = rawValue;
+      addParent(valueVm, targetViewModel, prop);
+      notifyVmPropChange(targetViewModel, prop);
+    }
+    return; // important!
+  }
 
-export function wrapViewModelObj(target: ViewModelRaw) {
-  const viewModel: ViewModel = {
-    [VM_RAW]: target,
-    [VM_PROXY]: undefined as any,
+  if (isSymbol(prop)) {
+    // symbol 属性直接赋值且不需要通知变更。symbol 属性的旧值也不可能是 ViewModel,不需要 removeParent
+    target[prop] = value;
+    return; // important!
+  }
+
+  const [oldValueVm, oldRawValue] = getVmAndRaw(target[prop]);
+  oldValueVm && removeParent(oldValueVm, targetViewModel, prop);
+  if (oldRawValue === value) {
+    // 前后数据都没有发生变化,直接退出更新逻辑
+    return; // important!
+  }
+  if (shouldBeVm(value)) {
+    // value 是需要转 ViewModel 的类型,则转成 ViewModel
+    const newValueVm = wrapViewModel(value);
+    addParent(newValueVm, targetViewModel, prop);
+  }
+  target[prop] = value;
+  notifyVmPropChange(targetViewModel, prop);
+}
+
+function ObjectProxyHandler(): ProxyHandler<any> {
+  let watchers: Set<Watcher>;
+  let parents: Map<PropertyPathItem, Set<ViewModel>>;
+  return {
+    get(target, prop) {
+      if (prop === VM_RAW) return target;
+      else if (prop === VM_PARENTS) {
+        return parents;
+      } else if (prop === VM_WATCHERS) {
+        return watchers;
+      } else if (isSymbol(prop)) {
+        return target[prop];
+      } else {
+        const val = target[prop];
+        if (!isObject(val)) return val;
+        const vm = GlobalViewModelWeakMap.get(val);
+        return vm ?? val;
+      }
+    },
+    set(target, prop, newValue, receiver) {
+      if (prop === VM_WATCHERS) {
+        watchers = newValue;
+      } else if (prop === VM_PARENTS) {
+        parents = newValue;
+      } else {
+        propSetHandler(receiver, target, prop, newValue);
+      }
+      return true;
+    },
   };
-  // BEGIN_DROP_IN_PRODUCTION
-  viewModel[ONLY_DEV_TARGET] = viewModel;
-  // END_DROP_IN_PRODUCTION
-  const proxy = new Proxy(viewModel, ObjectProxyHandler);
-  viewModel[VM_PROXY] = target[VM_PROXY] = proxy;
+}
+
+export function wrapViewModelObj(target: AnyObj) {
+  const viewModel = new Proxy(target, ObjectProxyHandler());
+  GlobalViewModelWeakMap.set(target, viewModel);
   for (const k in target) {
     wrapPropChildViewModel(viewModel, target[k], k);
   }
-  return proxy;
+  return viewModel;
 }

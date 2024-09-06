@@ -4,7 +4,7 @@ import {
   type ViewModelArray,
   type ViewModelRaw,
   addParent,
-  mayBeVm,
+  shouldBeVm,
 } from '../core';
 import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
@@ -13,7 +13,7 @@ export function arrayPush(target: ViewModelArray, ...args: ViewModelRaw[]): numb
   const rawArr = target[VM_RAW];
   if (args.length === 0) return rawArr.length;
   args.forEach((arg) => {
-    if (mayBeVm(arg)) {
+    if (shouldBeVm(arg)) {
       rawArr.push(arg);
     } else {
       let viewModel = arg[VM_PROXY];

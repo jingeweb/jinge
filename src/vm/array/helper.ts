@@ -5,7 +5,7 @@ import {
   type ViewModelArray,
   type ViewModelRaw,
   addParent,
-  mayBeVm,
+  shouldBeVm,
 } from '../core';
 import { wrapViewModel } from '../proxy';
 
@@ -15,7 +15,7 @@ export function wrapArray(arr: ViewModelRaw<ViewModelRaw[]>) {
   const proxy = new Proxy(viewModel, ArrayProxyHandler);
   viewModel[VM_PROXY] = arr[VM_PROXY] = proxy;
   arr.forEach((it, i) => {
-    if (mayBeVm(it)) {
+    if (shouldBeVm(it)) {
       const itViewModel = it[VM_PROXY] ?? wrapViewModel(it);
       addParent(itViewModel, viewModel, i);
       viewModel[i] = itViewModel;

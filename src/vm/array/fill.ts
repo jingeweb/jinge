@@ -4,7 +4,7 @@ import {
   type ViewModelArray,
   type ViewModelRaw,
   addParent,
-  mayBeVm,
+  shouldBeVm,
   removeParent,
 } from '../core';
 import { wrapViewModel } from '../proxy';
@@ -14,7 +14,7 @@ export function arrayFill(target: ViewModelArray, v: ViewModelRaw) {
   const len = rawArr.length;
   if (len === 0) return rawArr[VM_PROXY];
 
-  if (mayBeVm(v)) {
+  if (shouldBeVm(v)) {
     let viewModel = v[VM_PROXY];
     const rawValue = viewModel ?? v;
     if (!viewModel) viewModel = wrapViewModel(v);

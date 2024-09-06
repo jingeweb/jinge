@@ -3,7 +3,7 @@
 import type { AnyObj } from '../util';
 import { clearImmediate, isFunction, isObject, setImmediate, throwErr } from '../util';
 import type { PropertyPathItem, ViewModel } from './core';
-import { VM_PARENTS, VM_PROXY, VM_RAW, VM_WATCHERS } from './core';
+import { VM_PARENTS, VM_RAW, VM_WATCHERS, isViewModel } from './core';
 
 export const VM_WATCHER_PATH = Symbol('PATH');
 export const VM_WATCHER_VALUE = Symbol('VALUE');
@@ -62,7 +62,7 @@ export function watchPath(
   deep?: boolean,
   immediate?: boolean,
 ) {
-  if (!(vm = vm[VM_PROXY])) throwErr('watch-not-vm');
+  if (!isViewModel(vm)) throwErr('watch-not-vm');
 
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 

@@ -4,7 +4,7 @@ import {
   type ViewModel,
   type ViewModelArray,
   addParent,
-  mayBeVm,
+  shouldBeVm,
   removeParent,
 } from '../core';
 import { wrapViewModel } from '../proxy';
@@ -24,7 +24,7 @@ export function arrayUnshift(target: ViewModelArray, ...args: ViewModel[]) {
       }
     });
   args.forEach((arg, i) => {
-    if (mayBeVm(arg)) {
+    if (shouldBeVm(arg)) {
       let viewModel = arg[VM_PROXY];
       if (viewModel) {
         rawArr.unshift(viewModel[VM_RAW]);

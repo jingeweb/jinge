@@ -1,28 +1,29 @@
-import { isArray, isObject } from '../util';
+import { type AnyObj, isArray, isObject } from '../util';
 import { wrapViewModelArr } from './array';
 
-import type { ViewModel, ViewModelIgnore, ViewModelRaw } from './core';
+import type { ViewModel, ViewModelIgnore } from './core';
 import {
+  GlobalViewModelWeakMap,
   // END_DROP_IN_PRODUCTION
   VM_IGNORED,
-  VM_PROXY,
   VM_RAW,
   addParent,
-  mayBeVm,
+  isInnerObj,
+  shouldBeVm,
 } from './core';
 import { wrapViewModelObj } from './object';
 
 export function wrapPropChildViewModel(parent: ViewModel, child: unknown, prop: string | number) {
-  if (!mayBeVm(child)) {
+  if (!shouldBeVm(child)) {
     return;
   }
-  let viewModel = child[VM_PROXY];
+
+  let viewModel = GlobalViewModelWeakMap.get(child);
   if (!viewModel) viewModel = wrapViewModel(child);
-  parent[prop] = viewModel;
   addParent(viewModel, parent, prop);
 }
 
-export function wrapViewModel(target: ViewModelRaw | ViewModelRaw<ViewModelRaw[]>) {
+export function wrapViewModel(target: AnyObj | unknown[]): ViewModel {
   return isArray(target) ? wrapViewModelArr(target) : wrapViewModelObj(target);
 }
 
@@ -42,7 +43,10 @@ export function wrapViewModel(target: ViewModelRaw | ViewModelRaw<ViewModelRaw[]
  * 需要注意的是，如果 target 对象的属性 key 是 Symbol，则不会进行包裹。赋值时同理。
  */
 export function vm<T extends object>(target: T): T {
-  return mayBeVm(target) ? (target[VM_PROXY] ?? wrapViewModel(target)) : target;
+  if (!isObject(target)) return target;
+  if ((target as ViewModel)[VM_RAW]) return target;
+  if (isInnerObj(target) || target[VM_IGNORED]) return target;
+  return GlobalViewModelWeakMap.get(target) ?? wrapViewModel(target);
 }
 
 /**
@@ -56,5 +60,13 @@ export function vmRaw<T extends object>(target: T): T {
  * 标记目标对象数据为 vm ignored。被忽略后的数据，在赋予到其它 ViewModel 属性上时，不会被转换成 ViewModel
  */
 export function vmIgnore<T extends object>(target: T) {
-  isObject<ViewModelIgnore>(target) && (target[VM_IGNORED] = true);
+  if (isObject<ViewModelIgnore>(target)) {
+    Object.defineProperty(target, VM_IGNORED, {
+      configurable: true,
+      writable: false,
+      enumerable: false,
+      value: true,
+    });
+  }
+  return target;
 }
