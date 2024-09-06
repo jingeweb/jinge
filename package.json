@@ -64,13 +64,9 @@
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
     "@eslint/js": "^9.9.1",
-    "@swc/core": "^1.7.23",
-    "@swc/jest": "^0.2.36",
     "@types/eslint__js": "^8.42.3",
     "@types/jest": "^29.5.12",
     "@types/node": "^22.5.4",
-    "esbuild": "^0.23.1",
-    "esbuild-jest": "^0.5.0",
     "eslint": "^9.9.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import-x": "^4.2.1",

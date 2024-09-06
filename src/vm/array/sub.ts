@@ -1,19 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { wrapViewModelArr } from '.';
 import type { AnyFn } from '../../util';
 import { VM_RAW, type ViewModelArray } from '../core';
-import { wrapArray } from './helper';
 
-export function arrayConcat(target: ViewModelArray, another: ViewModelArray) {
-  return wrapArray(target[VM_RAW].concat(another[VM_RAW] ?? another) as any);
+export function arrayConcat(target: unknown[], another: unknown[]) {
+  return wrapViewModelArr(target.concat((another as ViewModelArray)[VM_RAW] ?? another));
 }
 
-export function arraySlice(target: ViewModelArray, start?: number, end?: number) {
-  return wrapArray(target[VM_RAW].slice(start, end) as any);
+export function arraySlice(target: unknown[], start?: number, end?: number) {
+  return wrapViewModelArr(target.slice(start, end));
 }
 
-export function arrayFilter(target: ViewModelArray, fn: AnyFn) {
-  return wrapArray(target[VM_RAW].filter(fn) as any);
+export function arrayFilter(target: unknown[], fn: AnyFn) {
+  return wrapViewModelArr(target.filter(fn));
 }
-export function arrayMap(target: ViewModelArray, fn: AnyFn) {
-  return wrapArray(target[VM_RAW].map(fn) as any);
+export function arrayMap(target: unknown[], fn: AnyFn) {
+  return wrapViewModelArr(target.map(fn));
 }

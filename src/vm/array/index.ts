@@ -11,6 +11,13 @@ import type { Watcher } from '../watch';
 import { arrayPush } from './push';
 import { propSetHandler } from '../object';
 import { wrapPropChildViewModel } from '../proxy';
+import { arrayPop } from './pop';
+import { arrayUnshift } from './unshift';
+import { arrayShift } from './shift';
+import { arrayConcat, arrayFilter, arrayMap, arraySlice } from './sub';
+import { arrayFill } from './fill';
+import { arrayReverse, arraySort } from './order';
+import { arraySplice } from './splice';
 
 /**
  * 即便是 arr[0] 这样的取值，在 Proxy 的 set 里面，传递的 property 也是 string 类型，即 "0"，转换为 int 后取值。
@@ -38,6 +45,36 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
         return target[prop];
       } else if (prop === 'push') {
         return wrapFn(receiver, target, arrayPush);
+      } else if (prop === 'pop') {
+        return wrapFn(receiver, target, arrayPop);
+      } else if (prop === 'unshift') {
+        return wrapFn(receiver, target, arrayUnshift);
+      } else if (prop === 'shift') {
+        return wrapFn(receiver, target, arrayShift);
+      } else if (prop === 'splice') {
+        return wrapFn(receiver, target, arraySplice);
+      } else if (prop === 'concat') {
+        return function (another: unknown[]) {
+          return arrayConcat(target, another);
+        };
+      } else if (prop === 'slice') {
+        return function (start?: number, end?: number) {
+          return arraySlice(target, start, end);
+        };
+      } else if (prop === 'filter') {
+        return function (fn: AnyFn) {
+          return arrayFilter(target, fn);
+        };
+      } else if (prop === 'map') {
+        return function (fn: AnyFn) {
+          return arrayMap(target, fn);
+        };
+      } else if (prop === 'fill') {
+        return wrapFn(receiver, target, arrayFill);
+      } else if (prop === 'sort') {
+        return wrapFn(receiver, target, arraySort);
+      } else if (prop === 'reverse') {
+        return wrapFn(receiver, target, arrayReverse);
       } else {
         const index = wrapProp(prop);
         const val = target[index];

@@ -18,7 +18,7 @@ export function wrapPropChildViewModel(parent: ViewModel, child: unknown, prop: 
     return;
   }
 
-  let viewModel = GlobalViewModelWeakMap.get(child);
+  let viewModel = child[VM_RAW] ? child : GlobalViewModelWeakMap.get(child);
   if (!viewModel) viewModel = wrapViewModel(child);
   addParent(viewModel, parent, prop);
 }

@@ -1,20 +1,16 @@
-import { VM_RAW, type ViewModelArray, addParent, removeParent } from '../core';
+import { isObject } from 'src/util';
+import { GlobalViewModelWeakMap, VM_RAW, type ViewModelArray, addParent } from '../core';
 import { notifyVmArrayChange } from '../watch';
+import { removeArrayItemVmParent } from './helper';
 
-export function arrayShift(target: ViewModelArray) {
-  const rawArr = target[VM_RAW];
-  if (rawArr.length === 0) return undefined;
-  const val = rawArr.shift();
-  // target 如果不为空，就一定有一个 ViewModel 存在且和 rawArr 对应位置对齐。target.shift 就可以返回第一个元素并保持和 rawArr 的对齐。
-  // target 如果为空，shift() 也是 undefined 符合预期。
-  const viewModel = target.shift();
-  viewModel && removeParent(viewModel, target, 0);
+export function arrayShift(targetViewModel: ViewModelArray, target: unknown[]) {
+  if (target.length === 0) return undefined;
+  const val = target.shift();
+  const valVm = isObject(val) ? (val[VM_RAW] ? val : GlobalViewModelWeakMap.get(val)) : undefined;
   target.forEach((v, i) => {
-    if (v) {
-      removeParent(v, target, i + 1);
-      addParent(v, target, i);
-    }
+    const vm = removeArrayItemVmParent(v, targetViewModel, i + 1);
+    vm && addParent(vm, targetViewModel, i);
   });
-  notifyVmArrayChange(target);
-  return viewModel ?? val;
+  notifyVmArrayChange(targetViewModel);
+  return valVm ?? val;
 }
