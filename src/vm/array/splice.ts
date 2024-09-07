@@ -1,15 +1,10 @@
 import { isUndefined } from 'src/util';
-import {
-  GlobalViewModelWeakMap,
-  VM_RAW,
-  type ViewModelArray,
-  addParent,
-  shouldBeVm,
-} from '../core';
+import { VM_RAW, type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { arrayPush } from './push';
 import { wrapViewModelArr } from '.';
 import { removeArrayItemVmParent } from './helper';
 import { wrapViewModel } from '../proxy';
+import { getVmAndRaw } from '../object';
 
 export function arraySplice(
   targetViewModel: ViewModelArray,
@@ -49,18 +44,15 @@ export function arraySplice(
   target.splice(idx, delCount);
 
   args.forEach((arg, i) => {
-    if (shouldBeVm(arg)) {
-      let viewModel = arg[VM_RAW] ? arg : GlobalViewModelWeakMap.get(arg);
-      if (viewModel) {
-        target.splice(idx, 0, viewModel[VM_RAW]);
-      } else {
-        viewModel = wrapViewModel(arg);
-        target.splice(idx, 0, arg);
-      }
-      addParent(viewModel, targetViewModel, idx + i);
-    } else {
-      target.push(arg);
+    const [valVm, rawVal] = getVmAndRaw(arg);
+    console.log(valVm, rawVal);
+    const index = idx + i;
+    if (valVm) {
+      addParent(valVm, targetViewModel, index);
+    } else if (shouldBeVm(arg)) {
+      addParent(wrapViewModel(arg), targetViewModel, index);
     }
+    target.splice(index, 0, rawVal);
   });
 
   return delArrVm;

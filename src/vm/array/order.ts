@@ -20,8 +20,8 @@ export function arrayReverse(targetViewModel: ViewModelArray, target: unknown[])
     const vm = removeArrayItemVmParent(target[i], targetViewModel, i);
     const vm2 = removeArrayItemVmParent(target[i2], targetViewModel, i2);
     const tmp = target[i];
+    target[i] = target[i2];
     target[i2] = tmp;
-    target[i] = tmp;
     vm && addParent(vm, targetViewModel, i2);
     vm2 && addParent(vm2, targetViewModel, i);
   }

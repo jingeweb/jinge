@@ -9,7 +9,7 @@ export const VM_RAW = Symbol('VM_RAW');
 export const VM_IGNORED = Symbol('VM_IGNORED');
 
 export const GlobalViewModelWeakMap = new WeakMap<any, ViewModel>();
-export type ViewModelParents = Map<PropertyPathItem, Set<ViewModel>>;
+export type ViewModelParents = Map<ViewModel, Set<PropertyPathItem>>;
 export type ViewModel<T extends object = AnyObj> = {
   [VM_PARENTS]?: ViewModelParents;
   [VM_WATCHERS]?: Set<Watcher>;
@@ -59,20 +59,20 @@ export function addParent(child: ViewModel, parent: ViewModel, property: Propert
   if (!map) {
     map = child[VM_PARENTS] = new Map();
   }
-  let set = map.get(property);
+  let set = map.get(parent);
   if (!set) {
-    map.set(property, (set = new Set()));
+    map.set(parent, (set = new Set()));
   }
-  set.add(parent);
+  set.add(property);
 }
 
 export function removeParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
   const ps = child[VM_PARENTS];
   if (!ps) return;
-  const p = ps.get(property);
+  const p = ps.get(parent);
   if (!p) return;
-  p.delete(parent);
-  if (!p.size) ps.delete(property);
+  p.delete(property);
+  if (!p.size) ps.delete(parent);
 }
 
 export function destroyViewModelCore(vm: ViewModel) {

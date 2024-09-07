@@ -18,6 +18,7 @@ import { arrayConcat, arrayFilter, arrayMap, arraySlice } from './sub';
 import { arrayFill } from './fill';
 import { arrayReverse, arraySort } from './order';
 import { arraySplice } from './splice';
+import { arraySetLength } from './length';
 
 /**
  * 即便是 arr[0] 这样的取值，在 Proxy 的 set 里面，传递的 property 也是 string 类型，即 "0"，转换为 int 后取值。
@@ -88,6 +89,8 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
         watchers = newValue;
       } else if (prop === VM_PARENTS) {
         parents = newValue;
+      } else if (prop === 'length') {
+        arraySetLength(receiver, target, newValue);
       } else {
         propSetHandler(receiver, target, wrapProp(prop), newValue);
       }

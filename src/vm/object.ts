@@ -15,10 +15,10 @@ import {
 import { wrapPropChildViewModel, wrapViewModel } from './proxy';
 import { type Watcher, notifyVmPropChange } from './watch';
 
-export function getVmAndRaw(value: ViewModel): [ViewModel | undefined, unknown] {
+export function getVmAndRaw(value: unknown): [ViewModel | undefined, unknown] {
   if (!isObject(value)) return [undefined, value];
   const rawValue = value[VM_RAW];
-  if (rawValue) return [value, rawValue];
+  if (rawValue) return [value as ViewModel, rawValue];
   const vm = GlobalViewModelWeakMap.get(value);
   return [vm, vm ? vm[VM_RAW] : value];
 }

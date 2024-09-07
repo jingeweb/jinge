@@ -39,6 +39,10 @@ describe('vm:object', () => {
     const vc = vm(10 as unknown as object);
     expect(vc === (10 as unknown as object)).toBe(true);
   });
+
+  function expectParent(v: ViewModel, parent: ViewModel, prop: PropertyPathItem) {
+    expect(!!v[VM_PARENTS]?.get(parent)?.has(prop)).toBe(true);
+  }
   it('object to view-model', () => {
     const a = { a: 10, aa: { a: 20 } } as AnyObj;
     const va = vm(a) as ViewModel;
@@ -70,17 +74,11 @@ describe('vm:object', () => {
 
     const vf = vm(f) as ViewModel;
     expect(va.f2 === vf).toBe(true);
-
+    expectParent(vf, va, 'f2');
     {
-      const ps = (vf.f as unknown as ViewModel)[VM_PARENTS]!;
-      expect(ps.size).toBe(1);
-      const p = ps.entries().next().value;
-      expect(p[0]).toBe('f');
-      expect(p[1].size).toBe(1);
+      expectParent(vf.f, vf, 'f');
 
-      const pa = p[1].values().next().value;
-      expect(isViewModel(pa)).toBe(true);
-      expect(pa === vf && pa === va.f2).toBe(true);
+      expect(vf.f[VM_PARENTS].size).toBe(1);
     }
 
     {
@@ -89,33 +87,27 @@ describe('vm:object', () => {
       expect(oo.k).toBe(va.f2);
       const oo2 = vm({}) as ViewModel;
       oo2.k = f;
-      const ps = vf[VM_PARENTS]!;
-      expect(ps.size).toBe(2);
-      const itr = ps.entries();
-      let p1 = itr.next().value;
-      expect(p1[0]).toBe('f2');
-      let pas = [...p1[1].values()];
-      expect(pas.length).toBe(1);
-      expect(pas[0]).toBe(va);
-      p1 = itr.next().value;
-      pas = [...p1[1].values()];
-      expect(p1[0]).toBe('k');
-      expect(pas.length).toBe(2);
-      expect(pas[0]).toBe(oo);
-      expect(pas[1]).toBe(oo2);
+      expect(oo.k === oo2.k && oo2.k === vf).toBe(true);
+      expectParent(vf, va, 'f2');
+      expectParent(vf, oo, 'k');
+      expectParent(vf, oo2, 'k');
+      expect(vf[VM_PARENTS]?.size).toBe(3);
 
       va.oo = oo;
       expect(oo[VM_PARENTS]!.size).toBe(1);
       expect(isViewModel(a.oo)).toBe(false);
 
       va.f2 = oo;
-      expect(ps.size).toBe(1);
-      expect(oo[VM_PARENTS]!.size).toBe(2);
+      expect(vf[VM_PARENTS]?.size).toBe(2);
+      expect(oo[VM_PARENTS]?.size).toBe(1);
+      expect(oo[VM_PARENTS]?.get(va)?.size).toBe(2);
+      expectParent(oo, va, 'oo');
+      expectParent(oo, va, 'f2');
       expect(isViewModel(a.f2)).toBe(false);
       expect(a.f2 === a.oo).toBe(true);
 
       va.f2 = oo;
-      expect(oo[VM_PARENTS]!.size).toBe(2);
+      expect(oo[VM_PARENTS]?.get(va)?.size).toBe(2);
 
       va.f2 = 30;
       expect(oo[VM_PARENTS]!.size).toBe(1);

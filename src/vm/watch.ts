@@ -190,10 +190,9 @@ function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
       imm.p = undefined;
     });
   });
-  vm[VM_PARENTS]?.forEach((parents, prop) => {
-    const parentPath = changedPath ? [prop, ...changedPath] : [prop];
-    parents.forEach((parentVmCore) => {
-      handleVmChange(parentVmCore, parentPath);
+  vm[VM_PARENTS]?.forEach((props, parent) => {
+    props.forEach((prop) => {
+      handleVmChange(parent, changedPath ? [prop, ...changedPath] : [prop]);
     });
   });
 }
