@@ -80,6 +80,7 @@ describe('vm:array', () => {
     const c = vm({ c: 'c' } as AnyObj) as ViewModel;
     arr.unshift(c);
     expect(arr[0][VM_RAW] === c[VM_RAW] && arr[0] === c).toBe(true);
+    expect(arr.unshift()).toBe(1);
   });
   it('array reverse & sort', () => {
     const arr = vm([1, 3, 2, { a: 10 }]) as unknown as ViewModel;
@@ -103,6 +104,7 @@ describe('vm:array', () => {
   });
   it('array fill', () => {
     const a = vm(new Array(10)) as ViewModelArray<any>;
+
     a.fill(4, 1);
     expect(a[0]).toBeUndefined();
     a.fill(5, 2, 1);
@@ -122,18 +124,21 @@ describe('vm:array', () => {
     const arr = vm([1, 2, { a: 'a' }] as unknown[]) as ViewModelArray;
     arr.splice(2, 0, arr[2]);
     const va = arr[2] as unknown as ViewModel;
-    console.log(va[VM_PARENTS]);
-
     expectParent(va, 2, arr);
     expectParent(va, 3, arr);
     expect(arr.splice(3, 0)).toStrictEqual([]);
-    arr.splice(1, 0, { b: 'b' });
-    console.log(va[VM_PARENTS]);
-    expect(arr[3]).toBe(va);
-    expectParent(va, 3, arr);
+
+    arr.splice(1, 0, { b: 'b' }, { c: 'c' });
+    expect(arr[4]).toBe(va);
     expectParent(va, 4, arr);
+    expectParent(va, 5, arr);
     expectParent(arr[1], 1, arr);
     expect(arr[1]).toStrictEqual({ b: 'b' });
+
+    arr.splice(2, 1);
+    expectParent(va, 3, arr);
+    expectParent(va, 4, arr);
+
     const vb = arr[1] as unknown as ViewModel;
     expect(arr.splice(1, 1, { c: 'c' }, { d: 'd' })[0]).toBe(vb);
     expectParent(va, 4, arr);
@@ -148,5 +153,8 @@ describe('vm:array', () => {
     expect(arr[0]).toBe(1);
     expectParent(va, 1, arr);
     expect(va[VM_PARENTS]?.size).toBe(2);
+
+    expect(arr.splice(1).length).toBe(0);
+    expect((arr as any).splice().length).toBe(0);
   });
 });

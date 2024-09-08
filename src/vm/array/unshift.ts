@@ -1,13 +1,8 @@
-import {
-  GlobalViewModelWeakMap,
-  VM_RAW,
-  type ViewModelArray,
-  addParent,
-  shouldBeVm,
-} from '../core';
+import { type ViewModelArray, addParent, shouldBeVm } from '../core';
+import { getVmAndRaw } from '../object';
 import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
-import { removeArrayItemVmParent } from './helper';
+import { moveArrayItemsVmParentIndex } from './helper';
 
 export function arrayUnshift(
   targetViewModel: ViewModelArray,
@@ -15,28 +10,22 @@ export function arrayUnshift(
   ...args: unknown[]
 ) {
   const argsLen = args.length;
-  if (argsLen === 0) return target.length;
+  const len = target.length;
+  if (argsLen === 0) return len;
 
-  target.forEach((v, i) => {
-    const vm = removeArrayItemVmParent(v, targetViewModel, i);
-    vm && addParent(vm, targetViewModel, i + args.length);
-  });
+  len > 0 && moveArrayItemsVmParentIndex(target, targetViewModel, argsLen, 0, len - 1);
   for (let i = argsLen - 1; i >= 0; i--) {
     const arg = args[i];
-    if (shouldBeVm(arg)) {
-      let viewModel = arg[VM_RAW] ? arg : GlobalViewModelWeakMap.get(arg);
-      if (viewModel) {
-        target.unshift(viewModel[VM_RAW]);
-      } else {
-        viewModel = wrapViewModel(arg);
-        target.unshift(arg);
-      }
-      addParent(viewModel, targetViewModel, i);
-    } else {
-      target.unshift(arg);
+
+    const [valVm, rawVal] = getVmAndRaw(arg);
+    if (valVm) {
+      addParent(valVm, targetViewModel, i);
+    } else if (shouldBeVm(arg)) {
+      addParent(wrapViewModel(arg), targetViewModel, i);
     }
+    target.unshift(rawVal);
   }
 
   notifyVmArrayChange(targetViewModel);
-  return target.length;
+  return len + argsLen;
 }

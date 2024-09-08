@@ -2,7 +2,7 @@ import { isUndefined } from 'src/util';
 import { VM_RAW, type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { arrayPush } from './push';
 import { wrapViewModelArr } from '.';
-import { removeArrayItemVmParent } from './helper';
+import { moveArrayItemsVmParentIndex, removeArrayItemVmParent } from './helper';
 import { wrapViewModel } from '../proxy';
 import { getVmAndRaw } from '../object';
 
@@ -33,19 +33,15 @@ export function arraySplice(
       vm && addParent(vm, delArrVm, i - idx);
     }
   }
-  const delta = delCount - args.length;
+  const delta = args.length - delCount;
   if (delta !== 0) {
-    for (let i = idx + delCount; i < len; i++) {
-      const vm = removeArrayItemVmParent(target[i], targetViewModel, i);
-      vm && addParent(vm, targetViewModel, i - delta);
-    }
+    moveArrayItemsVmParentIndex(target, targetViewModel, delta, idx + delCount, len - 1);
   }
 
   target.splice(idx, delCount);
 
   args.forEach((arg, i) => {
     const [valVm, rawVal] = getVmAndRaw(arg);
-    console.log(valVm, rawVal);
     const index = idx + i;
     if (valVm) {
       addParent(valVm, targetViewModel, index);

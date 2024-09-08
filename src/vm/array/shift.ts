@@ -1,15 +1,15 @@
-import { type ViewModelArray, addParent } from '../core';
+import type { ViewModelArray } from '../core';
 import { notifyVmArrayChange } from '../watch';
-import { removeArrayItemVmParent } from './helper';
+import { moveArrayItemsVmParentIndex, removeArrayItemVmParent } from './helper';
 
 export function arrayShift(targetViewModel: ViewModelArray, target: unknown[]) {
-  if (target.length === 0) return undefined;
-  const val = target.shift();
+  const len = target.length;
+  if (len === 0) return undefined;
+
+  const val = target[0];
   const valVm = removeArrayItemVmParent(val, targetViewModel, 0);
-  target.forEach((v, i) => {
-    const vm = removeArrayItemVmParent(v, targetViewModel, i + 1);
-    vm && addParent(vm, targetViewModel, i);
-  });
+  len > 1 && moveArrayItemsVmParentIndex(target, targetViewModel, -1, 1, len - 1);
+  target.shift();
   notifyVmArrayChange(targetViewModel);
   return valVm ?? val;
 }

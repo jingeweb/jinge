@@ -1,13 +1,8 @@
-import { isUndefined } from 'src/util';
-import {
-  GlobalViewModelWeakMap,
-  VM_RAW,
-  type ViewModelArray,
-  addParent,
-  shouldBeVm,
-} from '../core';
+import { type AnyObj, isUndefined } from 'src/util';
+import { type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { wrapViewModel } from '../proxy';
 import { removeArrayItemVmParent } from './helper';
+import { getVmAndRaw } from '../object';
 
 export function arrayFill(
   targetViewModel: ViewModelArray,
@@ -22,20 +17,17 @@ export function arrayFill(
   if (isUndefined(end)) end = target.length;
   if (end <= start) return targetViewModel;
 
-  if (shouldBeVm(v)) {
-    let newVm = v[VM_RAW] ? v : GlobalViewModelWeakMap.get(v);
-    const newRawV = newVm ? v[VM_RAW] : v;
-    if (!newVm) newVm = wrapViewModel(v);
-    for (let i = start; i < end; i++) {
-      removeArrayItemVmParent(target[i], targetViewModel, i);
-      target[i] = newRawV;
-      addParent(newVm, targetViewModel, i);
+  const result = getVmAndRaw(v);
+  let vm = result[0];
+  if (!vm && shouldBeVm(v)) vm = wrapViewModel(v as AnyObj);
+  const rawVal = result[1];
+  for (let i = start; i < end; i++) {
+    removeArrayItemVmParent(target[i], targetViewModel, i);
+    if (vm) {
+      addParent(vm, targetViewModel, i);
     }
-  } else {
-    for (let i = start; i < end; i++) {
-      removeArrayItemVmParent(target[1], targetViewModel, i);
-      target[i] = v;
-    }
+    target[i] = rawVal;
   }
+
   return targetViewModel;
 }
