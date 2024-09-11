@@ -1,6 +1,5 @@
-import type { AnyFn, AnyObj, PropertyPathItem, WatchHandler, WatchOptions } from '../../src';
+import type { AnyObj, PropertyPathItem } from '../../src';
 import {
-  type UnwatchFn,
   VM_PARENTS,
   VM_RAW,
   VM_WATCHERS,
@@ -12,6 +11,7 @@ import {
   vmRaw,
   vmWatch,
 } from '../../src';
+import { expectWatch } from './_helper';
 
 describe('vm:object', () => {
   it('view-model to raw', () => {
@@ -144,28 +144,6 @@ describe('vm:object', () => {
   });
 });
 
-function doWatch(
-  vm: ViewModel,
-  expectFn: AnyFn,
-  updateFn: AnyFn,
-  path?: PropertyPathItem | PropertyPathItem[],
-  options?: WatchOptions,
-) {
-  setTimeout(updateFn);
-  return new Promise<void>((resolve) => {
-    let unwatchFn: UnwatchFn;
-    const cb: WatchHandler = (nv, ov, p) => {
-      expectFn(nv, ov, p);
-      unwatchFn?.();
-      resolve();
-    };
-    if (path) {
-      unwatchFn = vmWatch(vm, path as PropertyPathItem[], cb, options);
-    } else {
-      unwatchFn = vmWatch(vm, cb);
-    }
-  });
-}
 describe('watch:object', () => {
   it('simple watch', async () => {
     const va = vm({ a: 10 } as AnyObj) as ViewModel;
@@ -181,7 +159,7 @@ describe('watch:object', () => {
       },
     );
     unwatch();
-    await doWatch(
+    await expectWatch(
       va,
       (v) => {
         expect(va[VM_WATCHERS]?.size).toBe(1);
@@ -194,7 +172,7 @@ describe('watch:object', () => {
     );
     expect(va[VM_WATCHERS]?.size).toBe(0);
 
-    await doWatch(
+    await expectWatch(
       va,
       (v) => {
         expect(v === va).toBe(true);
@@ -205,7 +183,7 @@ describe('watch:object', () => {
       },
     );
 
-    await doWatch(
+    await expectWatch(
       va,
       (v) => {
         expect(v).toBe(10);
@@ -217,7 +195,7 @@ describe('watch:object', () => {
       { deep: true },
     );
 
-    await doWatch(
+    await expectWatch(
       va,
       (v) => {
         expect(v).toBe(20);
@@ -229,7 +207,7 @@ describe('watch:object', () => {
       { deep: true },
     );
 
-    await doWatch(
+    await expectWatch(
       va,
       (v) => {
         expect(v[VM_RAW]).toStrictEqual({ c: 30 });

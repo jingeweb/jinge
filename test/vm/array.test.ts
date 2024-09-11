@@ -1,6 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AnyObj, ViewModel, ViewModelArray } from '../../src';
-import { VM_PARENTS, VM_RAW, isViewModel, vm, vmIgnore, vmRaw } from '../../src';
+import {
+  VM_PARENTS,
+  VM_RAW,
+  destroyViewModelCore,
+  isViewModel,
+  vm,
+  vmIgnore,
+  vmRaw,
+} from '../../src';
+import { expectWatch } from './_helper';
 
 function expectParent(vm: ViewModel, index: number, parent: any) {
   expect(!!vm[VM_PARENTS]?.get(parent)?.has(index)).toBe(true);
@@ -17,6 +26,14 @@ describe('vm:array', () => {
     vmIgnore(a);
     const va = vm(a);
     expect(isViewModel(va)).toBe(false);
+  });
+  it('destroy view-model', () => {
+    const arr = vm([{ a: 1 }, vm({ b: 2 })]) as ViewModelArray<any>;
+    const a = arr[0];
+    const b = arr[1];
+    destroyViewModelCore(arr);
+    expect(a[VM_PARENTS]?.size).toBe(0);
+    expect(b[VM_PARENTS]?.size).toBe(0);
   });
   it('wrap array & set length', () => {
     const a: AnyObj = { a: [1, 2, { b: 10 }, vm({ o: 'o' })] };
@@ -156,5 +173,55 @@ describe('vm:array', () => {
 
     expect(arr.splice(1).length).toBe(0);
     expect((arr as any).splice().length).toBe(0);
+  });
+  it('array slice filter', () => {
+    const arr = vm([1, { a: 'a' }, { b: 'b' }, vm({ c: 'c' })]) as unknown as ViewModelArray;
+    const sa = arr.slice(1, 3) as ViewModelArray;
+    expect(sa.length).toBe(2);
+    expect(sa[0] === arr[1]).toBe(true);
+    expectParent(sa[0], 1, arr);
+    expectParent(arr[1], 0, sa);
+    expect(sa[0][VM_PARENTS]?.size).toBe(2);
+    const fa = arr.filter((it) => it.a === 'a') as ViewModelArray;
+    expect(fa.length).toBe(1);
+    expect(fa[0] === arr[1]).toBe(true);
+    expect(fa[0][VM_PARENTS]?.size).toBe(3);
+    const ma = arr.map((it) => ({
+      x: it,
+    }));
+    expect(ma[0]).toStrictEqual({ x: 1 });
+    expect(fa[0][VM_PARENTS]?.size).toBe(4);
+    const ca = fa.concat(sa).concat({ d: 'd' });
+    expect(ca.length).toBe(4);
+    expect(fa[0][VM_PARENTS]?.size).toBe(6);
+  });
+});
+describe('watch:array', () => {
+  it('simple watch', async () => {
+    const arr = vm([1, 2, { b: { bb: 30 } }]) as ViewModelArray<any>;
+    await expectWatch(
+      arr,
+      (v) => {
+        expect(v).toBe(3);
+      },
+      () => {
+        arr[0] = 2;
+        setTimeout(() => {
+          arr[1] = 3;
+        });
+      },
+      1,
+    );
+    await expectWatch(
+      arr,
+      (v) => {
+        expect(v).toBeUndefined();
+      },
+      () => {
+        arr[2].b.bb = 10;
+        arr[2] = { c: 30 };
+      },
+      [2, 'b', 'bb'],
+    );
   });
 });
