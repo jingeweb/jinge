@@ -116,8 +116,7 @@ export function lazy(
   }
 
   // BEGIN_DROP_IN_PRODUCTION
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const __HMR__ = (window as any).__JINGE_HMR__;
+  const __HMR__ = window.__JINGE_HMR__;
   if (__HMR__) {
     // DymLazy 是动态生成的 Lazy 组件，每一个的 __hmrId__ 都应该是唯一的。
     __HMR__.registerFunctionComponent(DymLazy, `jinge::core::DymLazy::${dymIncId++}`);

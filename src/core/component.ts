@@ -1,3 +1,4 @@
+import type { FC } from '../jsx';
 import type { AnyFn } from '../util';
 import { isFunction, isObject, throwErr } from '../util';
 
@@ -276,7 +277,7 @@ export function newComponentWithDefaultSlot(
   return c;
 }
 
-export function renderFunctionComponent<T extends AnyFn>(
+export function renderFunctionComponent<T extends FC>(
   host: ComponentHost,
   fc: T,
   attrs?: Omit<Parameters<T>[0], 'children'>,
@@ -286,10 +287,9 @@ export function renderFunctionComponent<T extends AnyFn>(
 
   // 渲染逻辑执行时，fc 有可能是内存中的旧版本，新版本通过 hmr 已经被更新，
   // 因此先通过 getLatestFunctionComponent 拿到最版本的组件。
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const __HMR__ = (window as any).__JINGE_HMR__;
+  const __HMR__ = window.__JINGE_HMR__;
   if (__HMR__) {
-    fc = __HMR__.getLatestFunctionComponent(fc);
+    fc = __HMR__.getLatestFunctionComponent(fc) as T;
     __HMR__.registerComponentInstance(fc, host, attrs, host[CONTEXT]);
   }
   // END_DROP_IN_PRODUCTION

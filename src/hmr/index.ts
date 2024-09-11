@@ -16,26 +16,39 @@ import {
   renderFunctionComponent,
   resetComponent,
 } from '../core';
-import { type AnyFn, createComment, createFragment, insertAfter, insertBefore } from '../util';
+import type { FC } from '../jsx';
+import { createComment, createFragment, insertAfter, insertBefore } from '../util';
+
+export type HMR_FC = FC & { __hmrId__: string };
+
+export interface JingeHmrRuntime {
+  replaceComponentInstance(fc: FC): void;
+  registerComponentInstance(
+    fc: FC,
+    instance: ComponentHost,
+    props?: object,
+    context?: Context,
+  ): void;
+  registerFunctionComponent(fc: FC, __hmrId__: string): void;
+  getLatestFunctionComponent(fc: FC): FC;
+}
 
 export function initHmr() {
-  type FC = AnyFn & { __hmrId__: string };
-
-  const ComponentStore = new Map<string, AnyFn>();
+  const ComponentStore = new Map<string, HMR_FC>();
 
   function registerFunctionComponent(fc: FC, __hmrId__: string) {
-    fc.__hmrId__ = __hmrId__;
-    ComponentStore.set(__hmrId__, fc);
+    (fc as HMR_FC).__hmrId__ = __hmrId__;
+    ComponentStore.set(__hmrId__, fc as HMR_FC);
   }
 
   [If, For, Transition, TransitionGroup, Transition, TransitionGroupItem, Portal, Lazy].forEach(
     (fc) => {
-      registerFunctionComponent(fc as FC, `jinge::core::${fc.name}`);
+      registerFunctionComponent(fc, `jinge::core::${fc.name}`);
     },
   );
 
   function getLatestFunctionComponent(fc: FC) {
-    const __hmrId__ = fc.__hmrId__;
+    const __hmrId__ = (fc as HMR_FC).__hmrId__;
     if (!__hmrId__) return fc;
     return ComponentStore.get(__hmrId__) ?? fc;
   }
@@ -54,7 +67,7 @@ export function initHmr() {
     props: object,
     context: Context,
   ) {
-    const __hmrId__ = fc.__hmrId__;
+    const __hmrId__ = (fc as HMR_FC).__hmrId__;
     if (!__hmrId__) {
       console.warn(`Component __hmrId__ not found, ignored.`, fc);
       return;
@@ -73,8 +86,8 @@ export function initHmr() {
   }
 
   function replaceComponentInstance(fc: FC) {
-    if (!fc.__hmrId__) throw new Error('unexpected, missing __hmrId__');
-    const comps = [...(InstanceStore.get(fc.__hmrId__)?.values() ?? [])];
+    if (!(fc as HMR_FC).__hmrId__) throw new Error('unexpected, missing __hmrId__');
+    const comps = [...(InstanceStore.get((fc as HMR_FC).__hmrId__)?.values() ?? [])];
     // !! 注意此处必须将 store.get 的 Set 转换成 array 后再遍历。如果直接遍历 Set.forEach，
     // 新渲染的 component 又会注册到 Set 中，导致无限循环。
     comps.forEach((item) => {
@@ -90,8 +103,7 @@ export function initHmr() {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__JINGE_HMR__ = {
+  window.__JINGE_HMR__ = {
     getLatestFunctionComponent,
     registerFunctionComponent,
 
