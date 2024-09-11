@@ -1,4 +1,4 @@
-import { isUndefined } from 'src/util';
+import { isUndefined } from '../../util';
 import { VM_RAW, type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { arrayPush } from './push';
 import { wrapViewModelArr } from '.';

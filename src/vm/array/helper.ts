@@ -1,5 +1,5 @@
 import { GlobalViewModelWeakMap, VM_RAW, type ViewModel, addParent, removeParent } from '../core';
-import { isObject } from 'src/util';
+import { isObject } from '../../util';
 
 export function removeArrayItemVmParent(val: unknown, targetViewModel: ViewModel, index: number) {
   const valVm = isObject(val)

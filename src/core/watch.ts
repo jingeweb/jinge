@@ -1,6 +1,6 @@
-import { arrayEqual, clearImmediate, setImmediate } from '../util';
+import { arrayEqual, clearImmediate, isUndefined, setImmediate } from '../util';
 import type { PropertyPathItem, ViewModel } from '../vm';
-import { VM_PROXY, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
+import { VM_RAW, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
 import { type ComponentHost, addUnmountFn } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
@@ -46,7 +46,7 @@ export function watchPathForRender2(
         ? (v: unknown) => renderFn(!!v)
         : renderFn;
   innerRenderFn(val);
-  if (!target[VM_PROXY]) {
+  if (isUndefined(target[VM_RAW])) {
     return;
   }
   addUnmountFn(hostComponent, innerWatchPath(target, val, innerRenderFn, path, true));
@@ -82,7 +82,7 @@ export function PathWatcher(
   let val = getValueByPath(target, path);
 
   let parent: ParentWatcher | undefined = undefined;
-  const unwatchFn = target[VM_PROXY]
+  const unwatchFn = isUndefined(target[VM_RAW])
     ? innerWatchPath(
         target,
         val,
@@ -165,7 +165,7 @@ export function DymPathWatcher(
       renderFn !== undefined,
     );
   };
-  let unwatchFn = target[VM_PROXY] ? __innerW() : undefined;
+  let unwatchFn = isUndefined(target[VM_RAW]) ? __innerW() : undefined;
   const rtn = {
     [VM_WATCHER_DESTROY]() {
       parent = undefined;

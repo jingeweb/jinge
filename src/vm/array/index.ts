@@ -1,4 +1,4 @@
-import { type AnyFn, isObject, isString, isSymbol } from 'src/util';
+import { type AnyFn, isObject, isString, isSymbol } from '../../util';
 import {
   GlobalViewModelWeakMap,
   type PropertyPathItem,

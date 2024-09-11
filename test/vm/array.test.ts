@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AnyObj, ViewModel, ViewModelArray } from 'src';
-import { VM_PARENTS, VM_RAW, isViewModel, vm, vmIgnore, vmRaw } from 'src/vm';
+import type { AnyObj, ViewModel, ViewModelArray } from '../../src';
+import { VM_PARENTS, VM_RAW, isViewModel, vm, vmIgnore, vmRaw } from '../../src';
 
 function expectParent(vm: ViewModel, index: number, parent: any) {
   expect(!!vm[VM_PARENTS]?.get(parent)?.has(index)).toBe(true);

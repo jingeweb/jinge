@@ -1,4 +1,4 @@
-import { type AnyObj, isUndefined } from 'src/util';
+import { type AnyObj, isUndefined } from '../../util';
 import { type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { wrapViewModel } from '../proxy';
 import { removeArrayItemVmParent } from './helper';

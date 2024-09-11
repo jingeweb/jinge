@@ -11,8 +11,7 @@
     "stripInternal": true,
     "alwaysStrict": true,
     "moduleResolution": "Bundler",
-    "noEmit": true,
-    "baseUrl": "."
+    "noEmit": true
   },
   "include": ["src/**/*", "test/**/*", "scripts/**/*", "*.mjs", "*.js"]
 }

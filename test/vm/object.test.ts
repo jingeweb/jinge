@@ -1,4 +1,4 @@
-import type { AnyFn, AnyObj, PropertyPathItem, WatchHandler, WatchOptions } from 'src';
+import type { AnyFn, AnyObj, PropertyPathItem, WatchHandler, WatchOptions } from '../../src';
 import {
   type UnwatchFn,
   VM_PARENTS,
@@ -11,7 +11,7 @@ import {
   vmIgnore,
   vmRaw,
   vmWatch,
-} from 'src/vm';
+} from '../../src';
 
 describe('vm:object', () => {
   it('view-model to raw', () => {

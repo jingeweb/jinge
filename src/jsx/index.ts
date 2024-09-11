@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { Ref, RefFn } from '../core';
+import type { ComponentHost, Ref, RefFn } from '../core';
 
 export type Slot<VM extends object> = (vm: VM) => JNode;
 export type SlotNoVm = () => JNode;
-export type FunctionComponent = (...args: any) => any;
+export type FC = (props: any) => JNode | (ComponentHost | Node)[];
 export type JNode =
   | JSX.Element
-  | FunctionComponent
+  | FC
   | Iterable<JNode>
   | string
   | number
@@ -1791,7 +1791,7 @@ interface AllHTMLElements {
 }
 declare global {
   namespace JSX {
-    type ElementType = string | FunctionComponent;
+    type ElementType = string | FC;
     interface Element {
       type: any;
       props: any;

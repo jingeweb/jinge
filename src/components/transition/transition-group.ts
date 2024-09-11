@@ -137,7 +137,8 @@ export function TransitionGroup<T>(
 
   const el = newComponentWithDefaultSlot(this[CONTEXT], renderEachFn);
   this[ROOT_NODES].push(el);
-  const nodes = renderFunctionComponent(el, For, props);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodes = renderFunctionComponent(el, For, props as any);
   itemProps[APPEAR] = true;
   return nodes;
 }
