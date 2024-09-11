@@ -242,7 +242,7 @@ export function setComponentContext(
     throwErr('setctx-after-render');
   }
   let context = component[CONTEXT];
-  if (contextState === CONTEXT_STATE_TOUCHED) {
+  if (contextState === CONTEXT_STATE_UNTOUCH) {
     // we copy context to make sure child component do not modify context passed from parent.
     // we do not copy it by default until setContext function is called, because it unnecessary to waste memory if
     // child component do not modify the context.
