@@ -1,5 +1,4 @@
 const Errs = {
-  'watch-not-vm': 'watch() or watchPath() requires view-model, use vm() to wrap object.',
   'ctx-key-exist':
     'Contenxt with key: {0} is exist. Pass third argument forceOverride=true to override it.',
   'dup-render': 'component has already been rendered.',

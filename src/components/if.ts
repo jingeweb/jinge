@@ -58,7 +58,7 @@ export function If(
     const placeholder = createComment(expect.toString());
     insertAfter($parent, placeholder, lastNode);
 
-    destroyComponentContent(this, true);
+    destroyComponentContent(this);
     const roots = this[ROOT_NODES];
     roots.length = 0;
 

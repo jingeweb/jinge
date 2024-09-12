@@ -174,7 +174,7 @@ export function addUnmountFn(component: ComponentHost, fn: AnyFn) {
 /**
  * 销毁组件的内容，但不销毁组件本身。
  */
-export function destroyComponentContent(target: ComponentHost, removeDOM = false) {
+export function destroyComponentContent(target: ComponentHost, removeDOM = true) {
   for (const component of target[NON_ROOT_COMPONENT_NODES]) {
     // it's not necessary to remove dom when destroy non-root component,
     // because those dom nodes will be auto removed when their parent dom is removed.
@@ -192,6 +192,9 @@ export function destroyComponentContent(target: ComponentHost, removeDOM = false
       $parent!.removeChild(node as Node);
     }
   }
+
+  target[NON_ROOT_COMPONENT_NODES].length = 0;
+  target[ROOT_NODES].length = 0;
 }
 
 /**
@@ -213,8 +216,6 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   });
   target[REFS] && (target[REFS].length = 0);
   target[STATE] = COMPONENT_STATE_DESTROIED;
-  target[ROOT_NODES].length = 0;
-  target[NON_ROOT_COMPONENT_NODES].length = 0;
   target[CONTEXT] = undefined;
 }
 
@@ -300,10 +301,10 @@ export function renderFunctionComponent<T extends FC>(
   return nodes as Node[];
 }
 
-export function renderSlotFunction(host: ComponentHost, fc?: AnyFn, attrs?: object) {
-  if (!fc) return [];
+export function renderSlotFunction(host: ComponentHost, slotFunc?: AnyFn, attrs?: object) {
+  if (!slotFunc) return [];
   setCurrentComponentHost(host);
-  const nodes = fc(host, attrs);
+  const nodes = slotFunc(host, attrs);
   setCurrentComponentHost(undefined);
   return nodes as Node[];
 }

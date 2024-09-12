@@ -29,3 +29,8 @@ export function classnames(...args: ClassnameItem[]) {
   });
   return segs.join(' ');
 }
+export { classnames as cx };
+
+export const noopFn = function () {
+  /* noop */
+};

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { AnyObj } from '../util';
-import { clearImmediate, isFunction, isObject, setImmediate, throwErr } from '../util';
+import { clearImmediate, isFunction, isObject, noopFn, setImmediate } from '../util';
 import type { PropertyPathItem, ViewModel } from './core';
 import { VM_PARENTS, VM_RAW, VM_WATCHERS, isViewModel } from './core';
 
@@ -62,7 +62,7 @@ export function watchPath(
   deep?: boolean,
   immediate?: boolean,
 ) {
-  if (!isViewModel(vm)) throwErr('watch-not-vm');
+  if (!isViewModel(vm)) return noopFn;
 
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 
