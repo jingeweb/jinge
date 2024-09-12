@@ -82,7 +82,7 @@ export function PathWatcher(
   let val = getValueByPath(target, path);
 
   let parent: ParentWatcher | undefined = undefined;
-  const unwatchFn = isUndefined(target[VM_RAW])
+  const unwatchFn = !isUndefined(target[VM_RAW])
     ? innerWatchPath(
         target,
         val,
@@ -94,6 +94,7 @@ export function PathWatcher(
         deep,
       )
     : undefined;
+
   return {
     [VM_WATCHER_DESTROY]() {
       parent = undefined;
@@ -165,7 +166,7 @@ export function DymPathWatcher(
       renderFn !== undefined,
     );
   };
-  let unwatchFn = isUndefined(target[VM_RAW]) ? __innerW() : undefined;
+  let unwatchFn = !isUndefined(target[VM_RAW]) ? __innerW() : undefined;
   const rtn = {
     [VM_WATCHER_DESTROY]() {
       parent = undefined;
