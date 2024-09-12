@@ -10,6 +10,7 @@ import {
 import {
   type ComponentHost,
   type Context,
+  ROOT_NODES,
   addUnmountFn,
   getLastDOM,
   handleRenderDone,
@@ -91,15 +92,24 @@ export function initHmr() {
     // !! 注意此处必须将 store.get 的 Set 转换成 array 后再遍历。如果直接遍历 Set.forEach，
     // 新渲染的 component 又会注册到 Set 中，导致无限循环。
     comps.forEach((item) => {
-      const placeholder = createComment('');
+      const placeholder = createComment('hmr');
       const lastEl = getLastDOM(item.comp);
       const $parent = lastEl.parentNode as Node;
       insertAfter($parent, placeholder, lastEl);
       resetComponent(item.comp, item.context);
-      const nodes = renderFunctionComponent(item.comp, fc, item.props);
-      insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], placeholder);
-      handleRenderDone(item.comp);
-      $parent.removeChild(placeholder);
+      let nodes: Node[] | undefined;
+      try {
+        nodes = renderFunctionComponent(item.comp, fc, item.props);
+      } catch (ex) {
+        console.error(ex);
+      }
+      if (nodes?.length) {
+        insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], placeholder);
+        $parent.removeChild(placeholder);
+        handleRenderDone(item.comp);
+      } else {
+        item.comp[ROOT_NODES].push(placeholder);
+      }
     });
   }
 
