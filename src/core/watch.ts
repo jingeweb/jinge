@@ -147,11 +147,10 @@ export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => voi
 export function DymPathWatcher(
   target: ViewModel,
   path: (PropertyPathItem | ViewWatcher)[],
-  renderFn?: (v: unknown) => void,
+  deep?: boolean,
 ) {
   let innerPath = path.map((p) => (typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p));
   let val = getValueByPath(target, innerPath);
-  renderFn?.(val);
   let parent: ParentWatcher | undefined = undefined;
   const __innerW = () => {
     return innerWatchPath(
@@ -160,10 +159,9 @@ export function DymPathWatcher(
       (v) => {
         val = v;
         parent?.[VM_WATCHER_NOTIFY](v);
-        renderFn?.(v);
       },
       innerPath,
-      renderFn !== undefined,
+      deep,
     );
   };
   let unwatchFn = !isUndefined(target[VM_RAW]) ? __innerW() : undefined;
@@ -191,7 +189,6 @@ export function DymPathWatcher(
       if (newVal !== val) {
         val = newVal;
         parent?.[VM_WATCHER_NOTIFY](val);
-        renderFn?.(val);
       }
       unwatchFn();
       unwatchFn = __innerW();
