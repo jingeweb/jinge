@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "4.0.0-alpha.2",
+  "version": "4.0.0-alpha.4",
   "description": "A small and smart web interface framework",
   "main": "./dist/jinge.prod.js",
   "module": "./dist/jinge.prod.js",

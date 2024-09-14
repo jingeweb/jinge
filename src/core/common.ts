@@ -24,7 +24,6 @@ export interface Slots {
   [slotName: string]: RenderFn | undefined;
 }
 
-export const EMITTER = Symbol('EMITTER');
 export const __ = Symbol('__');
 export const ROOT_NODES = Symbol('ROOT_NODES');
 export const NON_ROOT_COMPONENT_NODES = Symbol('NON_ROOT_COMPONENT_NODES');
@@ -36,4 +35,3 @@ export const ONMOUNT = Symbol('ON_MOUNT');
 export const UNMOUNT_FNS = Symbol('UNMOUNT_FNS');
 export const STATE = Symbol('STATE');
 export const CONTEXT_STATE = Symbol('CONTEXT_STATE');
-export const UPDATE_RENDER = Symbol('UPDATE_RENDER');

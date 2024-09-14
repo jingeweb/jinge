@@ -15,6 +15,10 @@ export type JNode =
   | null
   | undefined;
 
+export type Props<P extends object> = P & {
+  key?: string | undefined | null;
+  ref?: Ref<any>;
+};
 export interface PropsOnlySlots<
   S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
 > {
