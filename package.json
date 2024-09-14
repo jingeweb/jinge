@@ -1,7 +1,7 @@
 {
   "name": "jinge",
   "version": "4.0.0-alpha.1",
-  "description": "A Proxy based MVVM framework",
+  "description": "A small and smart web interface framework",
   "main": "./dist/jinge.prod.js",
   "module": "./dist/jinge.prod.js",
   "types": "src/index.ts",

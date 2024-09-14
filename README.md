@@ -1,6 +1,6 @@
 # jinge
 
-> 一个小而美的前端 Web 框架
+> 一个小巧的前端界面框架
 
 [English Version Readme](README_en.md)
 
