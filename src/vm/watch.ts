@@ -62,14 +62,12 @@ export function watchPath(
   deep?: boolean,
   immediate?: boolean,
 ) {
-  if (!isViewModel(vm)) return noopFn;
-
   const val = propertyPath ? getValueByPath(vm, propertyPath) : vm;
 
   if (immediate) {
     handler(val, undefined);
   }
-  return innerWatchPath(vm, val, handler, propertyPath, deep);
+  return isViewModel(vm) ? innerWatchPath(vm, val, handler, propertyPath, deep) : noopFn;
 }
 export function innerWatchPath(
   vm: ViewModel,
