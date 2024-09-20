@@ -1,6 +1,14 @@
 import type { FC } from '../jsx';
 import type { AnyFn } from '../util';
-import { isFunction, isObject, throwErr } from '../util';
+import {
+  createComment,
+  createFragment,
+  insertAfter,
+  insertBefore,
+  isFunction,
+  isObject,
+  throwErr,
+} from '../util';
 
 import type { ComponentState, Context, ContextState, Slots } from './common';
 import {
@@ -220,7 +228,7 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
 }
 
 /** 重置组件，销毁旧的，重置为全新。目前此函数仅用于 hmr 时更新组件。 */
-export function resetComponent(target: ComponentHost, context: Context) {
+export function resetComponent(target: ComponentHost, context?: Context) {
   destroyComponent(target);
   target[STATE] = COMPONENT_STATE_INITIALIZE;
   target[SLOTS] = {};
@@ -301,6 +309,31 @@ export function renderFunctionComponent<T extends FC>(
   return nodes as Node[];
 }
 
+export function replaceRenderFunctionComponent<T extends FC = FC>(
+  host: ComponentHost,
+  fc: T,
+  context?: Context,
+  props?: Omit<Parameters<T>[0], 'children'>,
+) {
+  const placeholder = createComment('');
+  const lastEl = getLastDOM(host);
+  const $parent = lastEl.parentNode as Node;
+  insertAfter($parent, placeholder, lastEl);
+  resetComponent(host, context);
+  let nodes: Node[] | undefined;
+  try {
+    nodes = renderFunctionComponent(host, fc, props);
+  } catch (ex) {
+    console.error(ex);
+  }
+  if (nodes?.length) {
+    insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], placeholder);
+    $parent.removeChild(placeholder);
+    handleRenderDone(host);
+  } else {
+    host[ROOT_NODES].push(placeholder);
+  }
+}
 export function renderSlotFunction(host: ComponentHost, slotFunc?: AnyFn, attrs?: object) {
   if (!slotFunc) return [];
   setCurrentComponentHost(host);

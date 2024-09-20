@@ -10,6 +10,8 @@ const Errs = {
   'transition-require-element':
     'Children of <Transition /> component must be one and only one html element',
   'assert-failed': 'Assert failed, contact developer to report this error.',
+  'intl-key-missing':
+    "Missing intl key, please run 'intl-extract',then translate generated csv file, then run 'intl-compile'",
 };
 
 export function throwErr(id: keyof typeof Errs, ...args: unknown[]): never {
