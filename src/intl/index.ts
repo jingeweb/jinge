@@ -50,8 +50,7 @@ export async function initIntl(options: {
 }
 
 export interface TOptions {
-  key?: string;
-  isolate?: boolean;
+  key: string;
 }
 
 export function t(
