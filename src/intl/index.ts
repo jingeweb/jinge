@@ -12,7 +12,7 @@ let currentLocale = '';
 const dictStore: DictStore = {};
 const watchers = new Set<OnChangeFn>();
 
-export function watchLocale(onChange: OnChangeFn, immediate = false) {
+export function intlWatchLocale(onChange: OnChangeFn, immediate = false) {
   if (immediate) {
     onChange(currentLocale);
   }
@@ -20,17 +20,17 @@ export function watchLocale(onChange: OnChangeFn, immediate = false) {
   return () => watchers.delete(onChange);
 }
 
-export function getLocale() {
+export function intlGetLocale() {
   return currentLocale;
 }
 
-export async function setLocale(locale: string) {
+export async function intlSetLocale(locale: string) {
   if (currentLocale === locale) return;
-  await changeLocale(locale);
+  await intlChangeLocale(locale);
   watchers.forEach((onChange) => onChange(locale));
 }
 
-async function changeLocale(locale: string) {
+async function intlChangeLocale(locale: string) {
   currentLocale = locale;
   if (!dictStore[locale] && dictLoader) {
     dictStore[locale] = await dictLoader(locale);
@@ -38,7 +38,7 @@ async function changeLocale(locale: string) {
   if (!dictStore[locale]) throw new Error(`dict of ${locale} not loaded!`);
 }
 
-export async function initIntl(options: {
+export async function intlInit(options: {
   defaultLocale: string;
   dicts?: DictStore;
   dictLoader?: DictLoaderFn;
@@ -46,7 +46,7 @@ export async function initIntl(options: {
   Object.assign(dictStore, options.dicts ?? {});
   dictLoader = options.dictLoader;
 
-  await changeLocale(options.defaultLocale);
+  await intlChangeLocale(options.defaultLocale);
 }
 
 export interface TOptions {
@@ -75,6 +75,9 @@ export function intlGetText(
   return fn ? fn(params) : (defaultText ?? key);
 }
 
+/**
+ * 给模板编译器生成的代码使用的渲染函数。
+ */
 export function renderIntlText(
   host: ComponentHost,
   pushRoot: boolean,
@@ -94,7 +97,7 @@ export function renderIntlText(
 
   addUnmountFn(
     host,
-    watchLocale(() => {
+    intlWatchLocale(() => {
       el.textContent = intlGetText(key, params, defaultText);
     }, true),
   );
@@ -103,6 +106,9 @@ export function renderIntlText(
   return el;
 }
 
+/**
+ * 给模板编译器生成的代码使用的渲染函数。
+ */
 export function renderIntlRichText(
   host: ComponentHost,
   pushRoot: boolean,
@@ -136,7 +142,7 @@ export function renderIntlRichText(
 
   addUnmountFn(
     host,
-    watchLocale(() => {
+    intlWatchLocale(() => {
       renderHtml(params);
     }, true),
   );
