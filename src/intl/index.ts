@@ -1,5 +1,16 @@
-import { ComponentHost, NON_ROOT_COMPONENT_NODES, ROOT_NODES, addUnmountFn } from '../core';
-import { type AnyFn, createEle, createFragment, createTextNode, insertBefore } from '../util';
+import {
+  CONTEXT,
+  ComponentHost,
+  NON_ROOT_COMPONENT_NODES,
+  ROOT_NODES,
+  addUnmountFn,
+  getFirstDOM,
+  renderFunctionComponent,
+  replaceRenderFunctionComponent,
+  resetComponent,
+} from '../core';
+import type { FC, JNode } from '../jsx';
+import { type AnyFn, createTextNode, insertBefore } from '../util';
 import { isViewModel, vmWatch } from '../vm';
 
 type Dict = Record<string, AnyFn>;
@@ -55,7 +66,8 @@ export interface TOptions {
 
 export function t(
   defaultText: string,
-  params?: Record<string, string | number | boolean>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params?: Record<string, string | number | boolean | JNode | ((content: any) => JNode)>,
   options?: TOptions,
 ): string {
   // 编译器会把第一个参数替换为 key，转换时会结合第三个 options 参数计算 key。然后把第三个参数替换为 defaultText。
@@ -106,9 +118,6 @@ export function renderIntlText(
   return el;
 }
 
-/**
- * 给模板编译器生成的代码使用的渲染函数。
- */
 export function renderIntlRichText(
   host: ComponentHost,
   pushRoot: boolean,
@@ -117,34 +126,36 @@ export function renderIntlRichText(
   defaultText?: string,
 ) {
   const el = new ComponentHost();
-  const renderHtml = (p: typeof params) => {
-    const html = intlGetText(key, p, defaultText);
-    const tmp = createEle('div');
-    tmp.innerHTML = html;
-    const nodes = [...tmp.childNodes];
-    const roots = el[ROOT_NODES];
-    if (roots.length) {
-      const lastEl = roots[0] as Node;
-      const pa = lastEl.parentNode as Node;
-      insertBefore(pa, nodes.length > 1 ? createFragment(nodes) : nodes[0]);
-      roots.forEach((el) => pa.removeChild(el as Node));
-      roots.length = 0;
+  let Fc: FC | undefined = undefined;
+
+  Fc = dictStore[currentLocale]?.[key];
+  if (!Fc) {
+    const tn = createTextNode(defaultText ?? key);
+    el[ROOT_NODES].push(tn);
+  } else {
+    renderFunctionComponent(el, Fc, params);
+  }
+
+  const update = () => {
+    const preFc = Fc;
+    Fc = dictStore[currentLocale]?.[key];
+    if (Fc) {
+      replaceRenderFunctionComponent(el, Fc, host[CONTEXT], params);
+    } else if (preFc) {
+      const tn = createTextNode(defaultText ?? key);
+      const firstEl = getFirstDOM(el);
+      const $parent = firstEl.parentNode as Node;
+      insertBefore($parent, tn, firstEl);
+      resetComponent(host, host[CONTEXT]);
+      host[ROOT_NODES].push(tn);
     }
-    roots.push(...nodes);
   };
-  isViewModel(params) &&
-    addUnmountFn(
-      host,
-      vmWatch(params, (v) => {
-        renderHtml(v);
-      }),
-    );
 
   addUnmountFn(
     host,
     intlWatchLocale(() => {
-      renderHtml(params);
-    }, true),
+      update();
+    }),
   );
 
   pushRoot ? host[ROOT_NODES].push(el) : host[NON_ROOT_COMPONENT_NODES].push(el);
