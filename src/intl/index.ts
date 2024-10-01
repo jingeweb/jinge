@@ -10,10 +10,11 @@ import {
   resetComponent,
 } from '../core';
 import type { FC, JNode } from '../jsx';
-import { type AnyFn, createTextNode, insertBefore } from '../util';
+import { createTextNode, insertBefore } from '../util';
 import { isViewModel, vmWatch } from '../vm';
 
-type Dict = Record<string, AnyFn>;
+type TFn = (params: Record<string, unknown>) => string;
+type Dict = Record<string, string | TFn | FC>;
 type DictStore = Record<string, Dict>;
 type DictLoaderFn = (locale: string) => Promise<Dict>;
 type OnChangeFn = (locale: string) => void;
@@ -71,20 +72,19 @@ export function t(
   options?: TOptions,
 ): string {
   // 编译器会把第一个参数替换为 key，转换时会结合第三个 options 参数计算 key。然后把第三个参数替换为 defaultText。
-  return intlGetText(
-    defaultText,
-    params as unknown as Record<string, string | number | boolean>,
-    options as unknown as string,
-  );
-}
-
-export function intlGetText(
-  key: string,
-  params?: Record<string, string | number | boolean>,
-  defaultText?: string,
-) {
-  const fn = dictStore[currentLocale]?.[key];
-  return fn ? fn(params) : (defaultText ?? key);
+  if (params) {
+    return (
+      (dictStore[currentLocale]?.[defaultText] as TFn)?.(params) ??
+      (options as unknown as string) ??
+      defaultText
+    );
+  } else {
+    return (
+      (dictStore[currentLocale]?.[defaultText] as string) ??
+      (options as unknown as string) ??
+      defaultText
+    );
+  }
 }
 
 /**
@@ -94,26 +94,41 @@ export function renderIntlText(
   host: ComponentHost,
   pushRoot: boolean,
   key: string,
-  params?: Record<string, string | number | boolean>,
   defaultText?: string,
 ) {
   const el = createTextNode('');
 
-  isViewModel(params) &&
-    addUnmountFn(
-      host,
-      vmWatch(params, (v) => {
-        el.textContent = intlGetText(key, v, defaultText);
-      }),
-    );
-
   addUnmountFn(
     host,
     intlWatchLocale(() => {
-      el.textContent = intlGetText(key, params, defaultText);
+      el.textContent = (dictStore[currentLocale]?.[key] as unknown as string) ?? defaultText ?? key;
     }, true),
   );
 
+  pushRoot && host[ROOT_NODES].push(el);
+  return el;
+}
+
+/**
+ * 给模板编译器生成的代码使用的渲染函数。
+ */
+export function renderIntlTextWithParams(
+  host: ComponentHost,
+  pushRoot: boolean,
+  key: string,
+  params: Record<string, unknown>,
+  defaultText?: string,
+) {
+  const el = createTextNode('');
+  const st = () => {
+    const fn = dictStore[currentLocale]?.[key] as TFn;
+    const tx = fn ? fn(params) : (defaultText ?? key);
+    el.textContent = tx;
+  };
+  isViewModel(params) && addUnmountFn(host, vmWatch(params, st));
+  addUnmountFn(host, intlWatchLocale(st));
+
+  st();
   pushRoot && host[ROOT_NODES].push(el);
   return el;
 }
@@ -127,18 +142,11 @@ export function renderIntlRichText(
 ) {
   const el = new ComponentHost();
   let Fc: FC | undefined = undefined;
-
-  Fc = dictStore[currentLocale]?.[key];
-  if (!Fc) {
-    const tn = createTextNode(defaultText ?? key);
-    el[ROOT_NODES].push(tn);
-  } else {
-    renderFunctionComponent(el, Fc, params);
-  }
+  Fc = dictStore[currentLocale]?.[key] as FC;
 
   const update = () => {
     const preFc = Fc;
-    Fc = dictStore[currentLocale]?.[key];
+    Fc = dictStore[currentLocale]?.[key] as FC;
     if (Fc) {
       replaceRenderFunctionComponent(el, Fc, host[CONTEXT], params);
     } else if (preFc) {
@@ -159,5 +167,12 @@ export function renderIntlRichText(
   );
 
   pushRoot ? host[ROOT_NODES].push(el) : host[NON_ROOT_COMPONENT_NODES].push(el);
-  return el[ROOT_NODES];
+
+  if (!Fc) {
+    const tn = createTextNode(defaultText ?? key);
+    el[ROOT_NODES].push(tn);
+    return el[ROOT_NODES];
+  } else {
+    return renderFunctionComponent(el, Fc, params);
+  }
 }
