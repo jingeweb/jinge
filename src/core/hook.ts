@@ -23,22 +23,32 @@ export function getCurrentComponentHost() {
   return componentHost;
 }
 
+/** 监听 vm 对象的 property 属性的变更。 */
 export function watch<T extends object, P extends keyof T>(
   vm: T,
   property: P,
   handler: WatchHandler<T[P]>,
   options?: WatchOptions,
 ): void;
-export function watch<T extends object>(vm: T, handler: WatchHandler<T>): void;
+/** 深度监听 vm 对象的任何变更 */
+export function watch<T extends object>(
+  vm: T,
+  handler: WatchHandler<T>,
+  options?: {
+    /** 是否立即执行监听回调函数，默认 false。 */
+    immediate?: boolean;
+  },
+): void;
+/** 监听 vm 对象上的 property path 属性，即多层的子对象的属性。 */
 export function watch<T extends object>(
   vm: T,
   propertyPath: PropertyPathItem[],
   handler: WatchHandler<any>,
   options?: WatchOptions,
 ): void;
-export function watch(vm: any, propOrPathOrHanlder: any, handler?: any, options?: any) {
+export function watch(vm: any, propOrPathOrHanlder: any, handlerOrOptions?: any, options?: any) {
   if (!componentHost) throwErr(MISS_KEY);
-  addUnmountFn(componentHost, vmWatch(vm, propOrPathOrHanlder, handler, options));
+  addUnmountFn(componentHost, vmWatch(vm, propOrPathOrHanlder, handlerOrOptions, options));
 }
 
 export function onMount(fn: () => (() => void) | void) {

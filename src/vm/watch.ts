@@ -96,29 +96,44 @@ export function innerWatchPath(
 }
 export type UnwatchFn = () => void;
 export interface WatchOptions {
+  /** 是否立即执行监听回调函数，默认 false。 */
   immediate?: boolean;
+  /** 是否深度监听该值，默认 false。 */
   deep?: boolean;
 }
+/** 监听 vm 对象的 property 属性的变更。 */
 export function vmWatch<T extends object, P extends keyof T>(
   vm: T,
   property: P,
   handler: WatchHandler<T[P]>,
   options?: WatchOptions,
 ): UnwatchFn;
-export function vmWatch<T extends object>(vm: T, handler: WatchHandler<T>): UnwatchFn;
+/** 深度监听 vm 对象的任何变更 */
+export function vmWatch<T extends object>(
+  vm: T,
+  handler: WatchHandler<T>,
+  options?: { immediate?: boolean },
+): UnwatchFn;
+/** 监听 vm 对象上的 property path 属性，即多层的子对象的属性。 */
 export function vmWatch<T extends object>(
   vm: T,
   propertyPath: PropertyPathItem[],
   handler: WatchHandler<any>,
   options?: WatchOptions,
 ): UnwatchFn;
-export function vmWatch(vm: any, propOrPathOrHanlder: any, handler?: any, options?: any) {
+export function vmWatch(vm: any, propOrPathOrHanlder: any, optionsOrHandler?: any, options?: any) {
   if (isFunction(propOrPathOrHanlder)) {
-    return watchPath(vm, propOrPathOrHanlder, undefined, true);
+    return watchPath(vm, propOrPathOrHanlder, undefined, true, optionsOrHandler?.immediate);
   } else if (Array.isArray(propOrPathOrHanlder)) {
-    return watchPath(vm, handler, propOrPathOrHanlder, options?.deep, options?.immediate);
+    return watchPath(vm, optionsOrHandler, propOrPathOrHanlder, options?.deep, options?.immediate);
   } else {
-    return watchPath(vm, handler, [propOrPathOrHanlder], options?.deep, options?.immediate);
+    return watchPath(
+      vm,
+      optionsOrHandler,
+      [propOrPathOrHanlder],
+      options?.deep,
+      options?.immediate,
+    );
   }
 }
 

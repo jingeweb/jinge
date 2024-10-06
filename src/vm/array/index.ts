@@ -32,6 +32,8 @@ function wrapFn(targetViewModel: ViewModel, target: unknown, fn: AnyFn) {
   };
 }
 
+const ArrayFnSet = new Set(Object.getOwnPropertyNames(Array.prototype));
+
 function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
   let watchers: Set<Watcher>;
   let parents: Map<PropertyPathItem, Set<ViewModel>>;
@@ -76,6 +78,12 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
         return wrapFn(receiver, target, arraySort);
       } else if (prop === 'reverse') {
         return wrapFn(receiver, target, arrayReverse);
+      } else if (prop === 'includes') {
+        return target.includes.bind(target);
+      } else if (prop === 'length') {
+        return target.length;
+      } else if (ArrayFnSet.has(prop)) {
+        return target[prop].bind(target);
       } else {
         const index = wrapProp(prop);
         const val = target[index];
