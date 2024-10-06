@@ -3,6 +3,7 @@ import { type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { wrapViewModel } from '../proxy';
 import { removeArrayItemVmParent } from './helper';
 import { getVmAndRaw } from '../object';
+import { notifyVmArrayChange } from '../watch';
 
 export function arrayFill(
   targetViewModel: ViewModelArray,
@@ -29,5 +30,6 @@ export function arrayFill(
     target[i] = rawVal;
   }
 
+  notifyVmArrayChange(targetViewModel);
   return targetViewModel;
 }

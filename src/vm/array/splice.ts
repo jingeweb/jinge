@@ -5,6 +5,7 @@ import { wrapViewModelArr } from '.';
 import { moveArrayItemsVmParentIndex, removeArrayItemVmParent } from './helper';
 import { wrapViewModel } from '../proxy';
 import { getVmAndRaw } from '../object';
+import { notifyVmArrayChange } from '../watch';
 
 export function arraySplice(
   targetViewModel: ViewModelArray,
@@ -20,6 +21,7 @@ export function arraySplice(
   if (len === 0) {
     if (args.length > 0) {
       arrayPush(targetViewModel, target, ...args);
+      notifyVmArrayChange(targetViewModel);
     }
     return wrapViewModelArr([]);
   }
@@ -51,5 +53,6 @@ export function arraySplice(
     target.splice(index, 0, rawVal);
   });
 
+  notifyVmArrayChange(targetViewModel);
   return delArrVm;
 }
