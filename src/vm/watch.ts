@@ -152,7 +152,7 @@ function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
       const imm = watcher[VM_WATCHER_IMM];
       if (imm.i > 0) clearImmediate(imm.i);
       imm.i = setImmediate(() => {
-        listener(vm, vm);
+        listener(vm, vm, changedPath);
       });
       imm.p = null;
       return;
