@@ -11,14 +11,20 @@ import {
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';
-import type { JNode, PropsWithSlots } from '../jsx';
+import type { JNode, Props } from '../jsx';
 import { appendChildren, createComment } from '../util';
 
 export interface PortalProps {
   /** portal 的目标元素，默认为 document.body。注意该属性为单向绑定属性。 */
   target?: HTMLElement;
 }
-export function Portal(this: ComponentHost, props: PropsWithSlots<PortalProps, JNode>) {
+export function Portal(
+  this: ComponentHost,
+  props: Props<{
+    props: PortalProps;
+    children: JNode;
+  }>,
+) {
   const renderFn = this[SLOTS][DEFAULT_SLOT];
   if (renderFn) {
     const el = newComponentWithDefaultSlot(this[CONTEXT]);

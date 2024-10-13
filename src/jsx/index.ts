@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { ComponentHost, Ref, RefFn } from '../core';
+import type { AnyFn } from '../util';
 
-export type Slot<VM extends object> = (vm: VM) => JNode;
-export type SlotNoVm = () => JNode;
 export type FC = (props: any) => JNode | (ComponentHost | Node)[];
 export type JNode =
   | JSX.Element
@@ -15,31 +14,37 @@ export type JNode =
   | null
   | undefined;
 
-export type Props<P extends object> = P & {
-  key?: string | undefined | null;
-  ref?: Ref<any>;
-};
-export interface PropsOnlySlots<
-  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
-> {
-  children: S;
-}
-export type PropsWithSlots<
-  P extends object,
-  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
-> = P & {
-  key?: string | undefined | null;
-  ref?: Ref<any>;
-  children: S;
-};
-export type PropsWithOptionalSlots<
-  P extends object,
-  S extends JNode | ((vm?: any) => JNode) | Record<string, ((vm: any) => JNode) | JNode>,
-> = P & {
-  key?: string | undefined | null;
-  ref?: Ref<any>;
-  children?: S;
-};
+export type JChildren = JNode | Record<string, JNode | ((vm: any) => JNode)>;
+
+export type Props<
+  D extends {
+    props?: object;
+    children?: JChildren;
+    expose?: Record<string, AnyFn>;
+    slots?: keyof D['props'];
+  } = {},
+> = D['props'] &
+  (D['slots'] extends keyof D['props']
+    ? {
+        slots?: Pick<D['props'], D['slots']>;
+      }
+    : {}) &
+  (D extends { children: JChildren }
+    ? {
+        children: D['children'];
+      }
+    : D extends { children?: JChildren }
+      ? {
+          children?: D['children'];
+        }
+      : {}) &
+  (D['expose'] extends Record<string, AnyFn>
+    ? {
+        ref?: Ref<D['expose']>;
+      }
+    : {}) & {
+    key?: string | undefined | null;
+  };
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;
@@ -1598,17 +1603,17 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
   zoomAndPan?: string | undefined;
 }
 
-type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {
+type DetailedHTMLProps<E extends HTMLAttributes<T>, T extends Node> = {
   ref?: Ref<T> | RefFn<T>;
   key?: string | number | symbol;
 } & E;
 
-interface SVGProps<T> extends SVGAttributes<T> {
+interface SVGProps<T extends Node> extends SVGAttributes<T> {
   ref?: Ref<T> | RefFn<T>;
 }
 
-interface SVGLineElementAttributes<T> extends SVGProps<T> {}
-interface SVGTextElementAttributes<T> extends SVGProps<T> {}
+interface SVGLineElementAttributes<T extends Node> extends SVGProps<T> {}
+interface SVGTextElementAttributes<T extends Node> extends SVGProps<T> {}
 
 interface AllHTMLElements {
   // HTML

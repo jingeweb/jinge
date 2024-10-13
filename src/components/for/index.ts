@@ -1,5 +1,5 @@
 import { innerWatchPath, isViewModel } from '../../vm';
-import type { JNode, PropsWithSlots } from '../../jsx';
+import type { JNode, Props } from '../../jsx';
 import type { ComponentHost } from '../../core';
 import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS, addUnmountFn } from '../../core';
 
@@ -18,7 +18,13 @@ export type ForSlot<T> = (each: {
   isLast: boolean;
 }) => JNode;
 
-export function For<T>(this: ComponentHost, props: PropsWithSlots<ForProps<T>, ForSlot<T>>) {
+export function For<T>(
+  this: ComponentHost,
+  props: Props<{
+    props: ForProps<T>;
+    children: ForSlot<T>;
+  }>,
+) {
   const keyFn = props.keyFn; // keyFn 属性仅作为单向属性使用。
   let keys: KeyMap | undefined = keyFn ? new Map() : undefined;
   let renderLen = 0;

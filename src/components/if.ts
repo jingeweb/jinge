@@ -12,7 +12,7 @@ import {
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';
-import type { JNode, PropsWithSlots } from '../jsx';
+import type { JNode, Props } from '../jsx';
 import { vmWatch } from '../vm';
 
 export interface IfAttrs {
@@ -20,16 +20,17 @@ export interface IfAttrs {
 }
 export function If(
   this: ComponentHost,
-  props: PropsWithSlots<
-    {
+  props: Props<{
+    props: {
       expect: boolean;
-    },
-    | JNode
-    | {
-        true: JNode;
-        false: JNode;
-      }
-  >,
+    };
+    children:
+      | JNode
+      | {
+          true: JNode;
+          false: JNode;
+        };
+  }>,
 ) {
   /**
    * if 组件的实现展示了不使用 hook 范式的高度自由化的组件实现。

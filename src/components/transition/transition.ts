@@ -10,7 +10,7 @@ import {
   newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
-import type { JNode, PropsWithSlots } from '../../jsx';
+import type { JNode, Props } from '../../jsx';
 import {
   addEvent,
   createComment,
@@ -58,7 +58,13 @@ const TStateEntered = 1;
 const TStateLeaving = 2;
 const TStateLeaved = 3;
 
-export function Transition(this: ComponentHost, props: PropsWithSlots<TransitionProps, JNode>) {
+export function Transition(
+  this: ComponentHost,
+  props: Props<{
+    props: TransitionProps;
+    children: JNode;
+  }>,
+) {
   const destroyAfterLeave = !!props.destroyAfterLeave;
   let realEnter = props.appear ? !props.isEnter : !!props.isEnter;
   let rootEl: Element | undefined = undefined;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { FC } from '../jsx';
 import type { AnyFn } from '../util';
 import {
@@ -92,7 +93,7 @@ export class ComponentHost {
   //  *   之后通过 __getRef 函数可以获取到元素实例。
   //  */
   // [REFS]?: Map<string, Component | Node | (Component | Node)[]>;
-  [REFS]?: (Ref<Node | ComponentHost> | RefFn<Node | ComponentHost>)[];
+  [REFS]?: (Ref<any> | RefFn<any>)[];
 
   [ONMOUNT]?: AnyFn[];
   /**
@@ -219,8 +220,8 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   destroyComponentContent(target, removeDOM);
 
   target[REFS]?.forEach((ref) => {
-    if (isObject<Ref>(ref)) ref.value = undefined;
-    else (ref as RefFn<undefined>)(undefined);
+    if (isObject<Ref<any>>(ref)) ref.value = undefined;
+    else (ref as RefFn<any>)(undefined);
   });
   target[REFS] && (target[REFS].length = 0);
   target[STATE] = COMPONENT_STATE_DESTROIED;
@@ -266,7 +267,7 @@ export function setComponentContext(
 /**
  * 给编译器使用的创建 Component 并同时设置 SLOTS 的函数
  */
-export function newComponentWithSlots(context: Context | undefined, slots: Slots) {
+export function newComponentWithSlots(context: Context | undefined, slots?: Slots) {
   const c = new ComponentHost();
   c[CONTEXT] = context;
   Object.assign(c[SLOTS], slots);

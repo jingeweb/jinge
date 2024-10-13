@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { isUndefined, throwErr } from '../util';
+import { type AnyFn, isUndefined, throwErr } from '../util';
 import type { PropertyPathItem, WatchHandler, WatchOptions } from '../vm';
 import { vmWatch } from '../vm';
-import { CONTEXT } from './common';
+import { CONTEXT, DEFAULT_SLOT, SLOTS } from './common';
 import {
   type ComponentHost,
   addMountFn,
@@ -73,9 +73,19 @@ export function context(key: string | symbol, value?: any) {
   }
 }
 
-export function exportInstance<E extends {}>(instance: E) {
+export function expose<E extends Record<string, AnyFn>>(instance: E) {
   if (!componentHost) throwErr(MISS_KEY);
   Object.assign(componentHost, instance);
+}
+
+export type SlotNames<S extends object | undefined> = S extends object ? keyof S : never;
+export function hasSlot<T extends string>(slotName: T) {
+  if (!componentHost) throwErr(MISS_KEY);
+  return !!componentHost[SLOTS][slotName];
+}
+export function hasDefaultSlot() {
+  if (!componentHost) throwErr(MISS_KEY);
+  return !!componentHost[SLOTS][DEFAULT_SLOT];
 }
 
 export function firstDOM() {

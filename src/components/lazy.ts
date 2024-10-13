@@ -14,21 +14,20 @@ import {
   renderFunctionComponent,
   renderSlotFunction,
 } from '../core';
-import type { JNode, PropsWithOptionalSlots } from '../jsx';
+import type { JNode, Props } from '../jsx';
 import { type AnyFn, createComment, createFragment, insertBefore, isFunction } from '../util';
 
 export function Lazy(
   this: ComponentHost,
-  props: PropsWithOptionalSlots<
-    {
+  props: Props<{
+    props: {
       loader: () => Promise<AnyFn>;
-    },
-    {
       loading?: JNode;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       error?: (vm: { error: any }) => JNode;
-    }
-  >,
+    };
+    slots: 'loading' | 'error';
+  }>,
 ) {
   const loader = props.loader;
   const errorSlot = this[SLOTS].error;

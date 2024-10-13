@@ -19,7 +19,7 @@ import {
   renderFunctionComponent,
   renderSlotFunction,
 } from '../../core';
-import type { JNode, PropsWithSlots } from '../../jsx';
+import type { JNode, Props } from '../../jsx';
 import { type AnyFn, addEvent, throwErr } from '../../util';
 import { For, type ForSlot } from '../for';
 import type { EachVm, Key } from '../for/common';
@@ -33,14 +33,14 @@ const ONDESTROY = Symbol('onDestroy');
 
 export function TransitionGroupItem(
   this: ComponentHost,
-  props: PropsWithSlots<
-    {
+  props: Props<{
+    props: {
       [CLASSNAMES]: string[][];
       [APPEAR]: boolean;
       [ONDESTROY]: (fn: AnyFn) => AnyFn;
-    },
-    JNode
-  >,
+    };
+    children: JNode;
+  }>,
 ) {
   const classTokens = props[CLASSNAMES];
   const toggleClass = (el: Element, enter: boolean, init = false) => {
@@ -111,7 +111,10 @@ export interface TransitionGroupProps<T> {
 
 export function TransitionGroup<T>(
   this: ComponentHost,
-  props: PropsWithSlots<TransitionGroupProps<T> & TransitionClassnames, ForSlot<T>>,
+  props: Props<{
+    props: TransitionGroupProps<T> & TransitionClassnames;
+    children: ForSlot<T>;
+  }>,
 ) {
   const onDestroyNotifies = new Set<AnyFn>();
   const itemProps = {
