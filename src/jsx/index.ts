@@ -42,9 +42,7 @@ export type Props<
     ? {
         ref?: Ref<D['expose']>;
       }
-    : {}) & {
-    key?: string | undefined | null;
-  };
+    : {});
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;
@@ -1605,7 +1603,6 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
 
 type DetailedHTMLProps<E extends HTMLAttributes<T>, T extends Node> = {
   ref?: Ref<T> | RefFn<T>;
-  key?: string | number | symbol;
 } & E;
 
 interface SVGProps<T extends Node> extends SVGAttributes<T> {
@@ -1805,9 +1802,13 @@ declare global {
       type: any;
       props: any;
     }
-    // interface ElementClass extends Component {
-    //   render(): any;
-    // }
+    interface IntrinsicAttributes {
+      /**
+       * 和 react/vue 等框架不同，jinge 框架的 `key` 属性暂时没有任何作用。
+       * 只是当编译器将 `.map()` 函数语句转成 `<For>` 组件时，会找到第一个根节点子元素的 `key` 属性转成 `For` 组件的 `keyFn` 属性。
+       */
+      key?: string | number;
+    }
     interface ElementAttributesProperty {
       props: {}; // specify the property name to use
     }

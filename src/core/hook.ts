@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { type AnyFn, isUndefined, throwErr } from '../util';
+import type { FC } from '../jsx';
+import { isUndefined, throwErr } from '../util';
 import type { PropertyPathItem, WatchHandler, WatchOptions } from '../vm';
 import { vmWatch } from '../vm';
 import { CONTEXT, DEFAULT_SLOT, SLOTS } from './common';
@@ -11,6 +12,7 @@ import {
   getLastDOM,
   setComponentContext,
 } from './component';
+import type { RefValue } from './ref';
 
 const MISS_KEY = 'hook-miss-component';
 let componentHost: ComponentHost | undefined = undefined;
@@ -73,7 +75,7 @@ export function context(key: string | symbol, value?: any) {
   }
 }
 
-export function expose<E extends Record<string, AnyFn>>(instance: E) {
+export function expose<T extends FC>(instance: RefValue<Parameters<T>[0]['ref']>) {
   if (!componentHost) throwErr(MISS_KEY);
   Object.assign(componentHost, instance);
 }

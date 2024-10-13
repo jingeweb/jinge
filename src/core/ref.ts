@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { FC } from '../jsx';
 import { type AnyFn, isObject } from '../util';
 import { REFS } from './common';
 import type { ComponentHost } from './component';
@@ -9,11 +10,13 @@ export interface Ref<T extends Node | Record<string, AnyFn>> {
   value?: T;
 }
 export type RefValue<T extends Ref<any> | undefined> = T extends Ref<infer R> ? R : never;
-/** 获取一个 FC （函数组件）的 ref 实例类型。 */
-export type RefOfFC<T extends AnyFn> = RefValue<Parameters<T>[0]['ref']>;
 
-export function ref<T extends Node | Record<string, AnyFn>>(): Ref<T> {
-  return { [REF]: true, value: undefined } as unknown as Ref<T>;
+export function ref<T extends Node | FC>(): T extends Node
+  ? Ref<T>
+  : T extends FC
+    ? Ref<RefValue<Parameters<T>[0]['ref']>>
+    : never {
+  return { [REF]: true, value: undefined } as any;
 }
 
 export function isRef<T extends Node | Record<string, AnyFn>>(v: object): v is Ref<T> {
