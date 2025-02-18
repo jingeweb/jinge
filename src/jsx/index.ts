@@ -23,12 +23,11 @@ export type Props<
     expose?: Record<string, AnyFn>;
     slots?: keyof D['props'];
   } = {},
-> = D['props'] &
-  (D['slots'] extends keyof D['props']
-    ? {
-        slots?: Pick<D['props'], D['slots']>;
-      }
-    : {}) &
+> = (D['slots'] extends keyof D['props']
+  ? {
+      slots?: Pick<D['props'], D['slots']>;
+    } & Omit<D['props'], D['slots']>
+  : D['props']) &
   (D extends { children: JChildren }
     ? {
         children: D['children'];

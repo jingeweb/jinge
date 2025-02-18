@@ -1,4 +1,4 @@
-import { isObject, isString, isUndefined } from './type';
+import { isObject, isUndefined } from './type';
 
 function toText(v: unknown) {
   if (v === null) return 'null';
@@ -19,7 +19,7 @@ export function createTextNode(text = ''): Text {
 export function createFragment(children?: (Node | string)[]): DocumentFragment {
   const f = document.createDocumentFragment();
   children?.forEach((n) => {
-    f.appendChild(isString(n) ? document.createTextNode(n as string) : (n as Node));
+    f.appendChild(n instanceof Node ? n : document.createTextNode(n as string));
   });
   return f;
 }
@@ -32,9 +32,9 @@ export function appendChildren($parent: Node, children: (Node | string)[]): void
   $parent.appendChild(
     children.length > 1
       ? createFragment(children)
-      : isString(children[0])
-        ? createTextNode(children[0] as string)
-        : (children[0] as Node),
+      : children[0] instanceof Node
+        ? children[0]
+        : createTextNode(children[0] as string),
   );
 }
 
