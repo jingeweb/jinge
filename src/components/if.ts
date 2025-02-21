@@ -24,12 +24,11 @@ export function If(
     props: {
       expect: boolean;
     };
-    children:
-      | JNode
-      | {
-          true: JNode;
-          false: JNode;
-        };
+    children?: JNode;
+    slots: {
+      true?: JNode;
+      false?: JNode;
+    };
   }>,
 ) {
   /**

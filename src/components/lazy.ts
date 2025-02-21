@@ -22,11 +22,12 @@ export function Lazy(
   props: Props<{
     props: {
       loader: () => Promise<AnyFn>;
+    };
+    slots: {
       loading?: JNode;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      error?: (vm: { error: any }) => JNode;
+      error?: (data: { error: any }) => JNode;
     };
-    slots: 'loading' | 'error';
   }>,
 ) {
   const loader = props.loader;
