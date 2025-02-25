@@ -10,11 +10,23 @@ import {
 import type { Watcher } from '../watch';
 import { arrayPush } from './push';
 import { propSetHandler } from '../object';
-import { wrapPropChildViewModel } from '../proxy';
+import { vmRaw, wrapPropChildViewModel } from '../proxy';
 import { arrayPop } from './pop';
 import { arrayUnshift } from './unshift';
 import { arrayShift } from './shift';
-import { arrayConcat, arrayFilter, arrayMap, arraySlice } from './sub';
+import {
+  arrayConcat,
+  arrayEvery,
+  arrayFilter,
+  arrayFind,
+  arrayFindIndex,
+  arrayFindLast,
+  arrayFindLastIndex,
+  arrayForEach,
+  arrayMap,
+  arraySlice,
+  arraySome,
+} from './sub';
 import { arrayFill } from './fill';
 import { arrayReverse, arraySort } from './order';
 import { arraySplice } from './splice';
@@ -72,6 +84,34 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
         return function (fn: AnyFn) {
           return arrayMap(target, fn);
         };
+      } else if (prop === 'forEach') {
+        return function (fn: AnyFn) {
+          return arrayForEach(target, fn);
+        };
+      } else if (prop === 'some') {
+        return function (fn: AnyFn) {
+          return arraySome(target, fn);
+        };
+      } else if (prop === 'every') {
+        return function (fn: AnyFn) {
+          return arrayEvery(target, fn);
+        };
+      } else if (prop === 'find') {
+        return function (fn: AnyFn) {
+          return arrayFind(target, fn);
+        };
+      } else if (prop === 'findLast') {
+        return function (fn: AnyFn) {
+          return arrayFindLast(target, fn);
+        };
+      } else if (prop === 'findIndex') {
+        return function (fn: AnyFn) {
+          return arrayFindIndex(target, fn);
+        };
+      } else if (prop === 'findLastIndex') {
+        return function (fn: AnyFn) {
+          return arrayFindLastIndex(target, fn);
+        };
       } else if (prop === 'fill') {
         return wrapFn(receiver, target, arrayFill);
       } else if (prop === 'sort') {
@@ -79,7 +119,13 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
       } else if (prop === 'reverse') {
         return wrapFn(receiver, target, arrayReverse);
       } else if (prop === 'includes') {
-        return target.includes.bind(target);
+        return function (v: unknown) {
+          return target.includes(vmRaw(v as object));
+        };
+      } else if (prop === 'indexOf') {
+        return function (v: unknown) {
+          return target.indexOf(vmRaw(v as object));
+        };
       } else if (prop === 'length') {
         return target.length;
       } else if (ArrayFnSet.has(prop)) {

@@ -3,13 +3,30 @@ import type { JNode, Props } from '../../jsx';
 import type { ComponentHost } from '../../core';
 import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS, addUnmountFn } from '../../core';
 
-import type { ForEach, KeyFn, KeyMap } from './common';
+import { type ForEach, KEY_DATA, KEY_INDEX, type KeyFn, type KeyMap } from './common';
 import { renderItems } from './render';
 import { handleUpdate } from './update';
 
+export { KEY_DATA, KEY_INDEX };
+
 export interface ForProps<T> {
   loop: T[] | undefined | null;
-  keyFn?: KeyFn<T>;
+  key?: keyof T | typeof KEY_INDEX | typeof KEY_DATA;
+}
+
+function getKeyFn<T>(k?: keyof T | typeof KEY_INDEX | typeof KEY_DATA): KeyFn<T> | undefined {
+  if (k === undefined) {
+    return undefined;
+  } else if (k === KEY_DATA) {
+    return (d) => d;
+  } else if (k === KEY_INDEX) {
+    return (_, i) => i;
+  } else {
+    return new Function(
+      '$jg$',
+      `return $jg$${(k as string).startsWith('[') ? '' : '.'}${k as string}`,
+    ) as KeyFn<T>;
+  }
 }
 export type ForSlot<T> = (each: {
   data: T;
@@ -25,8 +42,8 @@ export function For<T>(
     children: ForSlot<T>;
   }>,
 ) {
-  const keyFn = props.keyFn; // keyFn 属性仅作为单向属性使用。
-  let keys: KeyMap | undefined = keyFn ? new Map() : undefined;
+  const keyFn = getKeyFn(props.key);
+  let keys: KeyMap<T> | undefined = keyFn ? new Map() : undefined;
   let renderLen = 0;
 
   if (isViewModel(props)) {

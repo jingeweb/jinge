@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import type { KEY_DATA, KEY_INDEX } from '../components/for/common';
 import type { ComponentHost, Ref, RefFn } from '../core';
 import type { AnyFn } from '../util';
 
@@ -1606,10 +1607,12 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
 
 type DetailedHTMLProps<E extends HTMLAttributes<T>, T extends Node> = {
   ref?: Ref<T> | RefFn<T>;
+  key?: unknown | typeof KEY_DATA | typeof KEY_INDEX;
 } & E;
 
 interface SVGProps<T extends Node> extends SVGAttributes<T> {
   ref?: Ref<T> | RefFn<T>;
+  key?: string | number | typeof KEY_DATA | typeof KEY_INDEX;
 }
 
 interface SVGLineElementAttributes<T extends Node> extends SVGProps<T> {}
@@ -1808,9 +1811,9 @@ declare global {
     interface IntrinsicAttributes {
       /**
        * 和 react/vue 等框架不同，jinge 框架的 `key` 属性暂时没有任何作用。
-       * 只是当编译器将 `.map()` 函数语句转成 `<For>` 组件时，会找到第一个根节点子元素的 `key` 属性转成 `For` 组件的 `keyFn` 属性。
+       * 只是当编译器将 `.map()` 函数语句转成 `<For>` 组件时，会找到第一个根节点子元素的 `key` 属性转成 `For` 组件的 `key` 属性。
        */
-      key?: string | number;
+      key?: string | number | typeof KEY_DATA | typeof KEY_INDEX;
     }
     interface ElementAttributesProperty {
       props: {}; // specify the property name to use

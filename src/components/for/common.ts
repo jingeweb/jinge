@@ -1,13 +1,14 @@
 import type { ComponentHost } from '../../core';
 
-export type Key = string | number | symbol;
-export type KeyMap = Map<Key, number>;
-export type KeyFn<T> = (value: T, index: number) => Key;
+export type Key<T> = string | number | symbol | T;
+export type KeyMap<T> = Map<Key<T>, number>;
+export type KeyFn<T> = (value: T, index: number) => Key<T>;
 
-export const EACH = Symbol('each');
+export const KEY_DATA = Symbol('data');
+export const KEY_INDEX = Symbol('index');
 export interface EachVm<T> {
   data: T;
   index: number;
-  key?: Key;
+  key?: Key<T>;
 }
-export type ForEach<T> = ComponentHost & { [EACH]: EachVm<T> };
+export type ForEach<T> = ComponentHost & { [KEY_DATA]: EachVm<T> };

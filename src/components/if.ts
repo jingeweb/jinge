@@ -26,7 +26,6 @@ export function If(
     };
     children?: JNode;
     slots: {
-      true?: JNode;
       false?: JNode;
     };
   }>,

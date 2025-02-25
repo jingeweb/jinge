@@ -15,7 +15,7 @@ import {
 import { createFragment, insertBefore } from '../../util';
 import { vm } from '../../vm';
 import { renderItems } from './render';
-import { EACH, type EachVm, type ForEach, type Key, type KeyFn, type KeyMap } from './common';
+import { type EachVm, type ForEach, KEY_DATA, type Key, type KeyFn, type KeyMap } from './common';
 
 function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
   el[ROOT_NODES].forEach((c) => {
@@ -31,14 +31,13 @@ export function updateWithKey<T>(
   itemRenderFn: RenderFn,
   data: T[],
   roots: ForEach<T>[],
-  keys: Map<Key, number>,
+  keys: Map<Key<T>, number>,
   keyFn: KeyFn<T>,
-  onKeysUpdated: (newKeys: KeyMap) => void,
+  onKeysUpdated: (newKeys: KeyMap<T>) => void,
 ) {
   const newLen = data.length;
   const newRoots: ForEach<T>[] = [];
-  const newKeys = new Map<Key, number>();
-
+  const newKeys = new Map<Key<T>, number>();
   let pi = 0;
   let pe: Node | null = getFirstDOM(comp);
   const $parent = pe?.parentNode as Node;
@@ -51,7 +50,7 @@ export function updateWithKey<T>(
       // 没有匹配的旧的 key，创建新的组件。
       const el = newComponentWithDefaultSlot(comp[CONTEXT]) as ForEach<T>;
       const each: EachVm<T> = vm({ data: item, index: i, key: newKey });
-      el[EACH] = each;
+      el[KEY_DATA] = each;
       newRoots.push(el);
       const doms = renderSlotFunction(el, itemRenderFn, each);
       insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], pe);
@@ -62,7 +61,7 @@ export function updateWithKey<T>(
       const el = roots[oldIdx];
       keys.delete(newKey);
       newRoots.push(el);
-      const each = el[EACH];
+      const each = el[KEY_DATA];
       if (each.data !== item) {
         each.data = item;
       }
@@ -100,7 +99,7 @@ export function updateWithoutKey<T>(
   const dropLen = oldLen - updateLen;
   const appendLen = newLen - updateLen;
   for (let i = 0; i < updateLen; i++) {
-    const each = roots[i][EACH];
+    const each = roots[i][KEY_DATA];
     const pv = each.data;
     const nv = data[i];
     if (nv === pv) {
@@ -138,9 +137,9 @@ export function handleUpdate<T>(
   comp: ComponentHost,
   oldLen: number,
   data: T[] | undefined | null,
-  keys: KeyMap | undefined,
+  keys: KeyMap<T> | undefined,
   keyFn: KeyFn<T> | undefined,
-  onKeysUpdated: (newKeys: KeyMap) => void,
+  onKeysUpdated: (newKeys: KeyMap<T>) => void,
 ) {
   const itemRenderFn = comp[SLOTS][DEFAULT_SLOT];
   if (!itemRenderFn) return;
@@ -199,7 +198,7 @@ export function handleUpdate<T>(
       itemRenderFn,
       data!,
       roots as ForEach<T>[],
-      keys as Map<Key, number>,
+      keys as Map<Key<T>, number>,
       keyFn,
       onKeysUpdated,
     );

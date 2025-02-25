@@ -22,7 +22,7 @@ import {
 import type { JNode, Props } from '../../jsx';
 import { type AnyFn, addEvent, throwErr } from '../../util';
 import { For, type ForSlot } from '../for';
-import type { EachVm, Key } from '../for/common';
+import type { EachVm, KEY_DATA, KEY_INDEX } from '../for/common';
 
 import { TRANSITION_END, classnames2tokens } from './helper';
 import type { TransitionClassnames } from './transition';
@@ -104,8 +104,8 @@ export function TransitionGroupItem(
 
 export interface TransitionGroupProps<T> {
   loop: T[] | null | undefined;
-  /** TransitionGroup 必须指定 keyFn */
-  keyFn: (v: T, index: number) => Key;
+  /** TransitionGroup 必须指定 key */
+  key: keyof T | typeof KEY_DATA | typeof KEY_INDEX;
   appear?: boolean;
 }
 

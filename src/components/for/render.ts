@@ -1,7 +1,7 @@
 import { isViewModel, vm } from '../../vm';
 import type { Context, RenderFn } from '../../core';
 import { newComponentWithDefaultSlot, renderSlotFunction } from '../../core';
-import { EACH, type ForEach, type Key, type KeyFn } from './common';
+import { type ForEach, KEY_DATA, type Key, type KeyFn } from './common';
 
 function appendRenderEach<T>(
   vmMode: boolean,
@@ -9,12 +9,12 @@ function appendRenderEach<T>(
   index: number,
   itemRenderFn: RenderFn,
   roots: (ForEach<T> | Node)[],
-  key: Key | undefined,
+  key: Key<T> | undefined,
   context?: Context,
 ) {
   const el = newComponentWithDefaultSlot(context) as ForEach<T>;
   const each = vmMode ? vm({ data: item, index, key }) : { data: item, index, key };
-  el[EACH] = each;
+  el[KEY_DATA] = each;
   roots.push(el);
   return renderSlotFunction(el, itemRenderFn, each);
 }
@@ -23,7 +23,7 @@ export function renderItems<T>(
   items: T[],
   itemRenderFn: RenderFn,
   roots: (ForEach<T> | Node)[],
-  keys: Map<Key, number> | undefined,
+  keys: Map<Key<T>, number> | undefined,
   keyFn: KeyFn<T> | undefined,
   context?: Context,
 ) {
