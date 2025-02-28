@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "4.0.0-alpha.14",
+  "version": "4.0.0-alpha.15",
   "description": "A small and smart web interface framework",
   "main": "./dist/jinge.prod.js",
   "module": "./dist/jinge.prod.js",
@@ -66,7 +66,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.5",
     "eslint": "^9.21.0",
-    "eslint-config-prettier": "^10.0.1",
+    "eslint-config-prettier": "^10.0.2",
     "eslint-plugin-import-x": "^4.6.1",
     "eslint-plugin-jest": "^28.11.0",
     "husky": "^9.1.7",
