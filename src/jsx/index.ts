@@ -4,7 +4,7 @@ import type { KEY_DATA, KEY_INDEX } from '../components/for/common';
 import type { ComponentHost, Ref, RefFn } from '../core';
 import type { AnyFn } from '../util';
 
-export type FC = (props: Exclude<any, number>) => JNode | (ComponentHost | Node)[];
+export type FC = (props?: Record<string, any>) => JNode | (ComponentHost | Node)[];
 export type JNode =
   | JSX.Element
   | FC
@@ -20,7 +20,7 @@ export type Props<
     props?: object;
     children?: JNode;
     expose?: Record<string, AnyFn>;
-    slots?: Record<string, JNode>;
+    slots?: Record<string, JNode | AnyFn>;
     events?: Record<string, AnyFn>;
   } = {},
 > = (D['slots'] extends object

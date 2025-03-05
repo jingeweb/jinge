@@ -13,10 +13,10 @@ import type { FC, JNode } from '../jsx';
 import { createTextNode, insertBefore } from '../util';
 import { isViewModel, vmWatch } from '../vm';
 
-type TFn = (params: Record<string, unknown>) => string;
-type Dict = Record<string, string | TFn | FC>;
-type DictStore = Record<string, Dict>;
-type DictLoaderFn = (locale: string) => Promise<Dict>;
+export type TFn = (params: Record<string, unknown>) => string;
+export type Dict = Record<string, string | TFn | FC>;
+export type DictStore = Record<string, Dict>;
+export type DictLoaderFn = (locale: string) => Promise<Dict>;
 type OnChangeFn = (locale: string) => void;
 
 let dictLoader: DictLoaderFn | undefined = undefined;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   CONTEXT,
   type ComponentHost,
@@ -14,18 +15,17 @@ import {
   renderFunctionComponent,
   renderSlotFunction,
 } from '../core';
-import type { JNode, Props } from '../jsx';
+import type { FC, JNode, Props } from '../jsx';
 import { type AnyFn, createComment, createFragment, insertBefore, isFunction } from '../util';
 
-export function Lazy(
+export function Lazy<T extends FC>(
   this: ComponentHost,
   props: Props<{
     props: {
-      loader: () => Promise<AnyFn>;
+      loader: () => Promise<T>;
     };
     slots: {
       loading?: JNode;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       error?: (data: { error: any }) => JNode;
     };
   }>,
@@ -33,7 +33,6 @@ export function Lazy(
   const loader = props.loader;
   const errorSlot = this[SLOTS].error;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update = (fc?: AnyFn, error?: any) => {
     if (error) console.error(error);
     if (!fc && !errorSlot) return;
@@ -96,7 +95,7 @@ export function lazy(
   loader: () => Promise<AnyFn>,
   options?: {
     /** 错误发生时渲染的函数组件。组件的 props 中会传递 error 参数。 */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     error?: (props: { error: any }) => any;
     /** 加载时渲染的函数组件。 */
     loading?: AnyFn;
@@ -108,9 +107,9 @@ export function lazy(
   function DymLazy(this: ComponentHost) {
     const el = newComponentWithSlots(this[CONTEXT], {
       loading: loadingFc ? (host) => renderFunctionComponent(host, loadingFc) : undefined,
-      error: errorFc ? (host, vm) => renderFunctionComponent(host, errorFc, vm) : undefined,
+      error: errorFc ? (host, vm) => renderFunctionComponent(host, errorFc as any, vm) : undefined,
     });
-    const nodes = renderFunctionComponent(el, Lazy, { loader });
+    const nodes = renderFunctionComponent(el, Lazy as any, { loader });
     this[ROOT_NODES].push(el);
     return nodes;
   }
