@@ -4,7 +4,7 @@ import type { KEY_DATA, KEY_INDEX } from '../components/for/common';
 import type { ComponentHost, Ref, RefFn } from '../core';
 import type { AnyFn } from '../util';
 
-export type FC = (props?: Record<string, any>) => JNode | (ComponentHost | Node)[];
+export type FC = (props?: any) => JNode | (ComponentHost | Node)[];
 export type JNode =
   | JSX.Element
   | FC

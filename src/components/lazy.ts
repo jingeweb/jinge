@@ -91,11 +91,10 @@ export function Lazy<T extends FC>(
 let dymIncId = 0;
 // END_ONLY_PRODUCTION
 
-export function lazy(
-  loader: () => Promise<AnyFn>,
+export function lazy<T extends FC>(
+  loader: () => Promise<T>,
   options?: {
     /** 错误发生时渲染的函数组件。组件的 props 中会传递 error 参数。 */
-
     error?: (props: { error: any }) => any;
     /** 加载时渲染的函数组件。 */
     loading?: AnyFn;
