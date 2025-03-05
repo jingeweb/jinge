@@ -121,5 +121,5 @@ export function lazy<T extends FC>(
   }
   // END_DROP_IN_PRODUCTION
 
-  return DymLazy;
+  return DymLazy as T;
 }
