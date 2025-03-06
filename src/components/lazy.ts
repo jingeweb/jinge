@@ -21,8 +21,8 @@ import { type AnyFn, createComment, createFragment, insertBefore, isFunction } f
 export function Lazy<T extends FC>(
   this: ComponentHost,
   props: Props<{
-    props: {
-      loader: () => Promise<T>;
+    props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
+      _loader: () => Promise<T>;
     };
     slots: {
       loading?: JNode;
@@ -30,7 +30,7 @@ export function Lazy<T extends FC>(
     };
   }>,
 ) {
-  const loader = props.loader;
+  const loader = props._loader as () => Promise<T>;
   const errorSlot = this[SLOTS].error;
 
   const update = (fc?: AnyFn, error?: any) => {
@@ -43,7 +43,7 @@ export function Lazy<T extends FC>(
     const $pa = firstNode.parentNode as Node;
     const el = newComponentWithDefaultSlot(this[CONTEXT]);
     const nodes = fc
-      ? renderFunctionComponent(el, fc)
+      ? renderFunctionComponent(el, fc, props)
       : renderSlotFunction(el, errorSlot, { error });
     insertBefore($pa, nodes.length > 0 ? createFragment(nodes) : nodes[0], firstNode);
     if (isComp) {
@@ -103,12 +103,17 @@ export function lazy<T extends FC>(
   const loadingFc = options?.loading;
   const errorFc = options?.error;
 
-  function DymLazy(this: ComponentHost) {
+  function DymLazy(this: ComponentHost, props: any) {
     const el = newComponentWithSlots(this[CONTEXT], {
       loading: loadingFc ? (host) => renderFunctionComponent(host, loadingFc) : undefined,
       error: errorFc ? (host, vm) => renderFunctionComponent(host, errorFc as any, vm) : undefined,
     });
-    const nodes = renderFunctionComponent(el, Lazy as any, { loader });
+    if (props === undefined) {
+      props = { _loader: loader };
+    } else {
+      props._loader = loader;
+    }
+    const nodes = renderFunctionComponent(el, Lazy as any, props);
     this[ROOT_NODES].push(el);
     return nodes;
   }
@@ -117,7 +122,7 @@ export function lazy<T extends FC>(
   const __HMR__ = window.__JINGE_HMR__;
   if (__HMR__) {
     // DymLazy 是动态生成的 Lazy 组件，每一个的 __hmrId__ 都应该是唯一的。
-    __HMR__.registerFunctionComponent(DymLazy, `jinge::core::DymLazy::${dymIncId++}`);
+    __HMR__.registerFunctionComponent(DymLazy, `jinge::lazy::${dymIncId++}`);
   }
   // END_DROP_IN_PRODUCTION
 
