@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "4.0.0-alpha.20",
+  "version": "4.0.0",
   "description": "A small and smart web interface framework",
   "main": "./dist/jinge.prod.js",
   "module": "./dist/jinge.prod.js",
@@ -62,11 +62,11 @@
   ],
   "author": "Yuhang Ge <abeyuhang@gmail.com>",
   "devDependencies": {
-    "@eslint/js": "^9.21.0",
+    "@eslint/js": "^9.22.0",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.13.9",
-    "eslint": "^9.21.0",
-    "eslint-config-prettier": "^10.0.2",
+    "@types/node": "^22.13.10",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-import-x": "^4.6.1",
     "eslint-plugin-jest": "^28.11.0",
     "husky": "^9.1.7",
@@ -78,6 +78,6 @@
     "ts-jest": "^29.2.6",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.1"
   }
 }
