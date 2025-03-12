@@ -1,5 +1,7 @@
 import { type ViewModel, vm } from '../../src';
-import { expectWatch } from './_helper';
+import { expectWatch, mockOffscreenCanvas } from './_helper';
+
+mockOffscreenCanvas();
 
 describe('watch view-model', () => {
   it('deep watch array', async () => {

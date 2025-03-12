@@ -287,11 +287,7 @@ export function newComponentWithDefaultSlot(
   return c;
 }
 
-export function renderFunctionComponent<T extends FC>(
-  host: ComponentHost,
-  fc: T,
-  attrs?: Omit<Parameters<T>[0], 'children'>,
-) {
+export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T, attrs?: any) {
   // BEGIN_DROP_IN_PRODUCTION
   // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。
 
@@ -305,7 +301,7 @@ export function renderFunctionComponent<T extends FC>(
   // END_DROP_IN_PRODUCTION
 
   setCurrentComponentHost(host);
-  const nodes = fc.call(host, attrs);
+  const nodes = fc(attrs, host);
   setCurrentComponentHost(undefined);
   return nodes as Node[];
 }
@@ -335,10 +331,10 @@ export function replaceRenderFunctionComponent<T extends FC = FC>(
     host[ROOT_NODES].push(placeholder);
   }
 }
-export function renderSlotFunction(host: ComponentHost, slotFunc?: AnyFn, attrs?: object) {
+export function renderSlotFunction(host: ComponentHost, slotFunc?: FC, attrs?: object) {
   if (!slotFunc) return [];
   setCurrentComponentHost(host);
-  const nodes = slotFunc(host, attrs);
+  const nodes = slotFunc(attrs, host);
   setCurrentComponentHost(undefined);
   return nodes as Node[];
 }

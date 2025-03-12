@@ -19,7 +19,7 @@ import {
   renderFunctionComponent,
   renderSlotFunction,
 } from '../../core';
-import type { JNode, Props } from '../../jsx';
+import type { FC, JNode, Props } from '../../jsx';
 import { type AnyFn, addEvent, throwErr } from '../../util';
 import { For, type ForSlot } from '../for';
 import type { EachVm, KEY_DATA, KEY_INDEX } from '../for/common';
@@ -32,7 +32,6 @@ const APPEAR = Symbol('appear');
 const ONDESTROY = Symbol('onDestroy');
 
 export function TransitionGroupItem(
-  this: ComponentHost,
   props: Props<{
     props: {
       [CLASSNAMES]: string[][];
@@ -41,6 +40,7 @@ export function TransitionGroupItem(
     };
     children: JNode;
   }>,
+  host: ComponentHost,
 ) {
   const classTokens = props[CLASSNAMES];
   const toggleClass = (el: Element, enter: boolean, init = false) => {
@@ -51,8 +51,8 @@ export function TransitionGroupItem(
     clist.add(...classTokens[ia], ...classTokens[ia + 1]);
   };
 
-  let el: ComponentHost | undefined = newComponentWithDefaultSlot(this[CONTEXT]);
-  const nodes = renderSlotFunction(el, this[SLOTS][DEFAULT_SLOT]);
+  let el: ComponentHost | undefined = newComponentWithDefaultSlot(host[CONTEXT]);
+  const nodes = renderSlotFunction(el, host[SLOTS][DEFAULT_SLOT]);
   if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
     throwErr('transition-require-element');
   }
@@ -79,7 +79,7 @@ export function TransitionGroupItem(
   // 通过 props[ONDESTROY] 向父组件注册监听器，当父组件整体都被销毁时，直接立即销毁当前保留的还在动画中的 dom
   const dereg = props[ONDESTROY](finalDestroy);
 
-  addUnmountFn(this, () => {
+  addUnmountFn(host, () => {
     if (tm) clearTimeout(tm);
     if (!el) return;
     // 在实际销毁前，先将自身状态主动变更为已销毁，从而欺骗框架层跳过对该组件的销毁，也就保留了 dom 不被移除。
@@ -98,7 +98,7 @@ export function TransitionGroupItem(
     );
   });
 
-  this[ROOT_NODES].push(el);
+  host[ROOT_NODES].push(el);
   return nodes;
 }
 
@@ -110,11 +110,11 @@ export interface TransitionGroupProps<T> {
 }
 
 export function TransitionGroup<T>(
-  this: ComponentHost,
   props: Props<{
     props: TransitionGroupProps<T> & TransitionClassnames;
     children: ForSlot<T>;
   }>,
+  host: ComponentHost,
 ) {
   const onDestroyNotifies = new Set<AnyFn>();
   const itemProps = {
@@ -126,22 +126,21 @@ export function TransitionGroup<T>(
     },
   };
 
-  addUnmountFn(this, () => {
+  addUnmountFn(host, () => {
     onDestroyNotifies.forEach((notifyFn) => notifyFn());
     onDestroyNotifies.clear();
   });
   const renderEachFn = (host: ComponentHost, forEachVm: EachVm<T>) => {
     const el = newComponentWithDefaultSlot(host[CONTEXT], (tranHost) => {
-      return this[SLOTS][DEFAULT_SLOT]?.(tranHost, forEachVm) ?? [];
+      return host[SLOTS][DEFAULT_SLOT]?.(tranHost, forEachVm) ?? [];
     });
     host[ROOT_NODES].push(el);
-    return renderFunctionComponent(el, TransitionGroupItem, itemProps);
+    return renderFunctionComponent(el, TransitionGroupItem as FC, itemProps);
   };
 
-  const el = newComponentWithDefaultSlot(this[CONTEXT], renderEachFn);
-  this[ROOT_NODES].push(el);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodes = renderFunctionComponent(el, For, props as any);
+  const el = newComponentWithDefaultSlot(host[CONTEXT], renderEachFn);
+  host[ROOT_NODES].push(el);
+  const nodes = renderFunctionComponent(el, For as FC, props);
   itemProps[APPEAR] = true;
   return nodes;
 }

@@ -36,11 +36,11 @@ export type ForSlot<T> = (each: {
 }) => JNode;
 
 export function For<T>(
-  this: ComponentHost,
   props: Props<{
     props: ForProps<T>;
     children: ForSlot<T>;
   }>,
+  host: ComponentHost,
 ) {
   const keyFn = getKeyFn(props.key);
   let keys: KeyMap<T> | undefined = keyFn ? new Map() : undefined;
@@ -56,7 +56,7 @@ export function For<T>(
         if (!cp || cp.length <= 1) {
           const oldLen = renderLen;
           renderLen = data?.length ?? 0;
-          handleUpdate(this, oldLen, data, keys, keyFn, (newKeys) => {
+          handleUpdate(host, oldLen, data, keys, keyFn, (newKeys) => {
             keys = newKeys;
           });
         } else {
@@ -68,16 +68,16 @@ export function For<T>(
       ['loop'],
       true,
     );
-    addUnmountFn(this, unwatchFn);
+    addUnmountFn(host, unwatchFn);
   }
 
-  const roots = this[ROOT_NODES] as (ForEach<T> | Node)[];
-  const itemRenderFn = this[SLOTS][DEFAULT_SLOT];
+  const roots = host[ROOT_NODES] as (ForEach<T> | Node)[];
+  const itemRenderFn = host[SLOTS][DEFAULT_SLOT];
   const items = props.loop;
   if (!itemRenderFn || !items?.length) {
     roots.push(document.createComment('empty'));
     return roots as Node[];
   }
   renderLen = items.length;
-  return renderItems(items, itemRenderFn, roots, keys, keyFn, this[CONTEXT]);
+  return renderItems(items, itemRenderFn, roots, keys, keyFn, host[CONTEXT]);
 }

@@ -37,13 +37,19 @@ export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> & ViewMod
 export type PropertyPathItem = string | number | symbol;
 
 export function isInnerObj<T extends object>(v: unknown): v is T {
-  if (v instanceof Node || v instanceof Error || v instanceof Promise) return true;
+  if (v instanceof Node || v instanceof Error) return true;
   const clazz = (
     v as {
       constructor: unknown;
     }
   ).constructor;
-  return clazz === RegExp || clazz === Date || clazz === Boolean;
+  return (
+    clazz === OffscreenCanvas ||
+    clazz === RegExp ||
+    clazz === Date ||
+    clazz === Promise ||
+    clazz === Boolean
+  );
 }
 
 export function isViewModel<T extends object = AnyObj>(v: unknown): v is ViewModel<T> {
