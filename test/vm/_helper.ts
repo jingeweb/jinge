@@ -30,3 +30,14 @@ export function expectWatch(
     }
   });
 }
+
+export function mockOffscreenCanvas() {
+  if (typeof global.OffscreenCanvas === 'undefined') {
+    global.OffscreenCanvas = class OffscreenCanvas {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      constructor(width: number, height: number) {
+        //
+      }
+    } as unknown as typeof global.OffscreenCanvas;
+  }
+}

@@ -19,7 +19,6 @@ export interface IfAttrs {
   expect: boolean;
 }
 export function If(
-  this: ComponentHost,
   props: Props<{
     props: {
       expect: boolean;
@@ -29,6 +28,7 @@ export function If(
       false?: JNode;
     };
   }>,
+  host: ComponentHost,
 ) {
   /**
    * if 组件的实现展示了不使用 hook 范式的高度自由化的组件实现。
@@ -36,12 +36,12 @@ export function If(
    */
 
   const render = () => {
-    const slots = this[SLOTS];
+    const slots = host[SLOTS];
     const e = !!props.expect;
     const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
-    const roots = this[ROOT_NODES];
+    const roots = host[ROOT_NODES];
     if (renderFn) {
-      const el = newComponentWithDefaultSlot(this[CONTEXT]);
+      const el = newComponentWithDefaultSlot(host[CONTEXT]);
       roots.push(el);
       return renderSlotFunction(el, renderFn);
     } else {
@@ -52,20 +52,20 @@ export function If(
   };
 
   const update = (expect: boolean) => {
-    const lastNode = getLastDOM(this);
+    const lastNode = getLastDOM(host);
     const $parent = lastNode.parentNode as Node;
     const placeholder = createComment(expect.toString());
     insertAfter($parent, placeholder, lastNode);
 
-    destroyComponentContent(this);
-    const roots = this[ROOT_NODES];
+    destroyComponentContent(host);
+    const roots = host[ROOT_NODES];
     roots.length = 0;
 
-    const slots = this[SLOTS];
+    const slots = host[SLOTS];
 
     const renderFn = slots[expect.toString()] ?? (expect ? slots[DEFAULT_SLOT] : undefined);
     if (renderFn) {
-      const el = newComponentWithDefaultSlot(this[CONTEXT]);
+      const el = newComponentWithDefaultSlot(host[CONTEXT]);
       roots.push(el);
       const doms = renderSlotFunction(el, renderFn);
       insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], placeholder);
@@ -79,7 +79,7 @@ export function If(
 
   // 注意如果使用 vmWatch 则需要手动调用 addUnmountFn 来注册组件销毁时的取消监听。
   addUnmountFn(
-    this,
+    host,
     vmWatch(props, 'expect', (v) => update(!!v)),
   );
 

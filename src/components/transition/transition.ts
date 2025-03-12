@@ -59,11 +59,11 @@ const TStateLeaving = 2;
 const TStateLeaved = 3;
 
 export function Transition(
-  this: ComponentHost,
   props: Props<{
     props: TransitionProps;
     children: JNode;
   }>,
+  host: ComponentHost,
 ) {
   const destroyAfterLeave = !!props.destroyAfterLeave;
   let realEnter = props.appear ? !props.isEnter : !!props.isEnter;
@@ -85,7 +85,7 @@ export function Transition(
 
   const destroyMount = () => {
     if (!rootEl) return;
-    const roots = this[ROOT_NODES];
+    const roots = host[ROOT_NODES];
     const el = roots[0] as ComponentHost;
     const cmt = createComment('leaved');
     insertBefore(rootEl.parentNode!, cmt, rootEl);
@@ -110,8 +110,8 @@ export function Transition(
   };
 
   const renderMount = () => {
-    const el = newComponentWithDefaultSlot(this[CONTEXT]);
-    const nodes = renderSlotFunction(el, this[SLOTS][DEFAULT_SLOT]);
+    const el = newComponentWithDefaultSlot(host[CONTEXT]);
+    const nodes = renderSlotFunction(el, host[SLOTS][DEFAULT_SLOT]);
     if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
       throwErr('transition-require-element');
     }
@@ -125,9 +125,9 @@ export function Transition(
   };
 
   const updateMount = () => {
-    const cmt = this[ROOT_NODES][0] as Node;
+    const cmt = host[ROOT_NODES][0] as Node;
     const { el, nodes } = renderMount();
-    this[ROOT_NODES][0] = el;
+    host[ROOT_NODES][0] = el;
     const pa = cmt.parentNode as Node;
     insertBefore(pa, nodes.length > 0 ? createFragment(nodes) : nodes[0], cmt);
     pa.removeChild(cmt);
@@ -182,7 +182,7 @@ export function Transition(
     handleUpdate(!!v);
   });
 
-  addUnmountFn(this, () => {
+  addUnmountFn(host, () => {
     if (rootEl) removeEvent(rootEl, TRANSITION_END, onTransEnd);
     if (tm) clearTimeout(tm);
   });
@@ -194,11 +194,11 @@ export function Transition(
   }
 
   if (destroyAfterLeave && !realEnter) {
-    this[ROOT_NODES].push(createComment('leaved'));
-    return this[ROOT_NODES];
+    host[ROOT_NODES].push(createComment('leaved'));
+    return host[ROOT_NODES];
   } else {
     const { el, nodes } = renderMount();
-    this[ROOT_NODES].push(el);
+    host[ROOT_NODES].push(el);
     return nodes;
   }
 }

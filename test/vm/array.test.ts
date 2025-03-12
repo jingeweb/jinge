@@ -9,11 +9,14 @@ import {
   vmIgnore,
   vmRaw,
 } from '../../src';
-import { expectWatch } from './_helper';
+import { expectWatch, mockOffscreenCanvas } from './_helper';
+
+mockOffscreenCanvas();
 
 function expectParent(vm: ViewModel, index: number, parent: any) {
   expect(!!vm[VM_PARENTS]?.get(parent)?.has(index)).toBe(true);
 }
+
 describe('vm:array', () => {
   it('view-model to raw', () => {
     const a = [1, { a: 10 }, 2];

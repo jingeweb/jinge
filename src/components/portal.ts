@@ -19,24 +19,24 @@ export interface PortalProps {
   target?: HTMLElement;
 }
 export function Portal(
-  this: ComponentHost,
   props: Props<{
     props: PortalProps;
     children: JNode;
   }>,
+  host: ComponentHost,
 ) {
-  const renderFn = this[SLOTS][DEFAULT_SLOT];
+  const renderFn = host[SLOTS][DEFAULT_SLOT];
   if (renderFn) {
-    const el = newComponentWithDefaultSlot(this[CONTEXT]);
+    const el = newComponentWithDefaultSlot(host[CONTEXT]);
     const nodes = renderSlotFunction(el, renderFn);
     appendChildren(props.target ?? document.body, nodes);
-    addMountFn(this, () => {
+    addMountFn(host, () => {
       handleRenderDone(el);
     });
-    addUnmountFn(this, () => {
+    addUnmountFn(host, () => {
       destroyComponent(el, true);
     });
   }
-  this[ROOT_NODES].push(createComment('ported'));
-  return this[ROOT_NODES];
+  host[ROOT_NODES].push(createComment('ported'));
+  return host[ROOT_NODES];
 }

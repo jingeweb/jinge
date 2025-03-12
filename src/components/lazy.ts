@@ -19,7 +19,6 @@ import type { FC, JNode, Props } from '../jsx';
 import { type AnyFn, createComment, createFragment, insertBefore, isFunction } from '../util';
 
 export function Lazy<T extends FC>(
-  this: ComponentHost,
   props: Props<{
     props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
       _loader: () => Promise<T>;
@@ -29,19 +28,20 @@ export function Lazy<T extends FC>(
       error?: (data: { error: any }) => JNode;
     };
   }>,
+  host: ComponentHost,
 ) {
   const loader = props._loader as () => Promise<T>;
-  const errorSlot = this[SLOTS].error;
+  const errorSlot = host[SLOTS].error;
 
   const update = (fc?: AnyFn, error?: any) => {
     if (error) console.error(error);
     if (!fc && !errorSlot) return;
 
-    const oldEl = this[ROOT_NODES][0];
+    const oldEl = host[ROOT_NODES][0];
     const isComp = isComponent(oldEl);
     const firstNode = isComp ? getFirstDOM(oldEl) : oldEl;
     const $pa = firstNode.parentNode as Node;
-    const el = newComponentWithDefaultSlot(this[CONTEXT]);
+    const el = newComponentWithDefaultSlot(host[CONTEXT]);
     const nodes = fc
       ? renderFunctionComponent(el, fc, props)
       : renderSlotFunction(el, errorSlot, { error });
@@ -51,12 +51,12 @@ export function Lazy<T extends FC>(
     } else {
       $pa.removeChild(oldEl);
     }
-    this[ROOT_NODES][0] = el;
+    host[ROOT_NODES][0] = el;
     handleRenderDone(el);
   };
 
   let outdated = false;
-  addMountFn(this, () => {
+  addMountFn(host, () => {
     loader().then(
       (fc) => {
         if (outdated) return; // 组件如果已经被销毁（过期），则忽略加载器的返回逻辑。暂未设计成允许 abort 的模式。
@@ -70,20 +70,20 @@ export function Lazy<T extends FC>(
       },
     );
   });
-  addUnmountFn(this, () => {
+  addUnmountFn(host, () => {
     outdated = true;
   });
 
-  const loadingSlot = this[SLOTS].loading;
+  const loadingSlot = host[SLOTS].loading;
   if (loadingSlot) {
-    const el = newComponentWithDefaultSlot(this[CONTEXT]);
-    this[ROOT_NODES].push(el);
+    const el = newComponentWithDefaultSlot(host[CONTEXT]);
+    host[ROOT_NODES].push(el);
     const nodes = renderSlotFunction(el, loadingSlot);
     return nodes;
   } else {
     const cmt = createComment('lazy');
-    this[ROOT_NODES].push(cmt);
-    return this[ROOT_NODES];
+    host[ROOT_NODES].push(cmt);
+    return host[ROOT_NODES];
   }
 }
 
@@ -103,8 +103,8 @@ export function lazy<T extends FC>(
   const loadingFc = options?.loading;
   const errorFc = options?.error;
 
-  function DymLazy(this: ComponentHost, props: any) {
-    const el = newComponentWithSlots(this[CONTEXT], {
+  function DymLazy(props: any, host: ComponentHost) {
+    const el = newComponentWithSlots(host[CONTEXT], {
       loading: loadingFc ? (host) => renderFunctionComponent(host, loadingFc) : undefined,
       error: errorFc ? (host, vm) => renderFunctionComponent(host, errorFc as any, vm) : undefined,
     });
@@ -114,7 +114,7 @@ export function lazy<T extends FC>(
       props._loader = loader;
     }
     const nodes = renderFunctionComponent(el, Lazy as any, props);
-    this[ROOT_NODES].push(el);
+    host[ROOT_NODES].push(el);
     return nodes;
   }
 

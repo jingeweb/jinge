@@ -11,7 +11,9 @@ import {
   vmRaw,
   vmWatch,
 } from '../../src';
-import { expectWatch } from './_helper';
+import { expectWatch, mockOffscreenCanvas } from './_helper';
+
+mockOffscreenCanvas();
 
 describe('vm:object', () => {
   it('view-model to raw', () => {
