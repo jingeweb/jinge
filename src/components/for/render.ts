@@ -1,13 +1,14 @@
 import { isViewModel, vm } from '../../vm';
-import type { Context, RenderFn } from '../../core';
+import type { Context } from '../../core';
 import { newComponentWithDefaultSlot, renderSlotFunction } from '../../core';
 import { type ForEach, KEY_DATA, type Key, type KeyFn } from './common';
+import type { FC } from '../../jsx';
 
 function appendRenderEach<T>(
   vmMode: boolean,
   item: T,
   index: number,
-  itemRenderFn: RenderFn,
+  itemRenderFn: FC,
   roots: (ForEach<T> | Node)[],
   key: Key<T> | undefined,
   context?: Context,
@@ -21,7 +22,7 @@ function appendRenderEach<T>(
 
 export function renderItems<T>(
   items: T[],
-  itemRenderFn: RenderFn,
+  itemRenderFn: FC,
   roots: (ForEach<T> | Node)[],
   keys: Map<Key<T>, number> | undefined,
   keyFn: KeyFn<T> | undefined,

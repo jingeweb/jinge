@@ -114,7 +114,7 @@ export function TransitionGroup<T>(
     props: TransitionGroupProps<T> & TransitionClassnames;
     children: ForSlot<T>;
   }>,
-  host: ComponentHost,
+  hostRoot: ComponentHost,
 ) {
   const onDestroyNotifies = new Set<AnyFn>();
   const itemProps = {
@@ -126,21 +126,21 @@ export function TransitionGroup<T>(
     },
   };
 
-  addUnmountFn(host, () => {
+  addUnmountFn(hostRoot, () => {
     onDestroyNotifies.forEach((notifyFn) => notifyFn());
     onDestroyNotifies.clear();
   });
-  const renderEachFn = (host: ComponentHost, forEachVm: EachVm<T>) => {
-    const el = newComponentWithDefaultSlot(host[CONTEXT], (tranHost) => {
-      return host[SLOTS][DEFAULT_SLOT]?.(tranHost, forEachVm) ?? [];
+  const renderEachFn = (forEachVm: EachVm<T>, host: ComponentHost) => {
+    const el = newComponentWithDefaultSlot(host[CONTEXT], (_, tranHost) => {
+      return hostRoot[SLOTS][DEFAULT_SLOT]?.(forEachVm, tranHost) ?? [];
     });
     host[ROOT_NODES].push(el);
     return renderFunctionComponent(el, TransitionGroupItem as FC, itemProps);
   };
 
-  const el = newComponentWithDefaultSlot(host[CONTEXT], renderEachFn);
-  host[ROOT_NODES].push(el);
-  const nodes = renderFunctionComponent(el, For as FC, props);
+  const el = newComponentWithDefaultSlot(hostRoot[CONTEXT], renderEachFn);
+  hostRoot[ROOT_NODES].push(el);
+  const nodes = renderFunctionComponent(el, For, props);
   itemProps[APPEAR] = true;
   return nodes;
 }

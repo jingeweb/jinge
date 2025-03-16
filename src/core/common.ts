@@ -1,4 +1,4 @@
-import type { ComponentHost } from './component';
+import type { FC } from '../jsx';
 
 export const COMPONENT_STATE_INITIALIZE = 0;
 export const COMPONENT_STATE_RENDERED = 1;
@@ -14,14 +14,9 @@ export type ContextState = 0 | 1 | 2 | 3;
 
 export type Context = Record<string | number | symbol, unknown>;
 
-export type RenderFn<T extends ComponentHost = ComponentHost> = (
-  containerComponent: T,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...args: any[]
-) => Node[];
 export interface Slots {
-  [DEFAULT_SLOT]?: RenderFn;
-  [slotName: string]: RenderFn | undefined;
+  [DEFAULT_SLOT]?: FC;
+  [slotName: string]: FC | undefined;
 }
 
 export const __ = Symbol('__');

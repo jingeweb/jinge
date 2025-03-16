@@ -1,4 +1,4 @@
-import type { ComponentHost, RenderFn } from '../../core';
+import type { ComponentHost } from '../../core';
 import {
   CONTEXT,
   DEFAULT_SLOT,
@@ -16,6 +16,7 @@ import { createFragment, insertBefore } from '../../util';
 import { vm } from '../../vm';
 import { renderItems } from './render';
 import { type EachVm, type ForEach, KEY_DATA, type Key, type KeyFn, type KeyMap } from './common';
+import type { FC } from '../../jsx';
 
 function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
   el[ROOT_NODES].forEach((c) => {
@@ -28,7 +29,7 @@ function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
 }
 export function updateWithKey<T>(
   comp: ComponentHost,
-  itemRenderFn: RenderFn,
+  itemRenderFn: FC,
   data: T[],
   roots: ForEach<T>[],
   keys: Map<Key<T>, number>,
@@ -89,7 +90,7 @@ export function updateWithKey<T>(
 
 export function updateWithoutKey<T>(
   comp: ComponentHost,
-  itemRenderFn: RenderFn,
+  itemRenderFn: FC,
   data: T[],
   oldLen: number,
   roots: ForEach<T>[],

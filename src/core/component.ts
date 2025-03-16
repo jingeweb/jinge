@@ -277,10 +277,7 @@ export function newComponentWithSlots(context: Context | undefined, slots?: Slot
 /**
  * 给编译器使用的创建 Component 并同时设置 DEFAULT_SLOT 的函数
  */
-export function newComponentWithDefaultSlot(
-  context: Context | undefined,
-  defaultSlot?: Slots[typeof DEFAULT_SLOT] | undefined,
-) {
+export function newComponentWithDefaultSlot(context: Context | undefined, defaultSlot?: FC) {
   const c = new ComponentHost();
   c[CONTEXT] = context;
   defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
