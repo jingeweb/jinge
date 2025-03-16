@@ -25,7 +25,7 @@ export function If(
     };
     children?: JNode;
     slots: {
-      false?: JNode;
+      else?: JNode;
     };
   }>,
   host: ComponentHost,
@@ -38,7 +38,7 @@ export function If(
   const render = () => {
     const slots = host[SLOTS];
     const e = !!props.expect;
-    const renderFn = slots[e.toString()] ?? (e ? slots[DEFAULT_SLOT] : undefined);
+    const renderFn = e ? slots[DEFAULT_SLOT] : slots.else;
     const roots = host[ROOT_NODES];
     if (renderFn) {
       const el = newComponentWithDefaultSlot(host[CONTEXT]);
@@ -63,7 +63,7 @@ export function If(
 
     const slots = host[SLOTS];
 
-    const renderFn = slots[expect.toString()] ?? (expect ? slots[DEFAULT_SLOT] : undefined);
+    const renderFn = expect ? slots[DEFAULT_SLOT] : slots.else;
     if (renderFn) {
       const el = newComponentWithDefaultSlot(host[CONTEXT]);
       roots.push(el);
