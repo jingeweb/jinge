@@ -51,6 +51,13 @@ export default tseslint.config(
   // Node scripts
   {
     files: ['scripts/**', '*.{js,mjs,ts}'],
+    languageOptions: {
+      globals: {
+        __dirname: 'readable',
+        __filename: 'readable',
+        process: 'readable',
+      },
+    },
     rules: {
       'no-console': 'off',
     },
@@ -71,6 +78,7 @@ export default tseslint.config(
   // ignores
   {
     ignores: [
+      '**/types/',
       '**/node_modules/',
       '**/dist/',
       '**/temp/',
