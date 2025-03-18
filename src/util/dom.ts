@@ -109,10 +109,14 @@ export function insertBefore($parent: Node, newNode: Node, referenceNode?: Node 
   $parent.insertBefore(newNode, referenceNode ?? null);
 }
 
-export function addEvent(
+export type EventListener<E extends keyof HTMLElementEventMap> = (
+  evt: HTMLElementEventMap[E],
+) => void;
+
+export function addEvent<E extends keyof HTMLElementEventMap>(
   $element: Element | Window | Document,
-  eventName: string,
-  handler: EventListener,
+  eventName: E,
+  handler: EventListener<E>,
   capture?: boolean | AddEventListenerOptions,
 ): void {
   isUndefined(capture) &&
@@ -122,15 +126,17 @@ export function addEvent(
           passive: true,
         }
       : false);
-  $element.addEventListener(eventName, handler, capture);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  $element.addEventListener(eventName, handler as any, capture);
 }
 
-export function removeEvent(
+export function removeEvent<E extends keyof HTMLElementEventMap>(
   $element: Element | Window | Document,
-  eventName: string,
-  handler: EventListener,
+  eventName: E,
+  handler: EventListener<E>,
 ): void {
-  $element.removeEventListener(eventName, handler);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  $element.removeEventListener(eventName, handler as any);
 }
 
 /**
@@ -139,10 +145,10 @@ export function removeEvent(
  *
  * @returns {Function} deregister function which will removeEventListener
  */
-export function registerEvent(
+export function registerEvent<E extends keyof HTMLElementEventMap>(
   $element: Element | Window | Document,
-  eventName: string,
-  handler: EventListener,
+  eventName: E,
+  handler: EventListener<E>,
   capture?: boolean | AddEventListenerOptions,
 ) {
   addEvent($element, eventName, handler, capture);
