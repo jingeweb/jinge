@@ -15,6 +15,15 @@ export type JNode =
   | null
   | undefined;
 
+type RequireExactlyOne<T, Keys extends keyof T = keyof T> = {
+  [K in Keys]: Required<Pick<T, K>> & Partial<Record<Exclude<Keys, K>, never>>;
+}[Keys];
+type MakePropSlot<T extends object> = {
+  [K in keyof T as K extends string ? K : never]: string;
+} & {
+  [K in keyof T as K extends string ? `slot:${K}` : never]: T[K];
+};
+
 export type Props<
   D extends {
     props?: object;
@@ -22,12 +31,45 @@ export type Props<
     expose?: Record<string, AnyFn>;
     slots?: Record<string, JNode>;
     events?: Record<string, AnyFn>;
+    /**
+     * 同时指定 prop 属性和 slot 属性，且二者至少有一个必须指定。例如：
+     * ```
+     * type X = Props<{
+     *   propSlots: { content: JNode }
+     * }>
+     * ```
+     * 等价于：
+     * ```
+     * type X = { content: string } | { 'slot:content': JNode }
+     * ```
+     * 当组件某个属性参数即可接收 string，也可接收 slot，且二者必须赋予其中一个有值时，可使用此范型便捷定义。
+     * 比如 Tooltip 组件的内容（content）参数，可以是普通字符串，也可以是 slot，就可以定义为：
+     * ```
+     * import { type Props } from 'jinge';
+     * function Tooltip(props: Props<{
+     *   propSlots: {
+     *     content: JNode
+     *   }
+     * }>) {
+     *   return <div>{props['slot:content'] ?? props.content}</div>
+     * }
+     * ```
+     * 业务中可以使用：
+     * ```tsx
+     * <Tooltip content="hello"><button>hover</button></Tooltip>
+     * <Tooltip slot:content={<span>hello</span>}><button>hover</button></Tooltip>     *
+     * ```
+     * 但不能同时指定 `content` 和 `slot:content`，也不能两个都没有指定。
+     */
+    propSlots?: Record<string, JNode>;
   } = {},
-> = (D['slots'] extends object
-  ? {
-      [P in keyof D['slots'] as `slot:${string & P}`]: D['slots'][P];
-    } & D['props']
-  : D['props']) &
+> = D['props'] &
+  (D['propSlots'] extends object ? RequireExactlyOne<MakePropSlot<D['propSlots']>> : {}) &
+  (D['slots'] extends object
+    ? {
+        [P in keyof D['slots'] as `slot:${string & P}`]: D['slots'][P];
+      } & D['props']
+    : {}) &
   (D['events'] extends object
     ? {
         [P in keyof D['events'] as `on:${string & P}`]: D['events'][P];
