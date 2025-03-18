@@ -226,13 +226,15 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   target[REFS] && (target[REFS].length = 0);
   target[STATE] = COMPONENT_STATE_DESTROIED;
   target[CONTEXT] = undefined;
+  target[SLOTS] = undefined as any;
 }
 
-/** 重置组件，销毁旧的，重置为全新。目前此函数仅用于 hmr 时更新组件。 */
+/** 重置组件，销毁旧的，重置为全新，但保留 slots。目前此函数仅用于 hmr 时更新组件。 */
 export function resetComponent(target: ComponentHost, context?: Context) {
+  const slots = target[SLOTS];
   destroyComponent(target);
   target[STATE] = COMPONENT_STATE_INITIALIZE;
-  target[SLOTS] = {};
+  target[SLOTS] = slots;
   target[CONTEXT] = context;
   target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }

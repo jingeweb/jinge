@@ -22,15 +22,6 @@ import {
 import { vmWatch } from '../../vm';
 import { TRANSITION_END, classnames2tokens } from './helper';
 
-export interface TransitionCallbacks {
-  onBeforeEnter?(el?: Element): void;
-  onAfterEnter?(el?: Element): void;
-  onEnterCancelled?(el?: Element): void;
-  onBeforeLeave?(el?: Element): void;
-  onAfterLeave?(el?: Element): void;
-  onLeaveCancelled?(el?: Element): void;
-}
-
 export interface TransitionClassnames {
   /** enter 的目标 html class。默认为空。该属性为单向属性。*/
   enterClass?: string;
@@ -51,7 +42,7 @@ export interface TransitionInnerProps {
   appear?: boolean;
 }
 
-export type TransitionProps = TransitionInnerProps & TransitionClassnames & TransitionCallbacks;
+export type TransitionProps = TransitionInnerProps & TransitionClassnames;
 
 const TStateEntering = 0;
 const TStateEntered = 1;
@@ -62,6 +53,14 @@ export function Transition(
   props: Props<{
     props: TransitionProps;
     children: JNode;
+    events: {
+      beforeEnter?(el?: Element): void;
+      afterEnter?(el?: Element): void;
+      enterCancelled?(el?: Element): void;
+      beforeLeave?(el?: Element): void;
+      afterLeave?(el?: Element): void;
+      leaveCancelled?(el?: Element): void;
+    };
   }>,
   host: ComponentHost,
 ) {
@@ -80,7 +79,7 @@ export function Transition(
     const ia = realEnter ? 0 : 2;
     clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
     clist.add(...classTokens[ia], ...classTokens[ia + 1]);
-    realEnter ? props.onBeforeEnter?.(rootEl) : props.onBeforeLeave?.(rootEl);
+    realEnter ? props['on:beforeEnter']?.(rootEl) : props['on:beforeLeave']?.(rootEl);
   };
 
   const destroyMount = () => {
@@ -97,10 +96,10 @@ export function Transition(
   const onTransEnd = () => {
     if (state === TStateEntering) {
       state = TStateEntered;
-      props.onAfterEnter?.(rootEl);
+      props['on:afterEnter']?.(rootEl);
     } else if (state === TStateLeaving) {
       state = TStateLeaved;
-      props.onAfterLeave?.(rootEl);
+      props['on:afterLeave']?.(rootEl);
       if (destroyAfterLeave) {
         destroyMount();
       }
@@ -148,7 +147,7 @@ export function Transition(
     if (isEnter) {
       // isEnter === true，说明之前的 isEnter 一定是 false，则 state 只可能是 Leaving 或 Leaved 状态。
       if (state === TStateLeaving) {
-        props.onLeaveCancelled?.(rootEl);
+        props['on:leaveCancelled']?.(rootEl);
         state = TStateEntering;
         realEnter = true;
         // 状态是 Leaving，则一定有 mount 元素 ，直接触发动画。
@@ -168,7 +167,7 @@ export function Transition(
       // isEnter === true，说明之前的 isEnter 一定是 false，则 state 只可能是 Entering 或 Entered 状态。
       if (state === TStateEntering || state === TStateEntered) {
         if (state === TStateEntering) {
-          props.onEnterCancelled?.(rootEl);
+          props['on:enterCancelled']?.(rootEl);
         }
         state = TStateLeaving;
         realEnter = false;
