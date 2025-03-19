@@ -18,11 +18,21 @@ export type JNode =
 type RequireExactlyOne<T, Keys extends keyof T = keyof T> = {
   [K in Keys]: Required<Pick<T, K>> & Partial<Record<Exclude<Keys, K>, never>>;
 }[Keys];
-type MakePropSlot<T extends object> = {
-  [K in keyof T as K extends string ? K : never]: string;
-} & {
-  [K in keyof T as K extends string ? `slot:${K}` : never]: T[K];
-};
+
+/**
+ * 将 `{ [k]: JNode }` 类型的定义，转成：
+ * ```
+ * { [K]: string, 'slot:[K]': never } | { [K]: never, 'slot:[K]': JNode }
+ * ```
+ * 也就是，string 类型和插槽类型的属性值必须至少指定一个，且只能指定一个。
+ */
+export type MakePropSlots<T extends object> = RequireExactlyOne<
+  {
+    [K in keyof T as K extends string ? K : never]: string;
+  } & {
+    [K in keyof T as K extends string ? `slot:${K}` : never]: T[K];
+  }
+>;
 
 export type Props<
   D extends {
@@ -64,7 +74,7 @@ export type Props<
     propSlots?: Record<string, JNode>;
   } = {},
 > = D['props'] &
-  (D['propSlots'] extends object ? RequireExactlyOne<MakePropSlot<D['propSlots']>> : {}) &
+  (D['propSlots'] extends object ? MakePropSlots<D['propSlots']> : {}) &
   (D['slots'] extends object
     ? {
         [P in keyof D['slots'] as `slot:${string & P}`]: D['slots'][P];
