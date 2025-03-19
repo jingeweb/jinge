@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { isObject, isUndefined } from './type';
 
 function toText(v: unknown) {
@@ -109,16 +110,32 @@ export function insertBefore($parent: Node, newNode: Node, referenceNode?: Node 
   $parent.insertBefore(newNode, referenceNode ?? null);
 }
 
-export type EventListener<E extends keyof HTMLElementEventMap> = (
-  evt: HTMLElementEventMap[E],
-) => void;
+export type EventListener<M, E extends keyof M> = (evt: M[E]) => void;
 
-export function addEvent<E extends keyof HTMLElementEventMap>(
-  $element: Element | Window | Document,
+export function addEvent<E extends keyof WindowEventMap>(
+  $element: Window,
   eventName: E,
-  handler: EventListener<E>,
+  handler: EventListener<WindowEventMap, E>,
   capture?: boolean | AddEventListenerOptions,
-): void {
+): void;
+export function addEvent<E extends keyof DocumentEventMap>(
+  $element: Document,
+  eventName: E,
+  handler: EventListener<DocumentEventMap, E>,
+  capture?: boolean | AddEventListenerOptions,
+): void;
+export function addEvent<E extends keyof HTMLElementEventMap>(
+  $element: Element,
+  eventName: E,
+  handler: EventListener<HTMLElementEventMap, E>,
+  capture?: boolean | AddEventListenerOptions,
+): void;
+export function addEvent(
+  $element: Element | Window | Document,
+  eventName: any,
+  handler: any,
+  capture?: boolean | AddEventListenerOptions,
+) {
   isUndefined(capture) &&
     (capture = eventName.startsWith('touch')
       ? {
@@ -126,17 +143,30 @@ export function addEvent<E extends keyof HTMLElementEventMap>(
           passive: true,
         }
       : false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  $element.addEventListener(eventName, handler as any, capture);
+  $element.addEventListener(eventName, handler, capture);
 }
 
-export function removeEvent<E extends keyof HTMLElementEventMap>(
-  $element: Element | Window | Document,
+export function removeEvent<E extends keyof WindowEventMap>(
+  $element: Window,
   eventName: E,
-  handler: EventListener<E>,
+  handler: EventListener<WindowEventMap, E>,
+): void;
+export function removeEvent<E extends keyof DocumentEventMap>(
+  $element: Document,
+  eventName: E,
+  handler: EventListener<DocumentEventMap, E>,
+): void;
+export function removeEvent<E extends keyof HTMLElementEventMap>(
+  $element: Element,
+  eventName: E,
+  handler: EventListener<HTMLElementEventMap, E>,
+): void;
+export function removeEvent(
+  $element: Element | Window | Document,
+  eventName: any,
+  handler: any,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  $element.removeEventListener(eventName, handler as any);
+  $element.removeEventListener(eventName, handler);
 }
 
 /**
@@ -145,15 +175,33 @@ export function removeEvent<E extends keyof HTMLElementEventMap>(
  *
  * @returns {Function} deregister function which will removeEventListener
  */
-export function registerEvent<E extends keyof HTMLElementEventMap>(
-  $element: Element | Window | Document,
+export function registerEvent<E extends keyof WindowEventMap>(
+  $element: Window,
   eventName: E,
-  handler: EventListener<E>,
+  handler: EventListener<WindowEventMap, E>,
+  capture?: boolean | AddEventListenerOptions,
+): () => void;
+export function registerEvent<E extends keyof DocumentEventMap>(
+  $element: Document,
+  eventName: E,
+  handler: EventListener<DocumentEventMap, E>,
+  capture?: boolean | AddEventListenerOptions,
+): () => void;
+export function registerEvent<E extends keyof HTMLElementEventMap>(
+  $element: Element,
+  eventName: E,
+  handler: EventListener<DocumentEventMap, E>,
+  capture?: boolean | AddEventListenerOptions,
+): () => void;
+export function registerEvent(
+  $element: Element | Window | Document,
+  eventName: any,
+  handler: any,
   capture?: boolean | AddEventListenerOptions,
 ) {
-  addEvent($element, eventName, handler, capture);
+  addEvent($element as any, eventName, handler, capture);
   return () => {
-    removeEvent($element, eventName, handler);
+    removeEvent($element as any, eventName, handler);
   };
 }
 
