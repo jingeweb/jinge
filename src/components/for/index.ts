@@ -1,7 +1,7 @@
 import { innerWatchPath, isViewModel } from '../../vm';
-import type { JNode, Props } from '../../jsx';
+import type { FC, JNode, WithChildren } from '../../jsx';
 import type { ComponentHost } from '../../core';
-import { CONTEXT, DEFAULT_SLOT, ROOT_NODES, SLOTS, addUnmountFn } from '../../core';
+import { CONTEXT, DEFAULT_SLOT_NAME, ROOT_NODES, addUnmountFn } from '../../core';
 
 import { type ForEach, KEY_DATA, KEY_INDEX, type KeyFn, type KeyMap } from './common';
 import { renderItems } from './render';
@@ -35,13 +35,7 @@ export type ForSlot<T> = (each: {
   isLast: boolean;
 }) => JNode;
 
-export function For<T>(
-  props: Props<{
-    props: ForProps<T>;
-    children: ForSlot<T>;
-  }>,
-  host: ComponentHost,
-) {
+export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: ComponentHost) {
   const keyFn = getKeyFn(props.key);
   let keys: KeyMap<T> | undefined = keyFn ? new Map() : undefined;
   let renderLen = 0;
@@ -56,9 +50,17 @@ export function For<T>(
         if (!cp || cp.length <= 1) {
           const oldLen = renderLen;
           renderLen = data?.length ?? 0;
-          handleUpdate(host, oldLen, data, keys, keyFn, (newKeys) => {
-            keys = newKeys;
-          });
+          handleUpdate(
+            host,
+            props[DEFAULT_SLOT_NAME] as FC,
+            oldLen,
+            data,
+            keys,
+            keyFn,
+            (newKeys) => {
+              keys = newKeys;
+            },
+          );
         } else {
           // 如果发生变更的路径 cp.length > 1，说明是数组里某个具体的元素发生变更，
           // 这种情况下 For 组件不需要响应和更新渲染。render 模板中有依赖到这个具体元素的地方，会在
@@ -72,7 +74,7 @@ export function For<T>(
   }
 
   const roots = host[ROOT_NODES] as (ForEach<T> | Node)[];
-  const itemRenderFn = host[SLOTS][DEFAULT_SLOT];
+  const itemRenderFn = props[DEFAULT_SLOT_NAME];
   const items = props.loop;
   if (!itemRenderFn || !items?.length) {
     roots.push(document.createComment('empty'));

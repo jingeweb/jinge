@@ -1,32 +1,26 @@
 import { createComment, createFragment, insertAfter, insertBefore } from '../util';
-import type { ComponentHost } from '../core';
+import { ComponentHost, DEFAULT_SLOT_NAME } from '../core';
 import {
   CONTEXT,
-  DEFAULT_SLOT,
   ROOT_NODES,
-  SLOTS,
   addUnmountFn,
   destroyComponentContent,
   getLastDOM,
   handleRenderDone,
-  newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';
-import type { JNode, Props } from '../jsx';
+import type { FC, JNode, WithSlots } from '../jsx';
 import { vmWatch } from '../vm';
 
 export interface IfAttrs {
   expect: boolean;
 }
 export function If(
-  props: Props<{
-    props: {
-      expect: boolean;
-    };
-    children?: JNode;
-    slots: {
-      else?: JNode;
-    };
+  props: {
+    expect: boolean;
+  } & WithSlots<{
+    default?: JNode;
+    else?: JNode;
   }>,
   host: ComponentHost,
 ) {
@@ -36,12 +30,11 @@ export function If(
    */
 
   const render = () => {
-    const slots = host[SLOTS];
     const e = !!props.expect;
-    const renderFn = e ? slots[DEFAULT_SLOT] : slots.else;
+    const renderFn = e ? (props[DEFAULT_SLOT_NAME] as FC) : (props['slot:else'] as FC);
     const roots = host[ROOT_NODES];
     if (renderFn) {
-      const el = newComponentWithDefaultSlot(host[CONTEXT]);
+      const el = new ComponentHost(host[CONTEXT]);
       roots.push(el);
       return renderSlotFunction(el, renderFn);
     } else {
@@ -61,11 +54,9 @@ export function If(
     const roots = host[ROOT_NODES];
     roots.length = 0;
 
-    const slots = host[SLOTS];
-
-    const renderFn = expect ? slots[DEFAULT_SLOT] : slots.else;
+    const renderFn = expect ? (props[DEFAULT_SLOT_NAME] as FC) : (props['slot:else'] as FC);
     if (renderFn) {
-      const el = newComponentWithDefaultSlot(host[CONTEXT]);
+      const el = new ComponentHost(host[CONTEXT]);
       roots.push(el);
       const doms = renderSlotFunction(el, renderFn);
       insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], placeholder);

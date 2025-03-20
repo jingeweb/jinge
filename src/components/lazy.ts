@@ -1,37 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   CONTEXT,
-  type ComponentHost,
+  ComponentHost,
   ROOT_NODES,
-  SLOTS,
   addMountFn,
   addUnmountFn,
   destroyComponent,
   getFirstDOM,
   handleRenderDone,
   isComponent,
-  newComponentWithDefaultSlot,
-  newComponentWithSlots,
   renderFunctionComponent,
   renderSlotFunction,
 } from '../core';
-import type { FC, JNode, Props } from '../jsx';
+import type { FC, JNode, WithSlots } from '../jsx';
 import { type AnyFn, createComment, createFragment, insertBefore, isFunction } from '../util';
 
 export function Lazy<T extends FC>(
-  props: Props<{
-    props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
-      _loader: () => Promise<T>;
-    };
-    slots: {
+  props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
+    _loader: () => Promise<T>;
+  } & WithSlots<{
       loading?: JNode;
       error?: (data: { error: any }) => JNode;
-    };
-  }>,
+    }>,
   host: ComponentHost,
 ) {
   const loader = props._loader as () => Promise<T>;
-  const errorSlot = host[SLOTS].error;
+  const errorSlot = props['slot:error'];
 
   const update = (fc?: AnyFn, error?: any) => {
     if (error) console.error(error);
@@ -41,7 +35,7 @@ export function Lazy<T extends FC>(
     const isComp = isComponent(oldEl);
     const firstNode = isComp ? getFirstDOM(oldEl) : oldEl;
     const $pa = firstNode.parentNode as Node;
-    const el = newComponentWithDefaultSlot(host[CONTEXT]);
+    const el = new ComponentHost(host[CONTEXT]);
     const nodes = fc
       ? renderFunctionComponent(el, fc, props)
       : renderSlotFunction(el, errorSlot, { error });
@@ -74,9 +68,9 @@ export function Lazy<T extends FC>(
     outdated = true;
   });
 
-  const loadingSlot = host[SLOTS].loading;
+  const loadingSlot = props['slot:loading'];
   if (loadingSlot) {
-    const el = newComponentWithDefaultSlot(host[CONTEXT]);
+    const el = new ComponentHost(host[CONTEXT]);
     host[ROOT_NODES].push(el);
     const nodes = renderSlotFunction(el, loadingSlot);
     return nodes;
@@ -95,25 +89,28 @@ export function lazy<T extends FC>(
   loader: () => Promise<T>,
   options?: {
     /** 错误发生时渲染的函数组件。组件的 props 中会传递 error 参数。 */
-    error?: (props: { error: any }) => any;
+    'slot:error'?: (props: { error: any }) => JNode;
     /** 加载时渲染的函数组件。 */
-    loading?: AnyFn;
+    'slot:loading'?: JNode;
   },
 ) {
-  const loadingFc = options?.loading;
-  const errorFc = options?.error;
+  const loadingFc = options?.['slot:loading'] as FC;
+  const errorFc = options?.['slot:error'] as FC;
 
   function DymLazy(props: any, host: ComponentHost) {
-    const el = newComponentWithSlots(host[CONTEXT], {
-      loading: loadingFc ? (host) => renderFunctionComponent(host, loadingFc) : undefined,
-      error: errorFc ? (host, vm) => renderFunctionComponent(host, errorFc as any, vm) : undefined,
-    });
+    props['slot:loading'] = loadingFc
+      ? (_: any, host: ComponentHost) => renderFunctionComponent(host, loadingFc)
+      : undefined;
+    props['slot:error'] = errorFc
+      ? (err: any, host: ComponentHost) => renderFunctionComponent(host, errorFc, err)
+      : undefined;
+    const el = new ComponentHost(host[CONTEXT]);
     if (props === undefined) {
       props = { _loader: loader };
     } else {
       props._loader = loader;
     }
-    const nodes = renderFunctionComponent(el, Lazy as any, props);
+    const nodes = renderFunctionComponent(el, Lazy, props);
     host[ROOT_NODES].push(el);
     return nodes;
   }

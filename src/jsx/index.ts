@@ -15,90 +15,69 @@ export type JNode =
   | null
   | undefined;
 
-type RequireExactlyOne<T, Keys extends keyof T = keyof T> = {
-  [K in Keys]: Required<Pick<T, K>> & Partial<Record<Exclude<Keys, K>, never>>;
-}[Keys];
-
 /**
- * 将 `{ [k]: JNode }` 类型的定义，转成：
+ * 辅助类型工具，将 `{ [k]: JNode }` 类型的定义，转成：
  * ```
- * { [K]: string, 'slot:[K]': never } | { [K]: never, 'slot:[K]': JNode }
+ * { [K]: string, 'slot:[K]'?: never } | { [K]?: never, 'slot:[K]': JNode }
  * ```
  * 也就是，string 类型和插槽类型的属性值必须至少指定一个，且只能指定一个。
+ *
+ * TODO: 是否可以有 WithPropSlots 类型，可以批量转，比如
+ * ```ts
+ * WithPropSlots<{ a: JNode, b: (data) => JNode }>
+ * ```
+ * 等价于：
+ * ```ts
+ * WithPropSlot<'a', JNode> & WithPropSlot<'b', (data) => JNode>
+ * ```
+ * 简单探索过好像很难，后续进一步研究。
  */
-export type MakePropSlots<T extends object> = RequireExactlyOne<
-  {
-    [K in keyof T as K extends string ? K : never]: string;
-  } & {
-    [K in keyof T as K extends string ? `slot:${K}` : never]: T[K];
-  }
->;
+export type WithPropSlot<T extends string, P> =
+  | (Record<T, string> & Partial<Record<`slot:${T}`, never>>)
+  | (Partial<Record<T, never>> & Record<`slot:${T}`, P>);
 
-export type Props<
-  D extends {
-    props?: object;
-    children?: JNode;
-    expose?: Record<string, AnyFn>;
-    slots?: Record<string, JNode>;
-    events?: Record<string, AnyFn>;
-    /**
-     * 同时指定 prop 属性和 slot 属性，且二者至少有一个必须指定。例如：
-     * ```
-     * type X = Props<{
-     *   propSlots: { content: JNode }
-     * }>
-     * ```
-     * 等价于：
-     * ```
-     * type X = { content: string } | { 'slot:content': JNode }
-     * ```
-     * 当组件某个属性参数即可接收 string，也可接收 slot，且二者必须赋予其中一个有值时，可使用此范型便捷定义。
-     * 比如 Tooltip 组件的内容（content）参数，可以是普通字符串，也可以是 slot，就可以定义为：
-     * ```
-     * import { type Props } from 'jinge';
-     * function Tooltip(props: Props<{
-     *   propSlots: {
-     *     content: JNode
-     *   }
-     * }>) {
-     *   return <div>{props['slot:content'] ?? props.content}</div>
-     * }
-     * ```
-     * 业务中可以使用：
-     * ```tsx
-     * <Tooltip content="hello"><button>hover</button></Tooltip>
-     * <Tooltip slot:content={<span>hello</span>}><button>hover</button></Tooltip>     *
-     * ```
-     * 但不能同时指定 `content` 和 `slot:content`，也不能两个都没有指定。
-     */
-    propSlots?: Record<string, JNode>;
-  } = {},
-> = D['props'] &
-  (D['propSlots'] extends object ? MakePropSlots<D['propSlots']> : {}) &
-  (D['slots'] extends object
+export type WithEvents<T> = {
+  [P in keyof T as `on:${string & P}`]: T[P];
+};
+
+type X<T> = {
+  [P in keyof T as `slot:${string & P}`]: T[P];
+};
+export type WithSlots<T> = X<Omit<T, 'default'>> &
+  (T extends {
+    default: infer P;
+  }
     ? {
-        [P in keyof D['slots'] as `slot:${string & P}`]: D['slots'][P];
-      } & D['props']
-    : {}) &
-  (D['events'] extends object
-    ? {
-        [P in keyof D['events'] as `on:${string & P}`]: D['events'][P];
+        children: P;
+        'slot:default'?: P;
       }
     : {}) &
-  (D extends { children: JNode }
+  (T extends {
+    default?: infer P;
+  }
     ? {
-        children: D['children'];
-      }
-    : D extends { children?: JNode }
-      ? {
-          children?: D['children'];
-        }
-      : {}) &
-  (D['expose'] extends Record<string, AnyFn>
-    ? {
-        ref?: Ref<D['expose']>;
+        children?: P;
+        'slot:default'?: P;
       }
     : {});
+/**
+ * 辅助生成 children 属性的类型。等价于使用 WithSlots 搭配 'slot:default'。
+ */
+export interface WithChildren<T> {
+  children: T;
+  'slot:default'?: T;
+}
+/**
+ * 辅助生成 optional children 属性的类型。等价于使用 WithSlots 搭配 'slot:default'。
+ */
+export interface WithOptChildren<T> {
+  children?: T;
+  'slot:default'?: T;
+}
+
+export interface WithExpose<T extends Record<string, AnyFn>> {
+  ref?: Ref<T>;
+}
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
 export type JClipboardEvent<T = Element> = JEvent<T, ClipboardEvent>;

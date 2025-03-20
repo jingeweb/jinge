@@ -1,22 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { ComponentHost, handleRenderDone, renderFunctionComponent } from './component';
 import { appendChildren, replaceChildren } from '../util';
+import type { FC } from '../jsx';
+import type { Context } from './common';
+import type { RefValue } from './ref';
 
-export function bootstrap<C extends object = never>(FC: () => any, dom: HTMLElement): C;
-export function bootstrap<A extends object = never, C extends object = never>(
-  FC: (props: A) => any,
+export type BootstrapReturn<T extends FC> = ComponentHost & RefValue<Parameters<T>[0]['ref']>;
+
+export function bootstrap<T extends FC>(
+  fc: T,
   dom: HTMLElement,
-  props: A,
-): C;
-export function bootstrap(FC: any, dom: HTMLElement, props?: any) {
-  const app = new ComponentHost();
-  const nodes = renderFunctionComponent(app, FC, props);
+  props?: Omit<Parameters<T>[0], 'children'>,
+  context?: Context,
+) {
+  const host = new ComponentHost(context);
+  const nodes = renderFunctionComponent(host, fc, props ?? {});
   if (dom !== document.body) {
     replaceChildren(dom.parentNode as HTMLElement, nodes, dom);
   } else {
     appendChildren(dom, nodes);
   }
-  handleRenderDone(app);
-  return app;
+  handleRenderDone(host);
+  return host as unknown as BootstrapReturn<T>;
 }

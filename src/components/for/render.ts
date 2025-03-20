@@ -1,6 +1,6 @@
 import { isViewModel, vm } from '../../vm';
 import type { Context } from '../../core';
-import { newComponentWithDefaultSlot, renderSlotFunction } from '../../core';
+import { ComponentHost, renderSlotFunction } from '../../core';
 import { type ForEach, KEY_DATA, type Key, type KeyFn } from './common';
 import type { FC } from '../../jsx';
 
@@ -13,7 +13,8 @@ function appendRenderEach<T>(
   key: Key<T> | undefined,
   context?: Context,
 ) {
-  const el = newComponentWithDefaultSlot(context) as ForEach<T>;
+  // const el = newComponentWithDefaultSlot(context) as ForEach<T>;
+  const el = new ComponentHost(context) as ForEach<T>;
   const each = vmMode ? vm({ data: item, index, key }) : { data: item, index, key };
   el[KEY_DATA] = each;
   roots.push(el);

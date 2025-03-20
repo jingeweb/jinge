@@ -11,7 +11,7 @@ import {
   throwErr,
 } from '../util';
 
-import type { ComponentState, Context, ContextState, Slots } from './common';
+import type { ComponentState, Context, ContextState } from './common';
 import {
   COMPONENT_STATE_DESTROIED,
   COMPONENT_STATE_INITIALIZE,
@@ -23,12 +23,12 @@ import {
   CONTEXT_STATE_TOUCHED_FREEZED,
   CONTEXT_STATE_UNTOUCH,
   CONTEXT_STATE_UNTOUCH_FREEZED,
-  DEFAULT_SLOT,
+  // DEFAULT_SLOT,
   NON_ROOT_COMPONENT_NODES,
   ONMOUNT,
   REFS,
   ROOT_NODES,
-  SLOTS,
+  // SLOTS,
   STATE,
   UNMOUNT_FNS,
   __,
@@ -58,10 +58,10 @@ export class ComponentHost {
    */
   [CONTEXT]?: Context;
   [CONTEXT_STATE]: ContextState = CONTEXT_STATE_UNTOUCH;
-  /**
-   * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。
-   */
-  [SLOTS]: Slots;
+  // /**
+  //  * 编译器传递进来的渲染函数，跟 WebComponent 里的 Slot 概念类似。
+  //  */
+  // [SLOTS]: Slots;
 
   /**
    * 组件的状态
@@ -110,8 +110,9 @@ export class ComponentHost {
    */
   [ROOT_NODES]: (ComponentHost | Node)[] = [];
 
-  constructor() {
-    this[SLOTS] = {};
+  constructor(context?: Context) {
+    // this[SLOTS] = {};
+    this[CONTEXT] = context;
   }
 }
 
@@ -226,15 +227,15 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   target[REFS] && (target[REFS].length = 0);
   target[STATE] = COMPONENT_STATE_DESTROIED;
   target[CONTEXT] = undefined;
-  target[SLOTS] = undefined as any;
+  // target[SLOTS] = undefined as any;
 }
 
 /** 重置组件，销毁旧的，重置为全新，但保留 slots。目前此函数仅用于 hmr 时更新组件。 */
 export function resetComponent(target: ComponentHost, context?: Context) {
-  const slots = target[SLOTS];
+  // const slots = target[SLOTS];
   destroyComponent(target);
   target[STATE] = COMPONENT_STATE_INITIALIZE;
-  target[SLOTS] = slots;
+  // target[SLOTS] = slots;
   target[CONTEXT] = context;
   target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }
@@ -266,25 +267,25 @@ export function setComponentContext(
 
   context[key] = value;
 }
-/**
- * 给编译器使用的创建 Component 并同时设置 SLOTS 的函数
- */
-export function newComponentWithSlots(context: Context | undefined, slots?: Slots) {
-  const c = new ComponentHost();
-  c[CONTEXT] = context;
-  Object.assign(c[SLOTS], slots);
-  return c;
-}
+// /**
+//  * 给编译器使用的创建 Component 并同时设置 SLOTS 的函数
+//  */
+// export function newComponentWithSlots(context: Context | undefined, slots?: Slots) {
+//   const c = new ComponentHost();
+//   c[CONTEXT] = context;
+//   Object.assign(c[SLOTS], slots);
+//   return c;
+// }
 
-/**
- * 给编译器使用的创建 Component 并同时设置 DEFAULT_SLOT 的函数
- */
-export function newComponentWithDefaultSlot(context: Context | undefined, defaultSlot?: FC) {
-  const c = new ComponentHost();
-  c[CONTEXT] = context;
-  defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
-  return c;
-}
+// /**
+//  * 给编译器使用的创建 Component 并同时设置 DEFAULT_SLOT 的函数
+//  */
+// export function newComponentWithDefaultSlot(context: Context | undefined, defaultSlot?: FC) {
+//   const c = new ComponentHost();
+//   c[CONTEXT] = context;
+//   defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
+//   return c;
+// }
 
 export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T, attrs?: any) {
   // BEGIN_DROP_IN_PRODUCTION

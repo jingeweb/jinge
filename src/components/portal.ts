@@ -1,36 +1,27 @@
 import {
   CONTEXT,
-  type ComponentHost,
-  DEFAULT_SLOT,
+  ComponentHost,
+  DEFAULT_SLOT_NAME,
   ROOT_NODES,
-  SLOTS,
   addMountFn,
   addUnmountFn,
   destroyComponent,
   handleRenderDone,
-  newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../core';
-import type { JNode, Props } from '../jsx';
+import type { FC, JNode, WithChildren } from '../jsx';
 import { appendChildren, createComment } from '../util';
 
-export interface PortalProps {
-  /** portal 的目标元素，默认为 document.body。注意该属性为单向绑定属性。 */
-  target?: HTMLElement;
-}
 export function Portal(
-  props: Props<{
-    props: PortalProps;
-    children: JNode;
-    expose: {
-      getPortedHost(): ComponentHost;
-    };
-  }>,
+  props: {
+    /** portal 的目标元素，默认为 document.body。注意该属性为单向绑定属性。 */
+    target?: HTMLElement;
+  } & WithChildren<JNode>,
   host: ComponentHost,
 ) {
-  const renderFn = host[SLOTS][DEFAULT_SLOT];
+  const renderFn = props[DEFAULT_SLOT_NAME] as FC;
   if (renderFn) {
-    const el = newComponentWithDefaultSlot(host[CONTEXT]);
+    const el = new ComponentHost(host[CONTEXT]);
     const nodes = renderSlotFunction(el, renderFn);
     appendChildren(props?.target ?? document.body, nodes);
     addMountFn(host, () => {

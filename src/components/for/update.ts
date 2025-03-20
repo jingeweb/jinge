@@ -1,15 +1,15 @@
-import type { ComponentHost } from '../../core';
+import { ComponentHost } from '../../core';
 import {
   CONTEXT,
-  DEFAULT_SLOT,
+  // DEFAULT_SLOT,
   ROOT_NODES,
-  SLOTS,
+  // SLOTS,
   destroyComponent,
   getFirstDOM,
   getLastDOM,
   handleRenderDone,
   isComponent,
-  newComponentWithDefaultSlot,
+  // newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
 import { createFragment, insertBefore } from '../../util';
@@ -49,7 +49,8 @@ export function updateWithKey<T>(
     const oldIdx = keys.get(newKey);
     if (oldIdx === undefined) {
       // 没有匹配的旧的 key，创建新的组件。
-      const el = newComponentWithDefaultSlot(comp[CONTEXT]) as ForEach<T>;
+      // const el = newComponentWithDefaultSlot(comp[CONTEXT]) as ForEach<T>;
+      const el = new ComponentHost(comp[CONTEXT]) as ForEach<T>;
       const each: EachVm<T> = vm({ data: item, index: i, key: newKey });
       el[KEY_DATA] = each;
       newRoots.push(el);
@@ -136,13 +137,14 @@ export function updateWithoutKey<T>(
 }
 export function handleUpdate<T>(
   comp: ComponentHost,
+  itemRenderFn: FC,
   oldLen: number,
   data: T[] | undefined | null,
   keys: KeyMap<T> | undefined,
   keyFn: KeyFn<T> | undefined,
   onKeysUpdated: (newKeys: KeyMap<T>) => void,
 ) {
-  const itemRenderFn = comp[SLOTS][DEFAULT_SLOT];
+  // const itemRenderFn = comp[SLOTS][DEFAULT_SLOT];
   if (!itemRenderFn) return;
 
   const newLen = data?.length ?? 0;

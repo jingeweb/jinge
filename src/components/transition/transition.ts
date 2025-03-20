@@ -1,16 +1,13 @@
-import type { ComponentHost } from '../../core';
+import { ComponentHost, DEFAULT_SLOT_NAME } from '../../core';
 import {
   CONTEXT,
-  DEFAULT_SLOT,
   ROOT_NODES,
-  SLOTS,
   addUnmountFn,
   destroyComponent,
   handleRenderDone,
-  newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
-import type { JNode, Props } from '../../jsx';
+import type { FC, JNode, WithChildren, WithEvents } from '../../jsx';
 import {
   addEvent,
   createComment,
@@ -50,18 +47,16 @@ const TStateLeaving = 2;
 const TStateLeaved = 3;
 
 export function Transition(
-  props: Props<{
-    props: TransitionProps;
-    children: JNode;
-    events: {
+  props: TransitionProps &
+    WithChildren<JNode> &
+    WithEvents<{
       beforeEnter?(el?: Element): void;
       afterEnter?(el?: Element): void;
       enterCancelled?(el?: Element): void;
       beforeLeave?(el?: Element): void;
-      afterLeave?(el?: Element): void;
+      afterLeave?(): void;
       leaveCancelled?(el?: Element): void;
-    };
-  }>,
+    }>,
   host: ComponentHost,
 ) {
   const destroyAfterLeave = !!props.destroyAfterLeave;
@@ -99,18 +94,18 @@ export function Transition(
       props['on:afterEnter']?.(rootEl);
     } else if (state === TStateLeaving) {
       state = TStateLeaved;
-      props['on:afterLeave']?.(rootEl);
       if (destroyAfterLeave) {
         destroyMount();
       }
+      props['on:afterLeave']?.();
     } else {
       // transition end 可能在多个 property 动画结束时都触发。忽略除第一个之外的其它 propery 的事件。
     }
   };
 
   const renderMount = () => {
-    const el = newComponentWithDefaultSlot(host[CONTEXT]);
-    const nodes = renderSlotFunction(el, host[SLOTS][DEFAULT_SLOT]);
+    const el = new ComponentHost(host[CONTEXT]);
+    const nodes = renderSlotFunction(el, props[DEFAULT_SLOT_NAME] as FC);
     if (nodes.length > 1 || !(nodes[0] instanceof Element)) {
       throwErr('transition-require-element');
     }

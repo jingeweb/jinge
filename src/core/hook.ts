@@ -3,7 +3,7 @@ import type { FC } from '../jsx';
 import { isUndefined, throwErr } from '../util';
 import type { PropertyPathItem, WatchHandler, WatchOptions } from '../vm';
 import { vmWatch } from '../vm';
-import { CONTEXT, DEFAULT_SLOT, SLOTS } from './common';
+import { CONTEXT } from './common';
 import {
   type ComponentHost,
   addMountFn,
@@ -80,15 +80,15 @@ export function expose<T extends FC>(instance: RefValue<Parameters<T>[0]['ref']>
   Object.assign(componentHost, instance);
 }
 
-export type SlotNames<S extends object | undefined> = S extends object ? keyof S : never;
-export function hasSlot<T extends string>(slotName: T) {
-  if (!componentHost) throwErr(MISS_KEY);
-  return !!componentHost[SLOTS][slotName];
-}
-export function hasDefaultSlot() {
-  if (!componentHost) throwErr(MISS_KEY);
-  return !!componentHost[SLOTS][DEFAULT_SLOT];
-}
+// export type SlotNames<S extends object | undefined> = S extends object ? keyof S : never;
+// export function hasSlot<T extends string>(slotName: T) {
+//   if (!componentHost) throwErr(MISS_KEY);
+//   return !!componentHost[SLOTS][slotName];
+// }
+// export function hasDefaultSlot() {
+//   if (!componentHost) throwErr(MISS_KEY);
+//   return !!componentHost[SLOTS][DEFAULT_SLOT];
+// }
 
 export function firstDOM() {
   if (!componentHost) throwErr(MISS_KEY);
