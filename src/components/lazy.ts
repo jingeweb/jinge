@@ -17,7 +17,7 @@ import { type AnyFn, createComment, createFragment, insertBefore, isFunction } f
 
 export function Lazy<T extends FC>(
   props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
-    _loader: () => Promise<T>;
+    loader: () => Promise<T>;
   } & WithSlots<{
       loading?: JNode;
       error?: (data: { error: any }) => JNode;
@@ -98,18 +98,18 @@ export function lazy<T extends FC>(
   const errorFc = options?.['slot:error'] as FC;
 
   function DymLazy(props: any, host: ComponentHost) {
-    props['slot:loading'] = loadingFc
-      ? (_: any, host: ComponentHost) => renderFunctionComponent(host, loadingFc)
-      : undefined;
-    props['slot:error'] = errorFc
-      ? (err: any, host: ComponentHost) => renderFunctionComponent(host, errorFc, err)
-      : undefined;
-    const el = new ComponentHost(host[CONTEXT]);
-    if (props === undefined) {
-      props = { _loader: loader };
+    if (!props) {
+      props = { loader };
     } else {
-      props._loader = loader;
+      props.loader = loader;
     }
+    loadingFc &&
+      (props['slot:loading'] = (_: any, host: ComponentHost) =>
+        renderFunctionComponent(host, loadingFc));
+    errorFc &&
+      (props['slot:error'] = (err: any, host: ComponentHost) =>
+        renderFunctionComponent(host, errorFc, err));
+    const el = new ComponentHost(host[CONTEXT]);
     const nodes = renderFunctionComponent(el, Lazy, props);
     host[ROOT_NODES].push(el);
     return nodes;
