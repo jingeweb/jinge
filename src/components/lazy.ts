@@ -24,8 +24,8 @@ export function Lazy<T extends FC>(
     }>,
   host: ComponentHost,
 ) {
-  const loader = props._loader as () => Promise<T>;
-  const errorSlot = props['slot:error'];
+  const loader = props.loader as () => Promise<T>;
+  const errorSlot = props['slot:error'] as FC;
 
   const update = (fc?: AnyFn, error?: any) => {
     if (error) console.error(error);
