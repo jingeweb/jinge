@@ -1,4 +1,11 @@
-import { arrayEqual, clearImmediate, isUndefined, setImmediate } from '../util';
+import {
+  arrayEqual,
+  clearImmediate,
+  isFunction,
+  isUndefined,
+  registerEvent,
+  setImmediate,
+} from '../util';
 import type { PropertyPathItem, ViewModel } from '../vm';
 import { VM_RAW, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
 import { type ComponentHost, addUnmountFn } from './component';
@@ -20,6 +27,73 @@ export function watchForRender(
   renderFn(watcher[VM_WATCHER_VALUE]);
 
   addUnmountFn(hostComponent, () => watcher[VM_WATCHER_DESTROY]());
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function wrapEventBind($ele: any, eventName: any, capture: boolean) {
+  let dereg: (() => void) | undefined = undefined;
+  return (handler: unknown) => {
+    if (dereg) {
+      dereg();
+      dereg = undefined;
+    }
+    if (isFunction(handler)) {
+      dereg = registerEvent($ele, eventName, handler, capture);
+    }
+  };
+}
+
+/**
+ * 给编译器使用的 dom 元素的事件绑定器。会记住上一次绑定的事件，再次绑定时先解绑上一次绑定的。
+ * 用于当 dom 元素的事件属性的值是非函数时，搭配 ExprWatcher 等进行动态绑定。
+ */
+export function watchForDOMEventBind(
+  watcher: Pick<
+    ViewWatcher,
+    typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
+  >,
+  $ele: Element | Window | Document,
+  eventName: string,
+  capture: boolean,
+  hostComponent: ComponentHost,
+) {
+  const bindEvent = wrapEventBind($ele, eventName, capture);
+  watcher[VM_WATCHER_PARENT] = {
+    [VM_WATCHER_NOTIFY]: bindEvent,
+  };
+  bindEvent(watcher[VM_WATCHER_VALUE]);
+
+  addUnmountFn(hostComponent, () => {
+    bindEvent(undefined); // 通过 bind undefined 来销毁旧的监听。
+    watcher[VM_WATCHER_DESTROY]();
+  });
+}
+
+/**
+ * watchForDOMEventBind 的简化版本，用于最简单的诸如 {props.a.b.c} 这样的纯 path 的表达式事件属性的监控。
+ */
+export function watchPathForDOMEventBind(
+  target: ViewModel,
+  path: PropertyPathItem[],
+  $ele: Element | Window | Document,
+  eventName: string,
+  capture: boolean,
+  hostComponent: ComponentHost,
+) {
+  if (!target) {
+    return;
+  }
+  const bindEvent = wrapEventBind($ele, eventName, capture);
+  const val = getValueByPath(target, path);
+  bindEvent(val);
+  if (isUndefined(target[VM_RAW])) {
+    return;
+  }
+  const unwatch = innerWatchPath(target, val, bindEvent, path, true);
+  addUnmountFn(hostComponent, () => {
+    bindEvent(undefined); // 通过 bind undefined 来销毁旧的监听。
+    unwatch();
+  });
 }
 
 /**
