@@ -20,12 +20,13 @@ export function Dynamic<T extends FC>(
   host[ROOT_NODES].push(el);
 
   function update(fc?: FC) {
-    replaceRenderFunctionComponent(el, fc, host[CONTEXT], props);
+    replaceRenderFunctionComponent(el, fc, host[CONTEXT], props, 'dynamic:null');
   }
   addUnmountFn(host, vmWatch(props, 'fc', update));
+
   function render(fc?: FC) {
     if (!fc) {
-      el[ROOT_NODES].push(createComment(''));
+      el[ROOT_NODES].push(createComment('dynamic:null'));
       return el[ROOT_NODES];
     } else {
       return renderFunctionComponent(el, fc, props);

@@ -111,7 +111,6 @@ export class ComponentHost {
   [ROOT_NODES]: (ComponentHost | Node)[] = [];
 
   constructor(context?: Context) {
-    // this[SLOTS] = {};
     this[CONTEXT] = context;
   }
 }
@@ -264,25 +263,6 @@ export function setComponentContext(
 
   context[key] = value;
 }
-// /**
-//  * 给编译器使用的创建 Component 并同时设置 SLOTS 的函数
-//  */
-// export function newComponentWithSlots(context: Context | undefined, slots?: Slots) {
-//   const c = new ComponentHost();
-//   c[CONTEXT] = context;
-//   Object.assign(c[SLOTS], slots);
-//   return c;
-// }
-
-// /**
-//  * 给编译器使用的创建 Component 并同时设置 DEFAULT_SLOT 的函数
-//  */
-// export function newComponentWithDefaultSlot(context: Context | undefined, defaultSlot?: FC) {
-//   const c = new ComponentHost();
-//   c[CONTEXT] = context;
-//   defaultSlot && (c[SLOTS][DEFAULT_SLOT] = defaultSlot);
-//   return c;
-// }
 
 export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T, attrs?: any) {
   // BEGIN_DROP_IN_PRODUCTION
@@ -298,40 +278,78 @@ export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T
   // END_DROP_IN_PRODUCTION
 
   setCurrentComponentHost(host);
-  const nodes = fc(attrs, host);
+  const nodes = fc(attrs, host) as Node[];
   setCurrentComponentHost(undefined);
-  return nodes as Node[];
+  if (!nodes?.length) {
+    throwErr('fc-render-empty');
+  }
+  return nodes;
 }
 
-export function replaceRenderFunctionComponent<T extends FC = FC>(
+export function beforeReplaceRender(
   host: ComponentHost,
-  fc?: T,
-  context?: Context,
-  props?: Omit<Parameters<T>[0], 'children'>,
+  context: Context | undefined,
+  placeholder: string,
 ) {
-  const placeholder = createComment('');
+  const $placeholder = createComment(placeholder);
   const lastEl = getLastDOM(host);
   const $parent = lastEl.parentNode as Node;
-  insertAfter($parent, placeholder, lastEl);
+  insertAfter($parent, $placeholder, lastEl);
   resetComponent(host, context);
-  let nodes: Node[] | undefined = undefined;
-  try {
-    fc && (nodes = renderFunctionComponent(host, fc, props));
-  } catch (ex) {
-    console.error(ex);
-  }
-  if (nodes?.length) {
-    insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], placeholder);
-    $parent.removeChild(placeholder);
-    handleRenderDone(host);
+  return {
+    $parent,
+    $placeholder,
+  };
+}
+
+export function afterReplaceRender(
+  host: ComponentHost,
+  nodes: Node[],
+  $parent: Node,
+  $placeholder: Node,
+) {
+  insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], $placeholder);
+  $parent.removeChild($placeholder);
+  handleRenderDone(host);
+}
+
+export function replaceRenderFunctionComponent(
+  host: ComponentHost,
+  fc: FC | undefined,
+  context: Context | undefined,
+  props: any,
+  placeholder = '',
+) {
+  const { $parent, $placeholder } = beforeReplaceRender(host, context, placeholder);
+  if (fc) {
+    const nodes = renderFunctionComponent(host, fc, props);
+    afterReplaceRender(host, nodes, $parent, $placeholder);
   } else {
-    host[ROOT_NODES].push(placeholder);
+    host[ROOT_NODES].push($placeholder);
   }
 }
-export function renderSlotFunction(host: ComponentHost, slotFunc?: FC, attrs?: object) {
-  if (!slotFunc) return [];
+export function renderSlotFunction(host: ComponentHost, slotFc: FC, attrs?: any) {
   setCurrentComponentHost(host);
-  const nodes = slotFunc(attrs, host);
+  const nodes = slotFc(attrs, host) as Node[];
+  if (!nodes?.length) {
+    throwErr('fc-render-empty');
+  }
   setCurrentComponentHost(undefined);
-  return nodes as Node[];
+  return nodes;
+}
+
+export function replaceRenderSlot(
+  host: ComponentHost,
+  slotFc: FC | undefined,
+  context: Context | undefined,
+  props: any,
+  placeholder = '',
+) {
+  const { $parent, $placeholder } = beforeReplaceRender(host, context, placeholder);
+  if (slotFc) {
+    const nodes = renderSlotFunction(host, slotFc, props);
+    afterReplaceRender(host, nodes, $parent, $placeholder);
+  } else {
+    host[ROOT_NODES].push($placeholder);
+  }
 }
