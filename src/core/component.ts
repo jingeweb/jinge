@@ -227,15 +227,12 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   target[REFS] && (target[REFS].length = 0);
   target[STATE] = COMPONENT_STATE_DESTROIED;
   target[CONTEXT] = undefined;
-  // target[SLOTS] = undefined as any;
 }
 
-/** 重置组件，销毁旧的，重置为全新，但保留 slots。目前此函数仅用于 hmr 时更新组件。 */
+/** 重置组件，销毁旧的，重置为全新。 */
 export function resetComponent(target: ComponentHost, context?: Context) {
-  // const slots = target[SLOTS];
   destroyComponent(target);
   target[STATE] = COMPONENT_STATE_INITIALIZE;
-  // target[SLOTS] = slots;
   target[CONTEXT] = context;
   target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }
@@ -308,7 +305,7 @@ export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T
 
 export function replaceRenderFunctionComponent<T extends FC = FC>(
   host: ComponentHost,
-  fc: T,
+  fc?: T,
   context?: Context,
   props?: Omit<Parameters<T>[0], 'children'>,
 ) {
@@ -317,9 +314,9 @@ export function replaceRenderFunctionComponent<T extends FC = FC>(
   const $parent = lastEl.parentNode as Node;
   insertAfter($parent, placeholder, lastEl);
   resetComponent(host, context);
-  let nodes: Node[] | undefined;
+  let nodes: Node[] | undefined = undefined;
   try {
-    nodes = renderFunctionComponent(host, fc, props);
+    fc && (nodes = renderFunctionComponent(host, fc, props));
   } catch (ex) {
     console.error(ex);
   }

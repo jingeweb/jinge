@@ -1,4 +1,5 @@
 import {
+  Dynamic,
   For,
   If,
   Lazy,
@@ -37,11 +38,19 @@ export function initHmr() {
     ComponentStore.set(__hmrId__, fc as HMR_FC);
   }
 
-  [If, For, Transition, TransitionGroup, Transition, TransitionGroupItem, Portal, Lazy].forEach(
-    (fc) => {
-      registerFunctionComponent(fc, `jinge::core::${fc.name}`);
-    },
-  );
+  [
+    If,
+    For,
+    Transition,
+    Dynamic,
+    TransitionGroup,
+    Transition,
+    TransitionGroupItem,
+    Portal,
+    Lazy,
+  ].forEach((fc) => {
+    registerFunctionComponent(fc, `jinge::core::${fc.name}`);
+  });
 
   function getLatestFunctionComponent(fc: FC) {
     const __hmrId__ = (fc as HMR_FC).__hmrId__;
