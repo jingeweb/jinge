@@ -17,6 +17,8 @@ export function If(
   host: ComponentHost,
 ) {
   const el = new ComponentHost(host[CONTEXT]);
+  host[ROOT_NODES].push(el);
+
   const getSlot = (e: boolean) =>
     (e ? props[DEFAULT_SLOT_NAME] : props['slot:else']) as FC | undefined;
 
