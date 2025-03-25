@@ -171,12 +171,12 @@ export function handleRenderDone(component: ComponentHost) {
 
 export function addMountFn(component: ComponentHost, fn: AnyFn) {
   let fns = component[ONMOUNT];
-  if (!fns) fns = component[ONMOUNT] = [];
+  fns ??= component[ONMOUNT] = [];
   fns.push(fn);
 }
 export function addUnmountFn(component: ComponentHost, fn: AnyFn) {
   let fns = component[UNMOUNT_FNS];
-  if (!fns) fns = component[UNMOUNT_FNS] = [];
+  fns ??= component[UNMOUNT_FNS] = [];
   fns.push(fn);
 }
 
@@ -195,9 +195,7 @@ export function destroyComponentContent(target: ComponentHost, removeDOM = true)
     if (isComponent(node)) {
       destroyComponent(node, removeDOM);
     } else if (removeDOM) {
-      if (!$parent) {
-        $parent = (node as Node).parentNode;
-      }
+      $parent ??= (node as Node).parentNode;
       $parent!.removeChild(node as Node);
     }
   }
@@ -328,7 +326,11 @@ export function replaceRenderFunctionComponent(
     host[ROOT_NODES].push($placeholder);
   }
 }
-export function renderSlotFunction(host: ComponentHost, slotFc: FC, attrs?: any) {
+export function renderSlotFunction(host: ComponentHost, slotFc: FC | undefined, attrs?: any) {
+  if (!slotFc) {
+    // 插槽如果为空，直接返回空数组，不插入任何 DOM。当前版本插槽是单向的，不会响应变更后重新渲染。
+    return [];
+  }
   setCurrentComponentHost(host);
   const nodes = slotFc(attrs, host) as Node[];
   if (!nodes?.length) {

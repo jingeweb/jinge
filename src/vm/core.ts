@@ -62,9 +62,7 @@ export function shouldBeVm(v: unknown): v is ViewModel {
 
 export function addParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
   let map = child[VM_PARENTS];
-  if (!map) {
-    map = child[VM_PARENTS] = new Map();
-  }
+  map ??= child[VM_PARENTS] = new Map();
   let set = map.get(parent);
   if (!set) {
     map.set(parent, (set = new Set()));

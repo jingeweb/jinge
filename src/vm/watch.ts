@@ -77,9 +77,7 @@ export function innerWatchPath(
   deep?: boolean,
 ) {
   let watchers = vm[VM_WATCHERS];
-  if (!watchers) {
-    watchers = vm[VM_WATCHERS] = new Set();
-  }
+  watchers ??= vm[VM_WATCHERS] = new Set();
   const watcher: Watcher = {
     [VM_RAW]: vm,
     [VM_WATCHER_PATH]: path,
