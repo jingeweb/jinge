@@ -4,7 +4,8 @@ const Errs = {
   'dup-render': 'component has already been rendered.',
   'setctx-after-render':
     "Can't setContext after component has been rendered. Try put setContext code into constructor.",
-  'bind-attr-not-pub-prop': 'attrName of __bindAttr() requires public property.',
+  'bind-attr-not-pub-prop':
+    'attrName of __bindAttr() requires public property.',
   'switch-miss-slot': 'Slot {0} or [DEFAULT_SLOT] of <Switch /> not found.',
   'hook-miss-component': 'Unexpect error, global component not found.',
   'transition-require-element':
@@ -21,7 +22,10 @@ export function throwErr(id: keyof typeof Errs, ...args: unknown[]): never {
   } else {
     let err = Errs[id];
     args.forEach((arg, i) => {
-      err = err.replace(new RegExp(`\\{${i}\\}`, 'g'), `${arg}`);
+      err = err.replace(
+        new RegExp(`\\{${i}\\}`, 'g'),
+        (arg as { toString: () => string }).toString(),
+      );
     });
     throw new Error(`${err} Visit https://[todo]/error/${id} for more detail.`);
   }

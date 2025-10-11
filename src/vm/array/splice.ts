@@ -1,11 +1,12 @@
-import { isUndefined } from '../../util';
 import { VM_RAW, type ViewModelArray, addParent, shouldBeVm } from '../core';
-import { arrayPush } from './push';
-import { wrapViewModelArr } from '.';
 import { moveArrayItemsVmParentIndex, removeArrayItemVmParent } from './helper';
-import { wrapViewModel } from '../proxy';
+
+import { arrayPush } from './push';
 import { getVmAndRaw } from '../object';
+import { isUndefined } from '../../util';
 import { notifyVmArrayChange } from '../watch';
+import { wrapViewModel } from '../proxy';
+import { wrapViewModelArr } from '.';
 
 export function arraySplice(
   targetViewModel: ViewModelArray,
@@ -32,12 +33,18 @@ export function arraySplice(
       const v = target[i];
       const vm = removeArrayItemVmParent(v, targetViewModel, i);
       delArr.push(vm ? vm[VM_RAW] : v);
-      vm && addParent(vm, delArrVm, i - idx);
+      if (vm) addParent(vm, delArrVm, i - idx);
     }
   }
   const delta = args.length - delCount;
   if (delta !== 0) {
-    moveArrayItemsVmParentIndex(target, targetViewModel, delta, idx + delCount, len - 1);
+    moveArrayItemsVmParentIndex(
+      target,
+      targetViewModel,
+      delta,
+      idx + delCount,
+      len - 1,
+    );
   }
 
   target.splice(idx, delCount);

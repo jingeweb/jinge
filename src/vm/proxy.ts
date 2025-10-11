@@ -1,19 +1,24 @@
 import { type AnyObj, isArray, isObject } from '../util';
-import { wrapViewModelArr } from './array';
 
-import type { ViewModel, ViewModelIgnore } from './core';
 import {
   GlobalViewModelWeakMap,
-  // END_DROP_IN_PRODUCTION
   VM_IGNORED,
   VM_RAW,
+  type ViewModel,
+  type ViewModelIgnore,
   addParent,
   isInnerObj,
   shouldBeVm,
 } from './core';
+
+import { wrapViewModelArr } from './array';
 import { wrapViewModelObj } from './object';
 
-export function wrapPropChildViewModel(parent: ViewModel, child: unknown, prop: string | number) {
+export function wrapPropChildViewModel(
+  parent: ViewModel,
+  child: unknown,
+  prop: string | number,
+) {
   if (!shouldBeVm(child)) {
     return;
   }

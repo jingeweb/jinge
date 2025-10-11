@@ -1,8 +1,8 @@
-import { pathsToModuleNameMapper } from 'ts-jest';
 // In the following statement, replace `./tsconfig` with the path to your `tsconfig` file
 // which contains the path mapping (ie the `compilerOptions.paths` option):
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { pathsToModuleNameMapper } from 'ts-jest';
 const require = createRequire(import.meta.dirname);
 const {
   compilerOptions: { baseUrl, paths },

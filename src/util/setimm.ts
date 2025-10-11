@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-isUndefined(window.setImmediate) &&
+if (isUndefined(window.setImmediate))
   (function setImmediatePolyfill() {
     let nextHandle = 1; // Spec says greater than zero
     const tasksByHandle = new Map<number, () => void>();
@@ -31,7 +31,9 @@ isUndefined(window.setImmediate) &&
     (window as Window).clearImmediate = clearImmediateFallback;
     if (!isUndefined(window.queueMicrotask)) {
       // 绝大部分现代浏览器都支持 queueMicrotask: https://caniuse.com/?search=queueMicrotask
-      (window as Window).setImmediate = function setImmediateFallback(callback: () => void) {
+      (window as Window).setImmediate = function setImmediateFallback(
+        callback: () => void,
+      ) {
         const handle = nextHandle++;
         tasksByHandle.set(handle, callback);
         window.queueMicrotask(() => {
@@ -52,12 +54,16 @@ isUndefined(window.setImmediate) &&
         return handle;
       };
       window.addEventListener('message', (ev) => {
-        if (ev.source !== window || !isString(ev.data) || !ev.data.startsWith(PREFIX)) {
+        if (
+          ev.source !== window ||
+          !isString(ev.data) ||
+          !ev.data.startsWith(PREFIX)
+        ) {
           return;
         }
         runIfPresent(parseInt(ev.data.slice(PREFIX.length)));
       });
     }
   })();
-export const setImmediate = (window as Window).setImmediate;
-export const clearImmediate = (window as Window).clearImmediate;
+export const setImmediate = window.setImmediate;
+export const clearImmediate = window.clearImmediate;

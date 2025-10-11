@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { FC } from '../jsx';
-import type { AnyFn } from '../util';
 import {
+  type AnyFn,
   createComment,
   createFragment,
   insertAfter,
@@ -10,8 +8,6 @@ import {
   isObject,
   throwErr,
 } from '../util';
-
-import type { ComponentState, Context, ContextState } from './common';
 import {
   COMPONENT_STATE_DESTROIED,
   COMPONENT_STATE_INITIALIZE,
@@ -23,18 +19,21 @@ import {
   CONTEXT_STATE_TOUCHED_FREEZED,
   CONTEXT_STATE_UNTOUCH,
   CONTEXT_STATE_UNTOUCH_FREEZED,
-  // DEFAULT_SLOT,
+  type ComponentState,
+  type Context,
+  type ContextState,
   NON_ROOT_COMPONENT_NODES,
   ONMOUNT,
   REFS,
   ROOT_NODES,
-  // SLOTS,
   STATE,
   UNMOUNT_FNS,
   __,
 } from './common';
+import { type Ref, type RefFn } from './ref';
+
+import { type FC } from '../jsx';
 import { setCurrentComponentHost } from './hook';
-import type { Ref, RefFn } from './ref';
 
 /**
  * 用于判定是否是 Component 的函数。比 instanceof 要快很多。https://jsperf.app/bufamo
@@ -160,8 +159,9 @@ export function handleRenderDone(component: ComponentHost) {
     }
   });
   // onMount 事件后，函数不会再被执行，可以清理函数。
-  component[ONMOUNT] && (component[ONMOUNT].length = 0);
-
+  if (component[ONMOUNT]) {
+    component[ONMOUNT].length = 0;
+  }
   component[STATE] = COMPONENT_STATE_RENDERED;
   component[CONTEXT_STATE] =
     component[CONTEXT_STATE] === CONTEXT_STATE_TOUCHED
@@ -183,7 +183,10 @@ export function addUnmountFn(component: ComponentHost, fn: AnyFn) {
 /**
  * 销毁组件的内容，但不销毁组件本身。
  */
-export function destroyComponentContent(target: ComponentHost, removeDOM = true) {
+export function destroyComponentContent(
+  target: ComponentHost,
+  removeDOM = true,
+) {
   for (const component of target[NON_ROOT_COMPONENT_NODES]) {
     // it's not necessary to remove dom when destroy non-root component,
     // because those dom nodes will be auto removed when their parent dom is removed.
@@ -212,7 +215,9 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
   target[STATE] = COMPONENT_STATE_WILLDESTROY;
 
   target[UNMOUNT_FNS]?.forEach((fn) => fn());
-  target[UNMOUNT_FNS] && (target[UNMOUNT_FNS].length = 0);
+  if (target[UNMOUNT_FNS]) {
+    target[UNMOUNT_FNS].length = 0;
+  }
 
   // destroy children(include child component and html nodes)
   destroyComponentContent(target, removeDOM);
@@ -221,7 +226,9 @@ export function destroyComponent(target: ComponentHost, removeDOM = true) {
     if (isObject<Ref<any>>(ref)) ref.value = undefined;
     else (ref as RefFn<any>)(undefined);
   });
-  target[REFS] && (target[REFS].length = 0);
+  if (target[REFS]) {
+    target[REFS].length = 0;
+  }
   target[STATE] = COMPONENT_STATE_DESTROIED;
   target[CONTEXT] = undefined;
 }
@@ -234,7 +241,10 @@ export function resetComponent(target: ComponentHost, context?: Context) {
   target[CONTEXT_STATE] = CONTEXT_STATE_UNTOUCH;
 }
 
-export function getComponentContext<T = unknown>(component: ComponentHost, key: string | symbol) {
+export function getComponentContext<T = unknown>(
+  component: ComponentHost,
+  key: string | symbol,
+) {
   return component[CONTEXT]?.[key] as T;
 }
 export function setComponentContext(
@@ -262,7 +272,11 @@ export function setComponentContext(
   context[key] = value;
 }
 
-export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T, attrs?: any) {
+export function renderFunctionComponent<T extends FC>(
+  host: ComponentHost,
+  fc: T,
+  attrs?: any,
+) {
   // BEGIN_DROP_IN_PRODUCTION
   // 注意必须从 window 上取 __JINGE_HMR__，不要直接 import from '../hmr'，因为要解偶代码依赖，防止 hmr 相关代码被打包到产物中。
 
@@ -306,7 +320,11 @@ export function afterReplaceRender(
   $parent: Node,
   $placeholder: Node,
 ) {
-  insertBefore($parent, nodes.length > 1 ? createFragment(nodes) : nodes[0], $placeholder);
+  insertBefore(
+    $parent,
+    nodes.length > 1 ? createFragment(nodes) : nodes[0],
+    $placeholder,
+  );
   $parent.removeChild($placeholder);
   handleRenderDone(host);
 }
@@ -318,7 +336,11 @@ export function replaceRenderFunctionComponent(
   props: any,
   placeholder = '',
 ) {
-  const { $parent, $placeholder } = beforeReplaceRender(host, context, placeholder);
+  const { $parent, $placeholder } = beforeReplaceRender(
+    host,
+    context,
+    placeholder,
+  );
   if (fc) {
     const nodes = renderFunctionComponent(host, fc, props);
     afterReplaceRender(host, nodes, $parent, $placeholder);
@@ -326,7 +348,11 @@ export function replaceRenderFunctionComponent(
     host[ROOT_NODES].push($placeholder);
   }
 }
-export function renderSlotFunction(host: ComponentHost, slotFc: FC | undefined, attrs?: any) {
+export function renderSlotFunction(
+  host: ComponentHost,
+  slotFc: FC | undefined,
+  attrs?: any,
+) {
   if (!slotFc) {
     // 插槽如果为空，直接返回空数组，不插入任何 DOM。当前版本插槽是单向的，不会响应变更后重新渲染。
     return [];
@@ -347,7 +373,11 @@ export function replaceRenderSlot(
   props: any,
   placeholder = '',
 ) {
-  const { $parent, $placeholder } = beforeReplaceRender(host, context, placeholder);
+  const { $parent, $placeholder } = beforeReplaceRender(
+    host,
+    context,
+    placeholder,
+  );
   if (slotFc) {
     const nodes = renderSlotFunction(host, slotFc, props);
     afterReplaceRender(host, nodes, $parent, $placeholder);

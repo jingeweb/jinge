@@ -1,5 +1,6 @@
-import type { AnyObj, PropertyPathItem } from '../../src';
 import {
+  type AnyObj,
+  type PropertyPathItem,
   VM_PARENTS,
   VM_RAW,
   VM_WATCHERS,
@@ -42,7 +43,11 @@ describe('vm:object', () => {
     expect(vc === (10 as unknown as object)).toBe(true);
   });
 
-  function expectParent(v: ViewModel, parent: ViewModel, prop: PropertyPathItem) {
+  function expectParent(
+    v: ViewModel,
+    parent: ViewModel,
+    prop: PropertyPathItem,
+  ) {
     expect(!!v[VM_PARENTS]?.get(parent)?.has(prop)).toBe(true);
   }
   it('object to view-model', () => {
@@ -178,7 +183,9 @@ describe('watch:object', () => {
       va,
       (v) => {
         expect(v === va).toBe(true);
-        expect(JSON.stringify(v[VM_RAW])).toBe(JSON.stringify({ a: 20, b: 20 }));
+        expect(JSON.stringify(v[VM_RAW])).toBe(
+          JSON.stringify({ a: 20, b: 20 }),
+        );
       },
       () => {
         va.b = 20;

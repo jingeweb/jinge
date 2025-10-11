@@ -1,22 +1,27 @@
-import { ComponentHost } from '../../core';
 import {
   CONTEXT,
-  // DEFAULT_SLOT,
+  ComponentHost,
   ROOT_NODES,
-  // SLOTS,
   destroyComponent,
   getFirstDOM,
   getLastDOM,
   handleRenderDone,
   isComponent,
-  // newComponentWithDefaultSlot,
   renderSlotFunction,
 } from '../../core';
+import {
+  type EachVm,
+  type ForEach,
+  KEY_DATA,
+  type Key,
+  type KeyFn,
+  type KeyMap,
+} from './common';
 import { createFragment, insertBefore } from '../../util';
-import { vm } from '../../vm';
+
+import { type FC } from '../../jsx';
 import { renderItems } from './render';
-import { type EachVm, type ForEach, KEY_DATA, type Key, type KeyFn, type KeyMap } from './common';
-import type { FC } from '../../jsx';
+import { vm } from '../../vm';
 
 function loopMoveRootDOMToFrag(el: ComponentHost, frag: DocumentFragment) {
   el[ROOT_NODES].forEach((c) => {
@@ -55,7 +60,11 @@ export function updateWithKey<T>(
       el[KEY_DATA] = each;
       newRoots.push(el);
       const doms = renderSlotFunction(el, itemRenderFn, each);
-      insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], pe);
+      insertBefore(
+        $parent,
+        doms.length > 1 ? createFragment(doms) : doms[0],
+        pe,
+      );
       handleRenderDone(el);
       // console.log('append', pe, newKey);
     } else {
@@ -128,7 +137,11 @@ export function updateWithoutKey<T>(
       undefined,
       comp[CONTEXT],
     );
-    insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], nextSib);
+    insertBefore(
+      $parent,
+      doms.length > 1 ? createFragment(doms) : doms[0],
+      nextSib,
+    );
 
     for (let i = 0; i < appendLen; i++) {
       handleRenderDone(roots[updateLen + i] as ForEach<T>);

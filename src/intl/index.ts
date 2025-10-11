@@ -67,8 +67,7 @@ export interface TOptions {
 
 export function t(
   defaultText: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params?: Record<string, string | number | boolean | JNode | ((content: any) => JNode)>,
+  params?: Record<string, string | number | JNode | ((content: any) => JNode)>,
   options?: TOptions,
 ): string {
   // 编译器会把第一个参数替换为 key，转换时会结合第三个 options 参数计算 key。然后把第三个参数替换为 defaultText。
@@ -101,11 +100,14 @@ export function renderIntlText(
   addUnmountFn(
     host,
     intlWatchLocale(() => {
-      el.textContent = (dictStore[currentLocale]?.[key] as unknown as string) ?? defaultText ?? key;
+      el.textContent =
+        (dictStore[currentLocale]?.[key] as unknown as string) ??
+        defaultText ??
+        key;
     }, true),
   );
 
-  pushRoot && host[ROOT_NODES].push(el);
+  if (pushRoot) host[ROOT_NODES].push(el);
   return el;
 }
 
@@ -125,11 +127,11 @@ export function renderIntlTextWithParams(
     const tx = fn ? fn(params) : (defaultText ?? key);
     el.textContent = tx;
   };
-  isViewModel(params) && addUnmountFn(host, vmWatch(params, st));
+  if (isViewModel(params)) addUnmountFn(host, vmWatch(params, st));
   addUnmountFn(host, intlWatchLocale(st));
 
   st();
-  pushRoot && host[ROOT_NODES].push(el);
+  if (pushRoot) host[ROOT_NODES].push(el);
   return el;
 }
 
@@ -166,7 +168,8 @@ export function renderIntlRichText(
     }),
   );
 
-  pushRoot ? host[ROOT_NODES].push(el) : host[NON_ROOT_COMPONENT_NODES].push(el);
+  if (pushRoot) host[ROOT_NODES].push(el);
+  else host[NON_ROOT_COMPONENT_NODES].push(el);
 
   if (!Fc) {
     const tn = createTextNode(defaultText ?? key);

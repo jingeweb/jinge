@@ -2,7 +2,7 @@ export function typeOf(v: unknown): string {
   return typeof v;
 }
 
-export function isSymbol<T extends Symbol = Symbol>(v: unknown): v is T {
+export function isSymbol<T extends symbol = symbol>(v: unknown): v is T {
   return typeof v === 'symbol';
 }
 
@@ -15,7 +15,11 @@ export function isString(v: unknown): v is string {
 }
 
 export function isNumber(v: unknown): v is number {
-  return typeOf(v) === 'number' && !Number.isNaN(v as number) && Number.isFinite(v as number);
+  return (
+    typeOf(v) === 'number' &&
+    !Number.isNaN(v as number) &&
+    Number.isFinite(v as number)
+  );
 }
 
 export function isUndefined(v: unknown): v is undefined {

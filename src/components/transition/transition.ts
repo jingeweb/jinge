@@ -1,13 +1,20 @@
-import { ComponentHost, DEFAULT_SLOT_NAME } from '../../core';
 import {
   CONTEXT,
+  ComponentHost,
+  DEFAULT_SLOT_NAME,
   ROOT_NODES,
   addUnmountFn,
   destroyComponent,
   handleRenderDone,
   renderSlotFunction,
 } from '../../core';
-import type { FC, JNode, WithChildren, WithEvents } from '../../jsx';
+import {
+  type FC,
+  type JNode,
+  type WithChildren,
+  type WithEvents,
+} from '../../jsx';
+import { TRANSITION_END, classnames2tokens } from './helper';
 import {
   addEvent,
   createComment,
@@ -16,8 +23,8 @@ import {
   removeEvent,
   throwErr,
 } from '../../util';
+
 import { vmWatch } from '../../vm';
-import { TRANSITION_END, classnames2tokens } from './helper';
 
 export interface TransitionClassnames {
   /** enter 的目标 html class。默认为空。该属性为单向属性。*/
@@ -74,7 +81,8 @@ export function Transition(
     const ia = realEnter ? 0 : 2;
     clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
     clist.add(...classTokens[ia], ...classTokens[ia + 1]);
-    realEnter ? props['on:beforeEnter']?.(rootEl) : props['on:beforeLeave']?.(rootEl);
+    if (realEnter) props['on:beforeEnter']?.(rootEl);
+    else props['on:beforeLeave']?.(rootEl);
   };
 
   const destroyMount = () => {

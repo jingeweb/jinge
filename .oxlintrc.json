@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "unicorn",
+    "typescript",
+    "oxc",
+    "import",
+    "promise",
+    "react",
+    "regex"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-implied-eval": "off",
+    "sort-imports": "error",
+    "no-duplicate-imports": "error",
+    "consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports",
+        "fixStyle": "inline-type-imports",
+        "disallowTypeAnnotations": true
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "**/types/",
+    "**/node_modules/",
+    "**/dist/",
+    "**/temp/",
+    "**/coverage/",
+    ".husky/",
+    ".idea/",
+    ".vscode/"
+  ]
+}

@@ -4,11 +4,13 @@
  * 也就保留了 dom 不被移除，直到 leave 动画结束后，才又将状态变为正常后调用 `destroyComponent` 函数执行实际的销毁。
  */
 
-import { ComponentHost, DEFAULT_SLOT_NAME } from '../../core';
+import { type AnyFn, addEvent, throwErr } from '../../util';
 import {
   COMPONENT_STATE_DESTROIED,
   COMPONENT_STATE_RENDERED,
   CONTEXT,
+  ComponentHost,
+  DEFAULT_SLOT_NAME,
   ROOT_NODES,
   STATE,
   addUnmountFn,
@@ -16,13 +18,12 @@ import {
   renderFunctionComponent,
   renderSlotFunction,
 } from '../../core';
-import type { FC, JNode, WithChildren } from '../../jsx';
-import { type AnyFn, addEvent, throwErr } from '../../util';
+import { type EachVm, type KEY_DATA, type KEY_INDEX } from '../for/common';
+import { type FC, type JNode, type WithChildren } from '../../jsx';
 import { For, type ForSlot } from '../for';
-import type { EachVm, KEY_DATA, KEY_INDEX } from '../for/common';
-
 import { TRANSITION_END, classnames2tokens } from './helper';
-import type { TransitionClassnames } from './transition';
+
+import { type TransitionClassnames } from './transition';
 
 const CLASSNAMES = Symbol('classnames');
 const APPEAR = Symbol('appear');
@@ -41,7 +42,7 @@ export function TransitionGroupItem(
     const clist = el.classList;
     const ir = enter ? 2 : 0;
     const ia = enter ? 0 : 2;
-    !init && clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
+    if (!init) clist.remove(...classTokens[ir], ...classTokens[ir + 1]);
     clist.add(...classTokens[ia], ...classTokens[ia + 1]);
   };
 
@@ -104,7 +105,9 @@ export interface TransitionGroupProps<T> {
 }
 
 export function TransitionGroup<T>(
-  props: TransitionGroupProps<T> & TransitionClassnames & WithChildren<ForSlot<T>>,
+  props: TransitionGroupProps<T> &
+    TransitionClassnames &
+    WithChildren<ForSlot<T>>,
   hostRoot: ComponentHost,
 ) {
   const onDestroyNotifies = new Set<AnyFn>();

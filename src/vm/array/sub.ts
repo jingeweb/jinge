@@ -1,9 +1,12 @@
-import { wrapViewModelArr } from '.';
 import { type AnyFn, isObject } from '../../util';
 import { GlobalViewModelWeakMap, VM_RAW, type ViewModelArray } from '../core';
 
+import { wrapViewModelArr } from '.';
+
 export function arrayConcat(target: unknown[], another: unknown[]) {
-  return wrapViewModelArr(target.concat((another as ViewModelArray)[VM_RAW] ?? another));
+  return wrapViewModelArr(
+    target.concat((another as ViewModelArray)[VM_RAW] ?? another),
+  );
 }
 
 export function arraySlice(target: unknown[], start?: number, end?: number) {

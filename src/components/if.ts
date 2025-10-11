@@ -1,7 +1,15 @@
+import {
+  CONTEXT,
+  ComponentHost,
+  DEFAULT_SLOT_NAME,
+  ROOT_NODES,
+  addUnmountFn,
+  renderSlotFunction,
+  replaceRenderSlot,
+} from '../core';
+import { type FC, type JNode, type WithSlots } from '../jsx';
+
 import { createComment } from '../util';
-import { ComponentHost, DEFAULT_SLOT_NAME, replaceRenderSlot } from '../core';
-import { CONTEXT, ROOT_NODES, addUnmountFn, renderSlotFunction } from '../core';
-import type { FC, JNode, WithSlots } from '../jsx';
 import { vmWatch } from '../vm';
 
 export interface IfAttrs {

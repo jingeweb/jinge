@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AnyObj, ViewModel, ViewModelArray } from '../../src';
 import {
+  type AnyObj,
   VM_PARENTS,
   VM_RAW,
+  type ViewModel,
+  type ViewModelArray,
   destroyViewModelCore,
   isViewModel,
   vm,
@@ -123,6 +124,7 @@ describe('vm:array', () => {
     expect(arr2[VM_RAW]).toStrictEqual([{ b: 'b' }, { a: 10 }]);
   });
   it('array fill', () => {
+    // oxlint-disable-next-line no-new-array
     const a = vm(new Array(10)) as ViewModelArray<any>;
 
     a.fill(4, 1);
@@ -178,7 +180,12 @@ describe('vm:array', () => {
     expect((arr as any).splice().length).toBe(0);
   });
   it('array slice filter', () => {
-    const arr = vm([1, { a: 'a' }, { b: 'b' }, vm({ c: 'c' })]) as unknown as ViewModelArray;
+    const arr = vm([
+      1,
+      { a: 'a' },
+      { b: 'b' },
+      vm({ c: 'c' }),
+    ]) as unknown as ViewModelArray;
     const sa = arr.slice(1, 3) as ViewModelArray;
     expect(sa.length).toBe(2);
     expect(sa[0] === arr[1]).toBe(true);

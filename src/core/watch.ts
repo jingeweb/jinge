@@ -1,3 +1,12 @@
+import { type ComponentHost, addUnmountFn } from './component';
+import {
+  type PropertyPathItem,
+  VM_RAW,
+  VM_WATCHER_VALUE,
+  type ViewModel,
+  getValueByPath,
+  innerWatchPath,
+} from '../vm';
 import {
   arrayEqual,
   clearImmediate,
@@ -6,9 +15,6 @@ import {
   registerEvent,
   setImmediate,
 } from '../util';
-import type { PropertyPathItem, ViewModel } from '../vm';
-import { VM_RAW, VM_WATCHER_VALUE, getValueByPath, innerWatchPath } from '../vm';
-import { type ComponentHost, addUnmountFn } from './component';
 
 ////// 这个文件里的函数都是用于给编译器转译 tsx 时使用的 Component 的 watch 函数。 /////
 ////// 业务中请直接使用 `watch` 函数进行 Component 或 ViewModel 的监听。        /////
@@ -16,7 +22,9 @@ import { type ComponentHost, addUnmountFn } from './component';
 export function watchForRender(
   watcher: Pick<
     ViewWatcher,
-    typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
+    | typeof VM_WATCHER_DESTROY
+    | typeof VM_WATCHER_PARENT
+    | typeof VM_WATCHER_VALUE
   >,
   renderFn: (v: unknown) => void,
   hostComponent: ComponentHost,
@@ -50,7 +58,9 @@ function wrapEventBind($ele: any, eventName: any, capture: boolean) {
 export function watchForDOMEventBind(
   watcher: Pick<
     ViewWatcher,
-    typeof VM_WATCHER_DESTROY | typeof VM_WATCHER_PARENT | typeof VM_WATCHER_VALUE
+    | typeof VM_WATCHER_DESTROY
+    | typeof VM_WATCHER_PARENT
+    | typeof VM_WATCHER_VALUE
   >,
   $ele: Element | Window | Document,
   eventName: string,
@@ -123,7 +133,10 @@ export function watchPathForRender2(
   if (isUndefined(target[VM_RAW])) {
     return;
   }
-  addUnmountFn(hostComponent, innerWatchPath(target, val, innerRenderFn, path, true));
+  addUnmountFn(
+    hostComponent,
+    innerWatchPath(target, val, innerRenderFn, path, true),
+  );
 }
 
 /**
@@ -182,7 +195,10 @@ export function PathWatcher(
     },
   } as ViewWatcher;
 }
-export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => void) {
+export function ExprWatcher(
+  path: ViewWatcher[],
+  fn: (...args: unknown[]) => void,
+) {
   let val = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
   let parent: ParentWatcher | undefined = undefined;
   let imm = 0;
@@ -223,7 +239,9 @@ export function DymPathWatcher(
   path: (PropertyPathItem | ViewWatcher)[],
   deep?: boolean,
 ) {
-  let innerPath = path.map((p) => (typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p));
+  let innerPath = path.map((p) =>
+    typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p,
+  );
   let val = getValueByPath(target, innerPath);
   let parent: ParentWatcher | undefined = undefined;
   const __innerW = () => {

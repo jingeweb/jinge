@@ -1,19 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AnyObj } from '../util';
-import { isObject, isSymbol } from '../util';
+import { type AnyObj, isObject, isSymbol } from '../util';
 
-import type { PropertyPathItem, ViewModel } from './core';
 import {
   GlobalViewModelWeakMap,
+  type PropertyPathItem,
   VM_PARENTS,
   VM_RAW,
   VM_WATCHERS,
+  type ViewModel,
   addParent,
   removeParent,
   shouldBeVm,
 } from './core';
-import { wrapPropChildViewModel, wrapViewModel } from './proxy';
 import { type Watcher, notifyVmPropChange } from './watch';
+import { wrapPropChildViewModel, wrapViewModel } from './proxy';
 
 export function getVmAndRaw(value: unknown): [ViewModel | undefined, unknown] {
   if (!isObject(value)) return [undefined, value];
@@ -41,7 +40,7 @@ export function propSetHandler(
         // 前后都没变，直接退出。
         return;
       }
-      oldValueVm && removeParent(oldValueVm, targetViewModel, prop);
+      if (oldValueVm) removeParent(oldValueVm, targetViewModel, prop);
       target[prop] = rawValue;
       addParent(valueVm, targetViewModel, prop);
       notifyVmPropChange(targetViewModel, prop);
@@ -56,7 +55,7 @@ export function propSetHandler(
   }
 
   const [oldValueVm, oldRawValue] = getVmAndRaw(target[prop]);
-  oldValueVm && removeParent(oldValueVm, targetViewModel, prop);
+  if (oldValueVm) removeParent(oldValueVm, targetViewModel, prop);
   if (oldRawValue === value) {
     // 前后数据都没有发生变化,直接退出更新逻辑
     return; // important!

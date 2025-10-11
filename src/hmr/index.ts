@@ -1,4 +1,10 @@
 import {
+  type ComponentHost,
+  type Context,
+  addUnmountFn,
+  replaceRenderFunctionComponent,
+} from '../core';
+import {
   Dynamic,
   For,
   If,
@@ -8,12 +14,7 @@ import {
   TransitionGroup,
   TransitionGroupItem,
 } from '../components';
-import {
-  type ComponentHost,
-  type Context,
-  addUnmountFn,
-  replaceRenderFunctionComponent,
-} from '../core';
+
 import type { FC } from '../jsx';
 
 export type HMR_FC = FC & { __hmrId__: string };
@@ -92,7 +93,9 @@ export function initHmr() {
 
   function replaceComponentInstance(fc: FC) {
     if (!(fc as HMR_FC).__hmrId__) return; // 忽略没有 __hmrId__ 的组件
-    const comps = [...(InstanceStore.get((fc as HMR_FC).__hmrId__)?.values() ?? [])];
+    const comps = [
+      ...(InstanceStore.get((fc as HMR_FC).__hmrId__)?.values() ?? []),
+    ];
     // !! 注意此处必须将 store.get 的 Set 转换成 array 后再遍历。如果直接遍历 Set.forEach，
     // 新渲染的 component 又会注册到 Set 中，导致无限循环。
     comps.forEach((item) => {

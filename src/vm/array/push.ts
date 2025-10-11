@@ -1,7 +1,8 @@
 import { type ViewModelArray, addParent, shouldBeVm } from '../core';
+
 import { getVmAndRaw } from '../object';
-import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
+import { wrapViewModel } from '../proxy';
 
 export function arrayPush(
   targetViewModel: ViewModelArray,

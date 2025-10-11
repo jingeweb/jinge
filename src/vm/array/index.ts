@@ -7,13 +7,6 @@ import {
   VM_WATCHERS,
   type ViewModel,
 } from '../core';
-import type { Watcher } from '../watch';
-import { arrayPush } from './push';
-import { propSetHandler } from '../object';
-import { vmRaw, wrapPropChildViewModel } from '../proxy';
-import { arrayPop } from './pop';
-import { arrayUnshift } from './unshift';
-import { arrayShift } from './shift';
 import {
   arrayConcat,
   arrayEvery,
@@ -27,10 +20,18 @@ import {
   arraySlice,
   arraySome,
 } from './sub';
-import { arrayFill } from './fill';
 import { arrayReverse, arraySort } from './order';
-import { arraySplice } from './splice';
+import { vmRaw, wrapPropChildViewModel } from '../proxy';
+
+import { type Watcher } from '../watch';
+import { arrayFill } from './fill';
+import { arrayPop } from './pop';
+import { arrayPush } from './push';
 import { arraySetLength } from './length';
+import { arrayShift } from './shift';
+import { arraySplice } from './splice';
+import { arrayUnshift } from './unshift';
+import { propSetHandler } from '../object';
 
 /**
  * 即便是 arr[0] 这样的取值，在 Proxy 的 set 里面，传递的 property 也是 string 类型，即 "0"，转换为 int 后取值。
@@ -154,7 +155,10 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
 }
 
 export function wrapViewModelArr(target: unknown[]) {
-  const viewModel = new Proxy(target, ArrayProxyHandler()) as unknown as ViewModel;
+  const viewModel = new Proxy(
+    target,
+    ArrayProxyHandler(),
+  ) as unknown as ViewModel;
   GlobalViewModelWeakMap.set(target, viewModel);
   for (let i = 0; i < target.length; i++) {
     wrapPropChildViewModel(viewModel, target[i], i);

@@ -1,8 +1,9 @@
 import { type ViewModelArray, addParent, shouldBeVm } from '../core';
+
 import { getVmAndRaw } from '../object';
-import { wrapViewModel } from '../proxy';
-import { notifyVmArrayChange } from '../watch';
 import { moveArrayItemsVmParentIndex } from './helper';
+import { notifyVmArrayChange } from '../watch';
+import { wrapViewModel } from '../proxy';
 
 export function arrayUnshift(
   targetViewModel: ViewModelArray,
@@ -13,7 +14,8 @@ export function arrayUnshift(
   const len = target.length;
   if (argsLen === 0) return len;
 
-  len > 0 && moveArrayItemsVmParentIndex(target, targetViewModel, argsLen, 0, len - 1);
+  if (len > 0)
+    moveArrayItemsVmParentIndex(target, targetViewModel, argsLen, 0, len - 1);
   for (let i = argsLen - 1; i >= 0; i--) {
     const arg = args[i];
 

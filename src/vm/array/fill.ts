@@ -1,9 +1,10 @@
 import { type AnyObj, isUndefined } from '../../util';
 import { type ViewModelArray, addParent, shouldBeVm } from '../core';
-import { wrapViewModel } from '../proxy';
-import { removeArrayItemVmParent } from './helper';
+
 import { getVmAndRaw } from '../object';
 import { notifyVmArrayChange } from '../watch';
+import { removeArrayItemVmParent } from './helper';
+import { wrapViewModel } from '../proxy';
 
 export function arrayFill(
   targetViewModel: ViewModelArray,

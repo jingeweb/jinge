@@ -6,7 +6,7 @@ function toText(v: unknown) {
   else if (v === undefined) return 'undefined';
   else if (v instanceof Error) return v.message;
   else if (isObject(v)) return JSON.stringify(v);
-  else return `${v}`;
+  else return (v as { toString: () => string }).toString();
 }
 
 export function setTextContent($ele: Node, v: unknown) {
@@ -29,7 +29,10 @@ export function createComment(cmt?: string) {
   return document.createComment(cmt ?? '');
 }
 
-export function appendChildren($parent: Node, children: (Node | string)[]): void {
+export function appendChildren(
+  $parent: Node,
+  children: (Node | string)[],
+): void {
   $parent.appendChild(
     children.length > 1
       ? createFragment(children)
@@ -39,7 +42,11 @@ export function appendChildren($parent: Node, children: (Node | string)[]): void
   );
 }
 
-export function replaceChildren($parent: Node, children: Node[], oldNode: Node): void {
+export function replaceChildren(
+  $parent: Node,
+  children: Node[],
+  oldNode: Node,
+): void {
   $parent.replaceChild(createFragment(children), oldNode);
 }
 
@@ -54,11 +61,19 @@ export function removeAttribute($ele: Element, attrName: string): void {
   return $ele.removeAttribute(attrName);
 }
 
-export function setAttribute($ele: Element, attrName: string, attrValue: unknown) {
+export function setAttribute(
+  $ele: Element,
+  attrName: string,
+  attrValue: unknown,
+) {
   if (!attrName) return;
   if (isObject(attrName)) {
     for (const attrN in attrName as unknown as Record<string, unknown>) {
-      setAttribute($ele, attrN, (attrName as unknown as Record<string, unknown>)[attrN]);
+      setAttribute(
+        $ele,
+        attrN,
+        (attrName as unknown as Record<string, unknown>)[attrN],
+      );
     }
     return;
   }
@@ -69,7 +84,11 @@ export function setAttribute($ele: Element, attrName: string, attrValue: unknown
   }
 }
 
-function _createEl($el: Element, attrs?: Record<string, unknown>, children?: (Node | string)[]) {
+function _createEl(
+  $el: Element,
+  attrs?: Record<string, unknown>,
+  children?: (Node | string)[],
+) {
   if (attrs) {
     for (const an in attrs) {
       if (an && !isUndefined(attrs[an])) {
@@ -77,7 +96,7 @@ function _createEl($el: Element, attrs?: Record<string, unknown>, children?: (No
       }
     }
   }
-  children?.length && appendChildren($el, children);
+  if (children?.length) appendChildren($el, children);
   return $el;
 }
 
@@ -96,17 +115,32 @@ export function createSVGEleA(
   attrs: Record<string, unknown> | undefined,
   ...children: Node[]
 ) {
-  return _createEl(document.createElementNS('http://www.w3.org/2000/svg', tag), attrs, children);
+  return _createEl(
+    document.createElementNS('http://www.w3.org/2000/svg', tag),
+    attrs,
+    children,
+  );
 }
 export function createSVGEle(tag: string, ...children: Node[]) {
   return createSVGEleA(tag, undefined, ...children);
 }
 
-export function insertAfter($parent: Node, newNode: Node, referenceNode?: Node | null) {
-  $parent.insertBefore(newNode, referenceNode ? referenceNode.nextSibling : null);
+export function insertAfter(
+  $parent: Node,
+  newNode: Node,
+  referenceNode?: Node | null,
+) {
+  $parent.insertBefore(
+    newNode,
+    referenceNode ? referenceNode.nextSibling : null,
+  );
 }
 
-export function insertBefore($parent: Node, newNode: Node, referenceNode?: Node | null) {
+export function insertBefore(
+  $parent: Node,
+  newNode: Node,
+  referenceNode?: Node | null,
+) {
   $parent.insertBefore(newNode, referenceNode ?? null);
 }
 
@@ -136,13 +170,15 @@ export function addEvent(
   handler: any,
   capture?: boolean | AddEventListenerOptions,
 ) {
-  isUndefined(capture) &&
-    (capture = eventName.startsWith('touch')
+  if (isUndefined(capture)) {
+    capture = eventName.startsWith('touch')
       ? {
           capture: false,
           passive: true,
         }
-      : false);
+      : false;
+  }
+
   $element.addEventListener(eventName, handler, capture);
 }
 

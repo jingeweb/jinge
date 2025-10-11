@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AnyObj } from '../util';
-import { isArray, isObject } from '../util';
+import { type AnyObj, isArray, isObject } from '../util';
+
 import { type Watcher, destoryWatcher } from './watch';
 
 export const VM_PARENTS = Symbol('VM_PARENTS');
@@ -32,7 +31,8 @@ export type ViewModel<T extends object = AnyObj> = {
 export type ViewModelIgnore<T extends object = AnyObj> = T & {
   [VM_IGNORED]: boolean;
 };
-export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> & ViewModel<T>[];
+export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> &
+  ViewModel<T>[];
 
 export type PropertyPathItem = string | number | symbol;
 
@@ -52,7 +52,9 @@ export function isInnerObj<T extends object>(v: unknown): v is T {
   );
 }
 
-export function isViewModel<T extends object = AnyObj>(v: unknown): v is ViewModel<T> {
+export function isViewModel<T extends object = AnyObj>(
+  v: unknown,
+): v is ViewModel<T> {
   return isObject(v) && v[VM_RAW] !== undefined;
 }
 
@@ -60,7 +62,11 @@ export function shouldBeVm(v: unknown): v is ViewModel {
   return isObject(v) && !isInnerObj(v) && !v[VM_IGNORED];
 }
 
-export function addParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
+export function addParent(
+  child: ViewModel,
+  parent: ViewModel,
+  property: PropertyPathItem,
+) {
   let map = child[VM_PARENTS];
   map ??= child[VM_PARENTS] = new Map();
   let set = map.get(parent);
@@ -70,7 +76,11 @@ export function addParent(child: ViewModel, parent: ViewModel, property: Propert
   set.add(property);
 }
 
-export function removeParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
+export function removeParent(
+  child: ViewModel,
+  parent: ViewModel,
+  property: PropertyPathItem,
+) {
   const ps = child[VM_PARENTS];
   if (!ps) return;
   const p = ps.get(parent);
@@ -93,12 +103,12 @@ export function destroyViewModelCore(vm: ViewModel) {
 
   if (isArray(vm)) {
     vm.forEach((v, i) => {
-      isViewModel(v) && removeParent(v, vm, i);
+      if (isViewModel(v)) removeParent(v, vm, i);
     });
   } else {
     for (const prop in vm) {
       const v = vm[prop];
-      isViewModel(v) && removeParent(v, vm, prop);
+      if (isViewModel(v)) removeParent(v, vm, prop);
     }
   }
 }
