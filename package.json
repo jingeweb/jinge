@@ -2,6 +2,32 @@
   "name": "jinge",
   "version": "4.1.7",
   "description": "A small and smart web interface framework",
+  "keywords": [
+    "framework",
+    "mvvm",
+    "web"
+  ],
+  "homepage": "https://github.com/jingeweb/jinge#readme",
+  "bugs": {
+    "url": "https://github.com/jingeweb/jinge/issues"
+  },
+  "license": "AGPL-3.0",
+  "author": "Yuhang Ge <abeyuhang@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jingeweb/jinge.git"
+  },
+  "files": [
+    "dist",
+    "src",
+    "types",
+    "package.json",
+    "tsconfig.json",
+    "README_zh-cn.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
   "main": "./dist/jinge.prod.js",
   "module": "./dist/jinge.prod.js",
   "types": "./types/index.d.ts",
@@ -19,63 +45,36 @@
       "default": "./src/index.ts"
     }
   },
-  "type": "module",
   "scripts": {
+    "build": "rm -rf dist types && tsgo -project tsconfig.types.json && pnpm build-dev && pnpm build-prod",
     "build-dev": "NODE_ENV=development vite build --mode development -c scripts/vite.config.ts",
     "build-prod": "vite build -c scripts/vite.config.ts",
-    "build": "rm -rf dist types && tsc -project tsconfig.types.json && pnpm build-dev && pnpm build-prod",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
-    "test-cov-file": "pnpm test -- --coverage --collectCoverageFrom=src/vm/object.ts",
-    "lint-fix": "oxlint --type-aware --fix && biome format --fix",
-    "lint": "tsc --noEmit && oxlint --type-aware && biome format",
+    "lint": "tsgo --noEmit && oxlint --type-aware && oxfmt --check",
+    "lint-fix": "oxlint --type-aware --fix && oxfmt",
     "lint-staged": "lint-staged",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test-cov-file": "pnpm test -- --coverage --collectCoverageFrom=src/vm/object.ts"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.6.2",
+    "@typescript/native-preview": "7.0.0-dev.20260507.1",
+    "husky": "^9.1.7",
+    "jest": "^30.4.0",
+    "jest-environment-jsdom": "^30.4.0",
+    "jest-html-reporter": "^4.4.0",
+    "lint-staged": "^17.0.2",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "oxlint-tsgolint": "^0.22.1",
+    "ts-jest": "^29.4.9",
+    "vite": "^8.0.11"
   },
   "lint-staged": {
     "*.{js,ts}": [
       "oxlint --type-aware --fix",
-      "biome format --fix"
+      "oxfmt"
     ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jingeweb/jinge.git"
-  },
-  "license": "AGPL-3.0",
-  "homepage": "https://github.com/jingeweb/jinge#readme",
-  "bugs": {
-    "url": "https://github.com/jingeweb/jinge/issues"
-  },
-  "keywords": [
-    "mvvm",
-    "web",
-    "framework"
-  ],
-  "files": [
-    "dist",
-    "src",
-    "types",
-    "package.json",
-    "tsconfig.json",
-    "README_zh-cn.md",
-    "README.md",
-    "LICENSE"
-  ],
-  "author": "Yuhang Ge <abeyuhang@gmail.com>",
-  "devDependencies": {
-    "@biomejs/biome": "^2.2.5",
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.7.1",
-    "husky": "^9.1.7",
-    "jest": "^30.2.0",
-    "jest-environment-jsdom": "^30.2.0",
-    "jest-html-reporter": "^4.3.0",
-    "lint-staged": "^16.2.4",
-    "oxlint": "^1.22.0",
-    "oxlint-tsgolint": "^0.2.0",
-    "prettier": "^3.6.2",
-    "ts-jest": "^29.4.5",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.9"
   }
 }

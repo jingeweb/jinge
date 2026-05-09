@@ -6,17 +6,10 @@ import {
   addUnmountFn,
 } from '../../core';
 import { type FC, type JNode, type WithChildren } from '../../jsx';
-import {
-  type ForEach,
-  KEY_DATA,
-  KEY_INDEX,
-  type KeyFn,
-  type KeyMap,
-} from './common';
 import { innerWatchPath, isViewModel } from '../../vm';
-
-import { handleUpdate } from './update';
+import { type ForEach, KEY_DATA, KEY_INDEX, type KeyFn, type KeyMap } from './common';
 import { renderItems } from './render';
+import { handleUpdate } from './update';
 
 export { KEY_DATA, KEY_INDEX };
 
@@ -25,9 +18,7 @@ export interface ForProps<T> {
   key?: keyof T | typeof KEY_INDEX | typeof KEY_DATA;
 }
 
-function getKeyFn<T>(
-  k?: keyof T | typeof KEY_INDEX | typeof KEY_DATA,
-): KeyFn<T> | undefined {
+function getKeyFn<T>(k?: keyof T | typeof KEY_INDEX | typeof KEY_DATA): KeyFn<T> | undefined {
   if (k === undefined) {
     return undefined;
   } else if (k === KEY_DATA) {
@@ -48,10 +39,7 @@ export type ForSlot<T> = (each: {
   isLast: boolean;
 }) => JNode;
 
-export function For<T>(
-  props: ForProps<T> & WithChildren<ForSlot<T>>,
-  host: ComponentHost,
-) {
+export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: ComponentHost) {
   const keyFn = getKeyFn(props.key);
   let keys: KeyMap<T> | undefined = keyFn ? new Map() : undefined;
   let renderLen = 0;

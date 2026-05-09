@@ -1,7 +1,3 @@
 {
-  "recommendations": [
-    "biomejs.biome",
-    "oxc.oxc-vscode",
-    "amatiasq.sort-imports"
-  ]
+  "recommendations": ["oxc.oxc-vscode", "typescriptteam.native-preview"]
 }

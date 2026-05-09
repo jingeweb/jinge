@@ -180,12 +180,7 @@ describe('vm:array', () => {
     expect((arr as any).splice().length).toBe(0);
   });
   it('array slice filter', () => {
-    const arr = vm([
-      1,
-      { a: 'a' },
-      { b: 'b' },
-      vm({ c: 'c' }),
-    ]) as unknown as ViewModelArray;
+    const arr = vm([1, { a: 'a' }, { b: 'b' }, vm({ c: 'c' })]) as unknown as ViewModelArray;
     const sa = arr.slice(1, 3) as ViewModelArray;
     expect(sa.length).toBe(2);
     expect(sa[0] === arr[1]).toBe(true);

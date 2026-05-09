@@ -1,18 +1,7 @@
-import {
-  GlobalViewModelWeakMap,
-  VM_RAW,
-  type ViewModel,
-  addParent,
-  removeParent,
-} from '../core';
-
 import { isObject } from '../../util';
+import { GlobalViewModelWeakMap, VM_RAW, type ViewModel, addParent, removeParent } from '../core';
 
-export function removeArrayItemVmParent(
-  val: unknown,
-  targetViewModel: ViewModel,
-  index: number,
-) {
+export function removeArrayItemVmParent(val: unknown, targetViewModel: ViewModel, index: number) {
   const valVm = isObject(val)
     ? val[VM_RAW]
       ? (val as ViewModel)
@@ -57,11 +46,7 @@ export function moveArrayItemsVmParentIndex(
 
   const step = deltaIndex > 0 ? -1 : 1;
   while (true) {
-    const vm = removeArrayItemVmParent(
-      target[idxStart],
-      targetViewModel,
-      idxStart,
-    );
+    const vm = removeArrayItemVmParent(target[idxStart], targetViewModel, idxStart);
     if (vm) addParent(vm, targetViewModel, idxStart + deltaIndex);
     if (idxStart == idxEnd) break;
     idxStart += step;

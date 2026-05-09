@@ -1,14 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { ComponentHost, Ref, RefFn } from '../core';
 import type { KEY_DATA, KEY_INDEX } from '../components/for/common';
-
+import type { ComponentHost, Ref, RefFn } from '../core';
 import type { AnyFn } from '../util';
 
-export type FC = (
-  props: any,
-  host: ComponentHost,
-) => JNode | (ComponentHost | Node)[];
+export type FC = (props: any, host: ComponentHost) => JNode | (ComponentHost | Node)[];
 export type JNode =
   | JSX.Element
   | FC
@@ -402,14 +398,7 @@ interface AriaAttributes {
    * Indicates what functions can be performed when a dragged object is released on the drop target.
    * @deprecated in ARIA 1.1
    */
-  'aria-dropeffect'?:
-    | 'none'
-    | 'copy'
-    | 'execute'
-    | 'link'
-    | 'move'
-    | 'popup'
-    | undefined;
+  'aria-dropeffect'?: 'none' | 'copy' | 'execute' | 'link' | 'move' | 'popup' | undefined;
   /**
    * Identifies the element that provides an error message for the object.
    * @see aria-invalid @see aria-describedby.
@@ -447,13 +436,7 @@ interface AriaAttributes {
    * Indicates the entered value does not conform to the format expected by the application.
    * @see aria-errormessage.
    */
-  'aria-invalid'?:
-    | boolean
-    | 'false'
-    | 'true'
-    | 'grammar'
-    | 'spelling'
-    | undefined;
+  'aria-invalid'?: boolean | 'false' | 'true' | 'grammar' | 'spelling' | undefined;
   /** Indicates keyboard shortcuts that an author has implemented to activate or give focus to an element. */
   'aria-keyshortcuts'?: string | undefined;
   /**
@@ -841,12 +824,7 @@ type HTMLAttributeReferrerPolicy =
   | 'strict-origin-when-cross-origin'
   | 'unsafe-url';
 
-type HTMLAttributeAnchorTarget =
-  | '_self'
-  | '_blank'
-  | '_parent'
-  | '_top'
-  | (string & {});
+type HTMLAttributeAnchorTarget = '_self' | '_blank' | '_parent' | '_top' | (string & {});
 
 export interface AnchorHTMLAttributes<T> extends HTMLAttributes<T> {
   download?: any;
@@ -1095,15 +1073,7 @@ export interface InputHTMLAttributes<T> extends HTMLAttributes<T> {
   capture?: boolean | 'user' | 'environment' | undefined; // https://www.w3.org/TR/html-media-capture/#the-capture-attribute
   checked?: boolean | undefined;
   disabled?: boolean | undefined;
-  enterKeyHint?:
-    | 'enter'
-    | 'done'
-    | 'go'
-    | 'next'
-    | 'previous'
-    | 'search'
-    | 'send'
-    | undefined;
+  enterKeyHint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send' | undefined;
   form?: string | undefined;
   formAction?: string | undefined;
   formEncType?: string | undefined;
@@ -1449,12 +1419,7 @@ interface SVGAttributes<T> extends AriaAttributes, DOMAttributes<T> {
   clipPathUnits?: number | string | undefined;
   clipRule?: number | string | undefined;
   colorInterpolation?: number | string | undefined;
-  colorInterpolationFilters?:
-    | 'auto'
-    | 'sRGB'
-    | 'linearRGB'
-    | 'inherit'
-    | undefined;
+  colorInterpolationFilters?: 'auto' | 'sRGB' | 'linearRGB' | 'inherit' | undefined;
   colorProfile?: number | string | undefined;
   colorRendering?: number | string | undefined;
   contentScriptType?: number | string | undefined;
@@ -1686,78 +1651,42 @@ interface SVGTextElementAttributes<T extends Node> extends SVGProps<T> {}
 
 interface AllHTMLElements {
   // HTML
-  a: DetailedHTMLProps<
-    AnchorHTMLAttributes<HTMLAnchorElement>,
-    HTMLAnchorElement
-  >;
+  a: DetailedHTMLProps<AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>;
   abbr: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   address: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   area: DetailedHTMLProps<AreaHTMLAttributes<HTMLAreaElement>, HTMLAreaElement>;
   article: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   aside: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  audio: DetailedHTMLProps<
-    AudioHTMLAttributes<HTMLAudioElement>,
-    HTMLAudioElement
-  >;
+  audio: DetailedHTMLProps<AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement>;
   b: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   base: DetailedHTMLProps<BaseHTMLAttributes<HTMLBaseElement>, HTMLBaseElement>;
   bdi: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   bdo: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   big: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  blockquote: DetailedHTMLProps<
-    BlockquoteHTMLAttributes<HTMLQuoteElement>,
-    HTMLQuoteElement
-  >;
+  blockquote: DetailedHTMLProps<BlockquoteHTMLAttributes<HTMLQuoteElement>, HTMLQuoteElement>;
   body: DetailedHTMLProps<HTMLAttributes<HTMLBodyElement>, HTMLBodyElement>;
   br: DetailedHTMLProps<HTMLAttributes<HTMLBRElement>, HTMLBRElement>;
-  button: DetailedHTMLProps<
-    ButtonHTMLAttributes<HTMLButtonElement>,
-    HTMLButtonElement
-  >;
-  canvas: DetailedHTMLProps<
-    CanvasHTMLAttributes<HTMLCanvasElement>,
-    HTMLCanvasElement
-  >;
+  button: DetailedHTMLProps<ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
+  canvas: DetailedHTMLProps<CanvasHTMLAttributes<HTMLCanvasElement>, HTMLCanvasElement>;
   caption: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   center: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   cite: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   code: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  col: DetailedHTMLProps<
-    ColHTMLAttributes<HTMLTableColElement>,
-    HTMLTableColElement
-  >;
-  colgroup: DetailedHTMLProps<
-    ColgroupHTMLAttributes<HTMLTableColElement>,
-    HTMLTableColElement
-  >;
+  col: DetailedHTMLProps<ColHTMLAttributes<HTMLTableColElement>, HTMLTableColElement>;
+  colgroup: DetailedHTMLProps<ColgroupHTMLAttributes<HTMLTableColElement>, HTMLTableColElement>;
   data: DetailedHTMLProps<DataHTMLAttributes<HTMLDataElement>, HTMLDataElement>;
-  datalist: DetailedHTMLProps<
-    HTMLAttributes<HTMLDataListElement>,
-    HTMLDataListElement
-  >;
+  datalist: DetailedHTMLProps<HTMLAttributes<HTMLDataListElement>, HTMLDataListElement>;
   dd: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   del: DetailedHTMLProps<DelHTMLAttributes<HTMLModElement>, HTMLModElement>;
-  details: DetailedHTMLProps<
-    DetailsHTMLAttributes<HTMLDetailsElement>,
-    HTMLDetailsElement
-  >;
+  details: DetailedHTMLProps<DetailsHTMLAttributes<HTMLDetailsElement>, HTMLDetailsElement>;
   dfn: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  dialog: DetailedHTMLProps<
-    DialogHTMLAttributes<HTMLDialogElement>,
-    HTMLDialogElement
-  >;
+  dialog: DetailedHTMLProps<DialogHTMLAttributes<HTMLDialogElement>, HTMLDialogElement>;
   div: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
   dl: DetailedHTMLProps<HTMLAttributes<HTMLDListElement>, HTMLDListElement>;
   dt: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   em: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  embed: DetailedHTMLProps<
-    EmbedHTMLAttributes<HTMLEmbedElement>,
-    HTMLEmbedElement
-  >;
-  fieldset: DetailedHTMLProps<
-    FieldsetHTMLAttributes<HTMLFieldSetElement>,
-    HTMLFieldSetElement
-  >;
+  embed: DetailedHTMLProps<EmbedHTMLAttributes<HTMLEmbedElement>, HTMLEmbedElement>;
+  fieldset: DetailedHTMLProps<FieldsetHTMLAttributes<HTMLFieldSetElement>, HTMLFieldSetElement>;
   figcaption: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   figure: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   footer: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
@@ -1774,26 +1703,14 @@ interface AllHTMLElements {
   hr: DetailedHTMLProps<HTMLAttributes<HTMLHRElement>, HTMLHRElement>;
   html: DetailedHTMLProps<HtmlHTMLAttributes<HTMLHtmlElement>, HTMLHtmlElement>;
   i: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  iframe: DetailedHTMLProps<
-    IframeHTMLAttributes<HTMLIFrameElement>,
-    HTMLIFrameElement
-  >;
+  iframe: DetailedHTMLProps<IframeHTMLAttributes<HTMLIFrameElement>, HTMLIFrameElement>;
   img: DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
-  input: DetailedHTMLProps<
-    InputHTMLAttributes<HTMLInputElement>,
-    HTMLInputElement
-  >;
+  input: DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>;
   ins: DetailedHTMLProps<InsHTMLAttributes<HTMLModElement>, HTMLModElement>;
   kbd: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   keygen: DetailedHTMLProps<KeygenHTMLAttributes<HTMLElement>, HTMLElement>;
-  label: DetailedHTMLProps<
-    LabelHTMLAttributes<HTMLLabelElement>,
-    HTMLLabelElement
-  >;
-  legend: DetailedHTMLProps<
-    HTMLAttributes<HTMLLegendElement>,
-    HTMLLegendElement
-  >;
+  label: DetailedHTMLProps<LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>;
+  legend: DetailedHTMLProps<HTMLAttributes<HTMLLegendElement>, HTMLLegendElement>;
   li: DetailedHTMLProps<LiHTMLAttributes<HTMLLIElement>, HTMLLIElement>;
   link: DetailedHTMLProps<LinkHTMLAttributes<HTMLLinkElement>, HTMLLinkElement>;
   main: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
@@ -1802,44 +1719,20 @@ interface AllHTMLElements {
   menu: DetailedHTMLProps<MenuHTMLAttributes<HTMLElement>, HTMLElement>;
   menuitem: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   meta: DetailedHTMLProps<MetaHTMLAttributes<HTMLMetaElement>, HTMLMetaElement>;
-  meter: DetailedHTMLProps<
-    MeterHTMLAttributes<HTMLMeterElement>,
-    HTMLMeterElement
-  >;
+  meter: DetailedHTMLProps<MeterHTMLAttributes<HTMLMeterElement>, HTMLMeterElement>;
   nav: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   noindex: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   noscript: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  object: DetailedHTMLProps<
-    ObjectHTMLAttributes<HTMLObjectElement>,
-    HTMLObjectElement
-  >;
+  object: DetailedHTMLProps<ObjectHTMLAttributes<HTMLObjectElement>, HTMLObjectElement>;
   ol: DetailedHTMLProps<OlHTMLAttributes<HTMLOListElement>, HTMLOListElement>;
-  optgroup: DetailedHTMLProps<
-    OptgroupHTMLAttributes<HTMLOptGroupElement>,
-    HTMLOptGroupElement
-  >;
-  option: DetailedHTMLProps<
-    OptionHTMLAttributes<HTMLOptionElement>,
-    HTMLOptionElement
-  >;
-  output: DetailedHTMLProps<
-    OutputHTMLAttributes<HTMLOutputElement>,
-    HTMLOutputElement
-  >;
-  p: DetailedHTMLProps<
-    HTMLAttributes<HTMLParagraphElement>,
-    HTMLParagraphElement
-  >;
-  param: DetailedHTMLProps<
-    ParamHTMLAttributes<HTMLParamElement>,
-    HTMLParamElement
-  >;
+  optgroup: DetailedHTMLProps<OptgroupHTMLAttributes<HTMLOptGroupElement>, HTMLOptGroupElement>;
+  option: DetailedHTMLProps<OptionHTMLAttributes<HTMLOptionElement>, HTMLOptionElement>;
+  output: DetailedHTMLProps<OutputHTMLAttributes<HTMLOutputElement>, HTMLOutputElement>;
+  p: DetailedHTMLProps<HTMLAttributes<HTMLParagraphElement>, HTMLParagraphElement>;
+  param: DetailedHTMLProps<ParamHTMLAttributes<HTMLParamElement>, HTMLParamElement>;
   picture: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   pre: DetailedHTMLProps<HTMLAttributes<HTMLPreElement>, HTMLPreElement>;
-  progress: DetailedHTMLProps<
-    ProgressHTMLAttributes<HTMLProgressElement>,
-    HTMLProgressElement
-  >;
+  progress: DetailedHTMLProps<ProgressHTMLAttributes<HTMLProgressElement>, HTMLProgressElement>;
   q: DetailedHTMLProps<QuoteHTMLAttributes<HTMLQuoteElement>, HTMLQuoteElement>;
   rp: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   rt: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
@@ -1848,78 +1741,33 @@ interface AllHTMLElements {
   samp: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   search: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   slot: DetailedHTMLProps<SlotHTMLAttributes<HTMLSlotElement>, HTMLSlotElement>;
-  script: DetailedHTMLProps<
-    ScriptHTMLAttributes<HTMLScriptElement>,
-    HTMLScriptElement
-  >;
+  script: DetailedHTMLProps<ScriptHTMLAttributes<HTMLScriptElement>, HTMLScriptElement>;
   section: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  select: DetailedHTMLProps<
-    SelectHTMLAttributes<HTMLSelectElement>,
-    HTMLSelectElement
-  >;
+  select: DetailedHTMLProps<SelectHTMLAttributes<HTMLSelectElement>, HTMLSelectElement>;
   small: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  source: DetailedHTMLProps<
-    SourceHTMLAttributes<HTMLSourceElement>,
-    HTMLSourceElement
-  >;
+  source: DetailedHTMLProps<SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
   span: DetailedHTMLProps<HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>;
   strong: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  style: DetailedHTMLProps<
-    StyleHTMLAttributes<HTMLStyleElement>,
-    HTMLStyleElement
-  >;
+  style: DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>;
   sub: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   summary: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   sup: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  table: DetailedHTMLProps<
-    TableHTMLAttributes<HTMLTableElement>,
-    HTMLTableElement
-  >;
-  template: DetailedHTMLProps<
-    HTMLAttributes<HTMLTemplateElement>,
-    HTMLTemplateElement
-  >;
-  tbody: DetailedHTMLProps<
-    HTMLAttributes<HTMLTableSectionElement>,
-    HTMLTableSectionElement
-  >;
-  td: DetailedHTMLProps<
-    TdHTMLAttributes<HTMLTableDataCellElement>,
-    HTMLTableDataCellElement
-  >;
-  textarea: DetailedHTMLProps<
-    TextareaHTMLAttributes<HTMLTextAreaElement>,
-    HTMLTextAreaElement
-  >;
-  tfoot: DetailedHTMLProps<
-    HTMLAttributes<HTMLTableSectionElement>,
-    HTMLTableSectionElement
-  >;
-  th: DetailedHTMLProps<
-    ThHTMLAttributes<HTMLTableHeaderCellElement>,
-    HTMLTableHeaderCellElement
-  >;
-  thead: DetailedHTMLProps<
-    HTMLAttributes<HTMLTableSectionElement>,
-    HTMLTableSectionElement
-  >;
+  table: DetailedHTMLProps<TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>;
+  template: DetailedHTMLProps<HTMLAttributes<HTMLTemplateElement>, HTMLTemplateElement>;
+  tbody: DetailedHTMLProps<HTMLAttributes<HTMLTableSectionElement>, HTMLTableSectionElement>;
+  td: DetailedHTMLProps<TdHTMLAttributes<HTMLTableDataCellElement>, HTMLTableDataCellElement>;
+  textarea: DetailedHTMLProps<TextareaHTMLAttributes<HTMLTextAreaElement>, HTMLTextAreaElement>;
+  tfoot: DetailedHTMLProps<HTMLAttributes<HTMLTableSectionElement>, HTMLTableSectionElement>;
+  th: DetailedHTMLProps<ThHTMLAttributes<HTMLTableHeaderCellElement>, HTMLTableHeaderCellElement>;
+  thead: DetailedHTMLProps<HTMLAttributes<HTMLTableSectionElement>, HTMLTableSectionElement>;
   time: DetailedHTMLProps<TimeHTMLAttributes<HTMLTimeElement>, HTMLTimeElement>;
   title: DetailedHTMLProps<HTMLAttributes<HTMLTitleElement>, HTMLTitleElement>;
-  tr: DetailedHTMLProps<
-    HTMLAttributes<HTMLTableRowElement>,
-    HTMLTableRowElement
-  >;
-  track: DetailedHTMLProps<
-    TrackHTMLAttributes<HTMLTrackElement>,
-    HTMLTrackElement
-  >;
+  tr: DetailedHTMLProps<HTMLAttributes<HTMLTableRowElement>, HTMLTableRowElement>;
+  track: DetailedHTMLProps<TrackHTMLAttributes<HTMLTrackElement>, HTMLTrackElement>;
   u: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
   ul: DetailedHTMLProps<HTMLAttributes<HTMLUListElement>, HTMLUListElement>;
   var: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
-  video: DetailedHTMLProps<
-    VideoHTMLAttributes<HTMLVideoElement>,
-    HTMLVideoElement
-  >;
+  video: DetailedHTMLProps<VideoHTMLAttributes<HTMLVideoElement>, HTMLVideoElement>;
   wbr: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
 
   // SVG

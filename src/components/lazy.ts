@@ -1,11 +1,4 @@
 import {
-  type AnyFn,
-  createComment,
-  createFragment,
-  insertBefore,
-  isFunction,
-} from '../util';
-import {
   CONTEXT,
   ComponentHost,
   ROOT_NODES,
@@ -19,6 +12,7 @@ import {
   renderSlotFunction,
 } from '../core';
 import { type FC, type JNode, type WithSlots } from '../jsx';
+import { type AnyFn, createComment, createFragment, insertBefore, isFunction } from '../util';
 
 export function Lazy<T extends FC>(
   props: (Parameters<T>[0] extends object ? Parameters<T>[0] : {}) & {
@@ -44,11 +38,7 @@ export function Lazy<T extends FC>(
     const nodes = fc
       ? renderFunctionComponent(el, fc, props)
       : renderSlotFunction(el, errorSlot, { error });
-    insertBefore(
-      $pa,
-      nodes.length > 0 ? createFragment(nodes) : nodes[0],
-      firstNode,
-    );
+    insertBefore($pa, nodes.length > 0 ? createFragment(nodes) : nodes[0], firstNode);
     if (isComp) {
       destroyComponent(oldEl);
     } else {
@@ -64,8 +54,7 @@ export function Lazy<T extends FC>(
       (fc) => {
         if (outdated) return; // 组件如果已经被销毁（过期），则忽略加载器的返回逻辑。暂未设计成允许 abort 的模式。
 
-        if (!isFunction(fc))
-          update(undefined, new Error('Lazy 组件的 loader 函数未返回函数组件'));
+        if (!isFunction(fc)) update(undefined, new Error('Lazy 组件的 loader 函数未返回函数组件'));
         else update(fc);
       },
       (err) => {

@@ -4,8 +4,7 @@ const Errs = {
   'dup-render': 'component has already been rendered.',
   'setctx-after-render':
     "Can't setContext after component has been rendered. Try put setContext code into constructor.",
-  'bind-attr-not-pub-prop':
-    'attrName of __bindAttr() requires public property.',
+  'bind-attr-not-pub-prop': 'attrName of __bindAttr() requires public property.',
   'switch-miss-slot': 'Slot {0} or [DEFAULT_SLOT] of <Switch /> not found.',
   'hook-miss-component': 'Unexpect error, global component not found.',
   'transition-require-element':

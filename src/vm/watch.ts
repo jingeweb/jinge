@@ -1,11 +1,4 @@
-import {
-  type AnyObj,
-  clearImmediate,
-  isFunction,
-  isObject,
-  noopFn,
-  setImmediate,
-} from '../util';
+import { type AnyObj, clearImmediate, isFunction, isObject, noopFn, setImmediate } from '../util';
 import {
   type PropertyPathItem,
   VM_PARENTS,
@@ -77,9 +70,7 @@ export function watchPath(
   if (immediate) {
     handler(val, undefined);
   }
-  return isViewModel(vm)
-    ? innerWatchPath(vm, val, handler, propertyPath, deep)
-    : noopFn;
+  return isViewModel(vm) ? innerWatchPath(vm, val, handler, propertyPath, deep) : noopFn;
 }
 export function innerWatchPath(
   vm: ViewModel,
@@ -131,28 +122,11 @@ export function vmWatch<T extends object>(
   handler: WatchHandler<any>,
   options?: WatchOptions,
 ): UnwatchFn;
-export function vmWatch(
-  vm: any,
-  propOrPathOrHanlder: any,
-  optionsOrHandler?: any,
-  options?: any,
-) {
+export function vmWatch(vm: any, propOrPathOrHanlder: any, optionsOrHandler?: any, options?: any) {
   if (isFunction(propOrPathOrHanlder)) {
-    return watchPath(
-      vm,
-      propOrPathOrHanlder,
-      undefined,
-      true,
-      optionsOrHandler?.immediate,
-    );
+    return watchPath(vm, propOrPathOrHanlder, undefined, true, optionsOrHandler?.immediate);
   } else if (Array.isArray(propOrPathOrHanlder)) {
-    return watchPath(
-      vm,
-      optionsOrHandler,
-      propOrPathOrHanlder,
-      options?.deep,
-      options?.immediate,
-    );
+    return watchPath(vm, optionsOrHandler, propOrPathOrHanlder, options?.deep, options?.immediate);
   } else {
     return watchPath(
       vm,
@@ -189,9 +163,7 @@ function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
     // 不论是否是深度 watch，如果发生变化的 changedPath 是监听的 watchPath 的前缀，则监听的 watchPath 都可能发生变化，需要检测和触发 listener
     let match =
       clen === 0 ||
-      (clen <= watchPath.length &&
-        changedPath &&
-        !changedPath.some((v, i) => v !== watchPath[i]));
+      (clen <= watchPath.length && changedPath && !changedPath.some((v, i) => v !== watchPath[i]));
     if (!match && watcher[VM_WATCHER_IS_DEEP]) {
       // 如果是深度 watch，且监听 watchPath 是发生变化的 changedPath 的前缀，说明发生变化的是深度监听对象的子元素，需要触发 listener
       if (

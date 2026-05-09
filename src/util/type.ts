@@ -15,11 +15,7 @@ export function isString(v: unknown): v is string {
 }
 
 export function isNumber(v: unknown): v is number {
-  return (
-    typeOf(v) === 'number' &&
-    !Number.isNaN(v as number) &&
-    Number.isFinite(v as number)
-  );
+  return typeOf(v) === 'number' && !Number.isNaN(v as number) && Number.isFinite(v as number);
 }
 
 export function isUndefined(v: unknown): v is undefined {

@@ -31,9 +31,7 @@ if (isUndefined(window.setImmediate))
     (window as Window).clearImmediate = clearImmediateFallback;
     if (!isUndefined(window.queueMicrotask)) {
       // 绝大部分现代浏览器都支持 queueMicrotask: https://caniuse.com/?search=queueMicrotask
-      (window as Window).setImmediate = function setImmediateFallback(
-        callback: () => void,
-      ) {
+      (window as Window).setImmediate = function setImmediateFallback(callback: () => void) {
         const handle = nextHandle++;
         tasksByHandle.set(handle, callback);
         window.queueMicrotask(() => {
@@ -54,11 +52,7 @@ if (isUndefined(window.setImmediate))
         return handle;
       };
       window.addEventListener('message', (ev) => {
-        if (
-          ev.source !== window ||
-          !isString(ev.data) ||
-          !ev.data.startsWith(PREFIX)
-        ) {
+        if (ev.source !== window || !isString(ev.data) || !ev.data.startsWith(PREFIX)) {
           return;
         }
         runIfPresent(parseInt(ev.data.slice(PREFIX.length)));

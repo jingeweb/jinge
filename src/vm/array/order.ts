@@ -6,14 +6,10 @@ import {
   type ViewModelArray,
   addParent,
 } from '../core';
-
 import { notifyVmArrayChange } from '../watch';
 import { removeArrayItemVmParent } from './helper';
 
-export function arrayReverse(
-  targetViewModel: ViewModelArray,
-  target: unknown[],
-) {
+export function arrayReverse(targetViewModel: ViewModelArray, target: unknown[]) {
   const len = target.length;
   if (len <= 1) return targetViewModel;
   const it0 = target[0];
@@ -34,11 +30,7 @@ export function arrayReverse(
   return targetViewModel;
 }
 
-export function arraySort(
-  targetViewModel: ViewModelArray,
-  target: unknown[],
-  fn?: AnyFn,
-) {
+export function arraySort(targetViewModel: ViewModelArray, target: unknown[], fn?: AnyFn) {
   if (target.length <= 1) return targetViewModel;
   target.forEach((v, i) => {
     removeArrayItemVmParent(v, targetViewModel, i);

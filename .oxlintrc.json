@@ -1,20 +1,12 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "unicorn",
-    "typescript",
-    "oxc",
-    "import",
-    "promise",
-    "react",
-    "regex"
-  ],
+  "plugins": ["unicorn", "typescript", "oxc", "import", "promise", "react"],
   "categories": {
     "correctness": "error"
   },
   "rules": {
     "no-implied-eval": "off",
-    "sort-imports": "error",
+    "sort-imports": "off",
     "no-duplicate-imports": "error",
     "consistent-type-imports": [
       "error",

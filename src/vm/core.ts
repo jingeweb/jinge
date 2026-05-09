@@ -1,5 +1,4 @@
 import { type AnyObj, isArray, isObject } from '../util';
-
 import { type Watcher, destoryWatcher } from './watch';
 
 export const VM_PARENTS = Symbol('VM_PARENTS');
@@ -31,8 +30,7 @@ export type ViewModel<T extends object = AnyObj> = {
 export type ViewModelIgnore<T extends object = AnyObj> = T & {
   [VM_IGNORED]: boolean;
 };
-export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> &
-  ViewModel<T>[];
+export type ViewModelArray<T extends object = AnyObj> = ViewModel<T[]> & ViewModel<T>[];
 
 export type PropertyPathItem = string | number | symbol;
 
@@ -52,9 +50,7 @@ export function isInnerObj<T extends object>(v: unknown): v is T {
   );
 }
 
-export function isViewModel<T extends object = AnyObj>(
-  v: unknown,
-): v is ViewModel<T> {
+export function isViewModel<T extends object = AnyObj>(v: unknown): v is ViewModel<T> {
   return isObject(v) && v[VM_RAW] !== undefined;
 }
 
@@ -62,11 +58,7 @@ export function shouldBeVm(v: unknown): v is ViewModel {
   return isObject(v) && !isInnerObj(v) && !v[VM_IGNORED];
 }
 
-export function addParent(
-  child: ViewModel,
-  parent: ViewModel,
-  property: PropertyPathItem,
-) {
+export function addParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
   let map = child[VM_PARENTS];
   map ??= child[VM_PARENTS] = new Map();
   let set = map.get(parent);
@@ -76,11 +68,7 @@ export function addParent(
   set.add(property);
 }
 
-export function removeParent(
-  child: ViewModel,
-  parent: ViewModel,
-  property: PropertyPathItem,
-) {
+export function removeParent(child: ViewModel, parent: ViewModel, property: PropertyPathItem) {
   const ps = child[VM_PARENTS];
   if (!ps) return;
   const p = ps.get(parent);

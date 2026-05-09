@@ -1,3 +1,5 @@
+import type { FC } from '../jsx';
+
 import {
   CONTEXT,
   ComponentHost,
@@ -6,8 +8,6 @@ import {
   renderFunctionComponent,
   replaceRenderFunctionComponent,
 } from '../core';
-
-import type { FC } from '../jsx';
 import { createComment } from '../util';
 import { vmWatch } from '../vm';
 
@@ -21,13 +21,7 @@ export function Dynamic<T extends FC>(
   host[ROOT_NODES].push(el);
 
   function update(fc?: FC) {
-    replaceRenderFunctionComponent(
-      el,
-      fc,
-      host[CONTEXT],
-      props,
-      'dynamic:null',
-    );
+    replaceRenderFunctionComponent(el, fc, host[CONTEXT], props, 'dynamic:null');
   }
   addUnmountFn(host, vmWatch(props, 'fc', update));
 

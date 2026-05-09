@@ -8,7 +8,6 @@ import {
   replaceRenderSlot,
 } from '../core';
 import { type FC, type JNode, type WithSlots } from '../jsx';
-
 import { createComment } from '../util';
 import { vmWatch } from '../vm';
 

@@ -1,5 +1,5 @@
 import { type AnyObj, isArray, isObject } from '../util';
-
+import { wrapViewModelArr } from './array';
 import {
   GlobalViewModelWeakMap,
   VM_IGNORED,
@@ -10,15 +10,9 @@ import {
   isInnerObj,
   shouldBeVm,
 } from './core';
-
-import { wrapViewModelArr } from './array';
 import { wrapViewModelObj } from './object';
 
-export function wrapPropChildViewModel(
-  parent: ViewModel,
-  child: unknown,
-  prop: string | number,
-) {
+export function wrapPropChildViewModel(parent: ViewModel, child: unknown, prop: string | number) {
   if (!shouldBeVm(child)) {
     return;
   }

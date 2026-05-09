@@ -1,4 +1,5 @@
 import type { ViewModelArray } from '../core';
+
 import { notifyVmArrayChange } from '../watch';
 import { removeArrayItemVmParent } from './helper';
 

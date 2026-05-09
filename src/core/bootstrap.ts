@@ -1,16 +1,11 @@
-import {
-  ComponentHost,
-  handleRenderDone,
-  renderFunctionComponent,
-} from './component';
-import { appendChildren, replaceChildren } from '../util';
-
-import type { Context } from './common';
 import type { FC } from '../jsx';
+import type { Context } from './common';
 import type { RefValue } from './ref';
 
-export type BootstrapReturn<T extends FC> = ComponentHost &
-  RefValue<Parameters<T>[0]['ref']>;
+import { appendChildren, replaceChildren } from '../util';
+import { ComponentHost, handleRenderDone, renderFunctionComponent } from './component';
+
+export type BootstrapReturn<T extends FC> = ComponentHost & RefValue<Parameters<T>[0]['ref']>;
 
 export function bootstrap<T extends FC>(
   fc: T,

@@ -1,3 +1,5 @@
+import type { FC, JNode } from '../jsx';
+
 import {
   CONTEXT,
   ComponentHost,
@@ -9,7 +11,6 @@ import {
   replaceRenderFunctionComponent,
   resetComponent,
 } from '../core';
-import type { FC, JNode } from '../jsx';
 import { createTextNode, insertBefore } from '../util';
 import { isViewModel, vmWatch } from '../vm';
 
@@ -100,10 +101,7 @@ export function renderIntlText(
   addUnmountFn(
     host,
     intlWatchLocale(() => {
-      el.textContent =
-        (dictStore[currentLocale]?.[key] as unknown as string) ??
-        defaultText ??
-        key;
+      el.textContent = (dictStore[currentLocale]?.[key] as unknown as string) ?? defaultText ?? key;
     }, true),
   );
 

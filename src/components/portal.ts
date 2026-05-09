@@ -1,3 +1,5 @@
+import type { FC, JNode, WithChildren } from '../jsx';
+
 import {
   CONTEXT,
   ComponentHost,
@@ -9,7 +11,6 @@ import {
   handleRenderDone,
   renderSlotFunction,
 } from '../core';
-import type { FC, JNode, WithChildren } from '../jsx';
 import { appendChildren, createComment } from '../util';
 
 export function Portal(

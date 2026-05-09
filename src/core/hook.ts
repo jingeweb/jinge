@@ -1,3 +1,7 @@
+import { type FC } from '../jsx';
+import { isUndefined, throwErr } from '../util';
+import { type PropertyPathItem, type WatchHandler, type WatchOptions, vmWatch } from '../vm';
+import { CONTEXT } from './common';
 import {
   type ComponentHost,
   addMountFn,
@@ -6,16 +10,6 @@ import {
   getLastDOM,
   setComponentContext,
 } from './component';
-import {
-  type PropertyPathItem,
-  type WatchHandler,
-  type WatchOptions,
-  vmWatch,
-} from '../vm';
-import { isUndefined, throwErr } from '../util';
-
-import { CONTEXT } from './common';
-import { type FC } from '../jsx';
 import { type RefValue } from './ref';
 
 const MISS_KEY = 'hook-miss-component';
@@ -52,17 +46,9 @@ export function watch<T extends object>(
   handler: WatchHandler<any>,
   options?: WatchOptions,
 ): void;
-export function watch(
-  vm: any,
-  propOrPathOrHanlder: any,
-  handlerOrOptions?: any,
-  options?: any,
-) {
+export function watch(vm: any, propOrPathOrHanlder: any, handlerOrOptions?: any, options?: any) {
   if (!componentHost) throwErr(MISS_KEY);
-  addUnmountFn(
-    componentHost,
-    vmWatch(vm, propOrPathOrHanlder, handlerOrOptions, options),
-  );
+  addUnmountFn(componentHost, vmWatch(vm, propOrPathOrHanlder, handlerOrOptions, options));
 }
 
 export function onMount(fn: () => (() => void) | void) {
@@ -87,9 +73,7 @@ export function context(key: string | symbol, value?: any) {
   }
 }
 
-export function expose<T extends FC>(
-  instance: RefValue<Parameters<T>[0]['ref']>,
-) {
+export function expose<T extends FC>(instance: RefValue<Parameters<T>[0]['ref']>) {
   if (!componentHost) throwErr(MISS_KEY);
   Object.assign(componentHost, instance);
 }

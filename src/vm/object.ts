@@ -1,5 +1,4 @@
 import { type AnyObj, isObject, isSymbol } from '../util';
-
 import {
   GlobalViewModelWeakMap,
   type PropertyPathItem,
@@ -11,8 +10,8 @@ import {
   removeParent,
   shouldBeVm,
 } from './core';
-import { type Watcher, notifyVmPropChange } from './watch';
 import { wrapPropChildViewModel, wrapViewModel } from './proxy';
+import { type Watcher, notifyVmPropChange } from './watch';
 
 export function getVmAndRaw(value: unknown): [ViewModel | undefined, unknown] {
   if (!isObject(value)) return [undefined, value];

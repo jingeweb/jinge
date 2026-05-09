@@ -8,13 +8,7 @@ import {
   handleRenderDone,
   renderSlotFunction,
 } from '../../core';
-import {
-  type FC,
-  type JNode,
-  type WithChildren,
-  type WithEvents,
-} from '../../jsx';
-import { TRANSITION_END, classnames2tokens } from './helper';
+import { type FC, type JNode, type WithChildren, type WithEvents } from '../../jsx';
 import {
   addEvent,
   createComment,
@@ -23,8 +17,8 @@ import {
   removeEvent,
   throwErr,
 } from '../../util';
-
 import { vmWatch } from '../../vm';
+import { TRANSITION_END, classnames2tokens } from './helper';
 
 export interface TransitionClassnames {
   /** enter 的目标 html class。默认为空。该属性为单向属性。*/

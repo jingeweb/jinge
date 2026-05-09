@@ -1,6 +1,7 @@
-import { type AnyFn, isObject } from '../util';
-import type { ComponentHost } from './component';
 import type { FC } from '../jsx';
+import type { ComponentHost } from './component';
+
+import { type AnyFn, isObject } from '../util';
 import { REFS } from './common';
 
 export const REF = Symbol('REF');
@@ -8,9 +9,7 @@ export const REF = Symbol('REF');
 export interface Ref<T extends Node | Record<string, AnyFn>> {
   value?: T;
 }
-export type RefValue<T extends Ref<any> | undefined> = T extends Ref<infer R>
-  ? R
-  : never;
+export type RefValue<T extends Ref<any> | undefined> = T extends Ref<infer R> ? R : never;
 
 export function ref<T extends Node | FC>(): T extends Node
   ? Ref<T>
@@ -20,9 +19,7 @@ export function ref<T extends Node | FC>(): T extends Node
   return { [REF]: true, value: undefined } as any;
 }
 
-export function isRef<T extends Node | Record<string, AnyFn>>(
-  v: object,
-): v is Ref<T> {
+export function isRef<T extends Node | Record<string, AnyFn>>(v: object): v is Ref<T> {
   return (v as unknown as { [REF]: boolean })[REF] === true;
 }
 
