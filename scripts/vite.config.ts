@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+const __dirname = import.meta.dirname;
 
 const PROD = process.env.NODE_ENV === 'production';
 export default defineConfig({

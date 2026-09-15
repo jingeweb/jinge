@@ -46,10 +46,10 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist types && tsgo -project tsconfig.types.json && pnpm build-dev && pnpm build-prod",
+    "build": "rm -rf dist types && tsc -project tsconfig.types.json && pnpm build-dev && pnpm build-prod",
     "build-dev": "NODE_ENV=development vite build --mode development -c scripts/vite.config.ts",
     "build-prod": "vite build -c scripts/vite.config.ts",
-    "lint": "tsgo --noEmit && oxlint --type-aware && oxfmt --check",
+    "lint": "tsc --noEmit && oxlint --type-aware && oxfmt --check",
     "lint-fix": "oxlint --type-aware --fix && oxfmt",
     "lint-staged": "lint-staged",
     "prepare": "husky",
@@ -58,18 +58,18 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.6.2",
-    "@typescript/native-preview": "7.0.0-dev.20260507.1",
+    "@types/node": "^26.5.1",
     "husky": "^9.1.7",
-    "jest": "^30.4.0",
-    "jest-environment-jsdom": "^30.4.0",
-    "jest-html-reporter": "^4.4.0",
-    "lint-staged": "^17.0.2",
-    "oxfmt": "^0.48.0",
-    "oxlint": "^1.63.0",
-    "oxlint-tsgolint": "^0.22.1",
-    "ts-jest": "^29.4.9",
-    "vite": "^8.0.11"
+    "jest": "^30.5.1",
+    "jest-environment-jsdom": "^30.5.1",
+    "jest-html-reporter": "^4.4.2",
+    "lint-staged": "^17.5.1",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "ts-jest": "^29.4.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
   },
   "lint-staged": {
     "*.{js,ts}": [

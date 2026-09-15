@@ -19,7 +19,7 @@
   - 内置国际化多语言支持。
   - 简洁但完善地 `HMR` 支持。
   - 完善的范型组件支持。
-  - 轻量但够用的路由能力（通过 [jinge-router]() 支持）。
+  - 轻量但够用的路由能力（通过 [jinge-router](https://github.com/jingeweb/jinge-router) 支持）。
 - 友好
   - 完美的类型约束和智能提示，包括组件的参数属性以及插槽传递。
   - 编译器使用 rust 编写，顺畅的研发体验。
@@ -50,11 +50,11 @@ bootstrap(App, document.body);
 
 ### 更多示例
 
-- 经典的 [Todo MVC]()
-- 路由：[router-demo]()
-- 示例集合：[jinge-demos]()
-- UI 组件库：[jinge-preline]() `[编写中]`
-- UI 组件库：[jinge-antd]() `[规划中]`
+- 经典的 [Todo MVC](<>)
+- 路由：[router-demo](<>)
+- 示例集合：[jinge-demos](<>)
+- UI 组件库：[jinge-preline](<>) `[编写中]`
+- UI 组件库：[jinge-antd](<>) `[规划中]`
 
 ## 使用
 

@@ -26,6 +26,7 @@ function getKeyFn<T>(k?: keyof T | typeof KEY_INDEX | typeof KEY_DATA): KeyFn<T>
   } else if (k === KEY_INDEX) {
     return (_, i) => i;
   } else {
+    // oxlint-disable-next-line typescript/no-implied-eval
     return new Function(
       '$jg$',
       `return $jg$${(k as string).startsWith('[') ? '' : '.'}${k as string}`,
