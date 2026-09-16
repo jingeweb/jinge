@@ -1,3 +1,4 @@
+import { intlWatchLocale, t } from '../intl';
 import {
   arrayEqual,
   clearImmediate,
@@ -280,4 +281,27 @@ export function DymPathWatcher(
     }
   });
   return rtn;
+}
+
+export function IntlWatcher(key: string, params: Record<string, unknown>, defaultText?: string) {
+  let val = t(key, params as any, defaultText as any);
+  let parent: ParentWatcher | undefined = undefined;
+  const unwatchFn = intlWatchLocale(() => {
+    const v = t(key, params as any, defaultText as any);
+    val = v;
+    parent?.[VM_WATCHER_NOTIFY](v);
+  });
+
+  return {
+    [VM_WATCHER_DESTROY]() {
+      parent = undefined;
+      unwatchFn?.();
+    },
+    get [VM_WATCHER_VALUE]() {
+      return val;
+    },
+    set [VM_WATCHER_PARENT](v: ParentWatcher) {
+      parent = v;
+    },
+  } as ViewWatcher;
 }
