@@ -7,9 +7,10 @@ import {
   VM_WATCHERS,
   type ViewModel,
 } from '../core';
-import { propSetHandler } from '../object';
+import { propDeleteHandler, propSetHandler } from '../object';
 import { vmRaw, wrapPropChildViewModel } from '../proxy';
-import { type Watcher } from '../watch';
+import { type Watcher, notifyVmArrayChange } from '../watch';
+import { arrayCopyWithin } from './copy-within';
 import { arrayFill } from './fill';
 import { arraySetLength } from './length';
 import { arrayReverse, arraySort } from './order';
@@ -114,6 +115,8 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
         };
       } else if (prop === 'fill') {
         return wrapFn(receiver, target, arrayFill);
+      } else if (prop === 'copyWithin') {
+        return wrapFn(receiver, target, arrayCopyWithin);
       } else if (prop === 'sort') {
         return wrapFn(receiver, target, arraySort);
       } else if (prop === 'reverse') {
@@ -146,9 +149,14 @@ function ArrayProxyHandler(): ProxyHandler<unknown[] & ViewModel> {
       } else if (prop === 'length') {
         arraySetLength(receiver, target, newValue);
       } else {
+        const oldLength = target.length;
         propSetHandler(receiver, target, wrapProp(prop), newValue);
+        if (target.length !== oldLength) notifyVmArrayChange(receiver);
       }
       return true;
+    },
+    deleteProperty(target, prop) {
+      return propDeleteHandler(GlobalViewModelWeakMap.get(target)!, target, prop, wrapProp(prop));
     },
   };
 }

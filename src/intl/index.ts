@@ -7,6 +7,7 @@ import {
   ROOT_NODES,
   addUnmountFn,
   getFirstDOM,
+  handleRenderDone,
   renderFunctionComponent,
   replaceRenderFunctionComponent,
   resetComponent,
@@ -44,11 +45,17 @@ export async function intlSetLocale(locale: string) {
 }
 
 async function intlChangeLocale(locale: string) {
+  const previousLocale = currentLocale;
   currentLocale = locale;
-  if (!dictStore[locale] && dictLoader) {
-    dictStore[locale] = await dictLoader(locale);
+  try {
+    if (!dictStore[locale] && dictLoader) {
+      dictStore[locale] = await dictLoader(locale);
+    }
+    if (!dictStore[locale]) throw new Error(`dict of ${locale} not loaded!`);
+  } catch (error) {
+    if (currentLocale === locale) currentLocale = previousLocale;
+    throw error;
   }
-  if (!dictStore[locale]) throw new Error(`dict of ${locale} not loaded!`);
 }
 
 export async function intlInit(options: {
@@ -154,8 +161,9 @@ export function renderIntlRichText(
       const firstEl = getFirstDOM(el);
       const $parent = firstEl.parentNode as Node;
       insertBefore($parent, tn, firstEl);
-      resetComponent(host, host[CONTEXT]);
-      host[ROOT_NODES].push(tn);
+      resetComponent(el, host[CONTEXT]);
+      el[ROOT_NODES].push(tn);
+      handleRenderDone(el);
     }
   };
 

@@ -174,9 +174,12 @@ export function Transition(
     }
   };
 
-  vmWatch(props, 'isEnter', (v) => {
-    handleUpdate(!!v);
-  });
+  addUnmountFn(
+    host,
+    vmWatch(props, 'isEnter', (v) => {
+      handleUpdate(!!v);
+    }),
+  );
 
   addUnmountFn(host, () => {
     if (rootEl) removeEvent(rootEl, TRANSITION_END, onTransEnd);

@@ -68,6 +68,26 @@ export function propSetHandler(
   notifyVmPropChange(targetViewModel, prop);
 }
 
+export function propDeleteHandler(
+  targetViewModel: ViewModel,
+  target: AnyObj,
+  prop: PropertyPathItem,
+  pathProp: PropertyPathItem = prop,
+) {
+  const descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+  const deleted = Reflect.deleteProperty(target, prop);
+  if (!deleted || !descriptor || isSymbol(prop)) return deleted;
+
+  const [oldValueVm] = getVmAndRaw(descriptor.value);
+  if (oldValueVm) removeParent(oldValueVm, targetViewModel, pathProp);
+  // 删除自有属性后可能露出原型上的同名属性，维护其子对象关联。
+  if (prop in target) {
+    wrapPropChildViewModel(targetViewModel, target[prop], pathProp as string | number);
+  }
+  notifyVmPropChange(targetViewModel, pathProp);
+  return true;
+}
+
 function ObjectProxyHandler(): ProxyHandler<any> {
   let watchers: Set<Watcher>;
   let parents: Map<PropertyPathItem, Set<ViewModel>>;
@@ -96,6 +116,9 @@ function ObjectProxyHandler(): ProxyHandler<any> {
         propSetHandler(receiver, target, prop, newValue);
       }
       return true;
+    },
+    deleteProperty(target, prop) {
+      return propDeleteHandler(GlobalViewModelWeakMap.get(target)!, target, prop);
     },
   };
 }

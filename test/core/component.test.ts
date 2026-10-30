@@ -13,6 +13,8 @@ import {
   destroyComponent,
   destroyComponentContent,
   getComponentContext,
+  getCurrentComponentHost,
+  onUnmount,
   getFirstDOM,
   getLastDOM,
   handleRenderDone,
@@ -174,4 +176,36 @@ test('component replacement supports multiple roots', () => {
   );
   expect(document.body.textContent).toBe('ab');
   expect(document.body.childNodes).toHaveLength(2);
+});
+
+test('nested rendering restores the parent host after successful and failed child renders', () => {
+  const child = createHost();
+  let parentHost: ComponentHost | undefined;
+  const parent = mount((_, h) => {
+    parentHost = h;
+    renderFunctionComponent(child, elementSlot());
+    expect(getCurrentComponentHost()).toBe(h);
+    expect(() =>
+      renderFunctionComponent(createHost(), () => {
+        throw new Error('child failure');
+      }),
+    ).toThrow('child failure');
+    expect(getCurrentComponentHost()).toBe(h);
+    onUnmount(() => {});
+    return [textRenderFn(h, 'parent')];
+  });
+  expect(parent).toBe(parentHost);
+  expect(() => getCurrentComponentHost()).toThrow('global component not found');
+});
+test('a throwing slot restores the parent host and leaves the original error intact', () => {
+  const parent = mount((_, h) => {
+    expect(() =>
+      renderSlotFunction(createHost(), () => {
+        throw new Error('slot failure');
+      }),
+    ).toThrow('slot failure');
+    expect(getCurrentComponentHost()).toBe(h);
+    return [textRenderFn(h, 'parent')];
+  });
+  expect(parent[STATE]).toBe(COMPONENT_STATE_RENDERED);
 });

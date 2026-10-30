@@ -235,3 +235,45 @@ test('For expands from an empty placeholder into multiple rows', async () => {
   expect(document.body.textContent).toBe('ab');
   expect(document.querySelectorAll('span')).toHaveLength(2);
 });
+
+test('replacing a row with the same key reuses DOM and binds to the replacement object', async () => {
+  const props = listProps([{ id: 1, name: 'old' }], 'id');
+  mount(For, props);
+  const node = document.querySelector('span');
+  const old = props.loop[0];
+  props.loop[0] = { id: 1, name: 'new' };
+  await flushUpdates();
+  expect(document.querySelector('span')).toBe(node);
+  expect(node?.textContent).toBe('new');
+  old.name = 'detached';
+  await flushUpdates();
+  expect(node?.textContent).toBe('new');
+  props.loop[0].name = 'updated';
+  await flushUpdates();
+  expect(node?.textContent).toBe('updated');
+});
+test('unkeyed For appends global indexes that work in row event handlers', async () => {
+  const values: number[] = [];
+  const props = vm({
+    loop: [1, 2],
+    [DEFAULT_SLOT_NAME]: (each: { data: number; index: number }, h: ComponentHost) => {
+      const button = document.createElement('button');
+      button.onclick = () => values.push(each.index);
+      h[ROOT_NODES].push(button);
+      return [button];
+    },
+  });
+  mount(For, props);
+  props.loop.push(3, 4);
+  await flushUpdates();
+  document.querySelectorAll('button')[3].click();
+  expect(values).toEqual([3]);
+});
+test('For renders an appended index assigned directly to the array', async () => {
+  const props = listProps([{ id: 1, name: 'a' }], 'id');
+  mount(For, props);
+  props.loop[1] = { id: 2, name: 'b' };
+  await flushUpdates();
+  expect(document.body.textContent).toBe('ab');
+  expect(document.querySelectorAll('span')).toHaveLength(2);
+});

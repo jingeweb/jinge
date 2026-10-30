@@ -27,14 +27,18 @@ export function renderItems<T>(
   keys: Map<Key<T>, number> | undefined,
   keyFn: KeyFn<T> | undefined,
   context?: Context,
+  startIndex = 0,
 ) {
   const result: Node[] = [];
   const vmMode = isViewModel(items);
-  items.forEach((item, index) => {
+  const length = items.length;
+  for (let index = startIndex; index < length; index++) {
+    if (!(index in items)) continue;
+    const item = items[index];
     const key = keyFn?.(item, index);
     if (keyFn) keys!.set(key!, index);
     const els = appendRenderEach(vmMode, item, index, itemRenderFn, roots, key, context);
     result.push(...els);
-  });
+  }
   return result;
 }

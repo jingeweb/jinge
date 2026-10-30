@@ -118,12 +118,13 @@ export function updateWithoutKey<T>(
     const nextSib = lastNode.nextSibling;
     const $parent = lastNode.parentNode as Node;
     const doms = renderItems(
-      data.slice(updateLen),
+      data,
       itemRenderFn,
       roots,
       undefined,
       undefined,
       comp[CONTEXT],
+      updateLen,
     );
     insertBefore($parent, doms.length > 1 ? createFragment(doms) : doms[0], nextSib);
 

@@ -223,3 +223,21 @@ test('destroying a render binding cancels an already scheduled expression recomp
   await flushUpdates();
   expect(render).toHaveBeenCalledTimes(1);
 });
+
+test('a dynamic path render callback may unmount without recreating subscriptions', async () => {
+  const state = vm({ index: 0, items: ['a', 'b'] });
+  const host = createHost();
+  watchForRender(
+    DymPathWatcher(state as unknown as ViewModel, [
+      'items',
+      PathWatcher(state as unknown as ViewModel, ['index']),
+    ]),
+    (v) => {
+      if (v === 'b') destroyComponent(host, false);
+    },
+    host,
+  );
+  state.index = 1;
+  await flushUpdates();
+  expect((state as unknown as ViewModel)[VM_WATCHERS]?.size).toBe(0);
+});

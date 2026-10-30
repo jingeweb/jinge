@@ -246,10 +246,17 @@ export function DymPathWatcher(
     );
   };
   let unwatchFn = !isUndefined(target?.[VM_RAW]) ? __innerW() : undefined;
+  let destroyed = false;
   const rtn = {
     [VM_WATCHER_DESTROY]() {
+      if (destroyed) return;
+      destroyed = true;
       parent = undefined;
       unwatchFn?.();
+      unwatchFn = undefined;
+      path.forEach((p) => {
+        if (typeof p === 'object') p[VM_WATCHER_DESTROY]();
+      });
     },
     get [VM_WATCHER_VALUE]() {
       return val;
@@ -258,7 +265,7 @@ export function DymPathWatcher(
       parent = v;
     },
     [VM_WATCHER_NOTIFY]() {
-      if (!unwatchFn) return;
+      if (destroyed) return;
       const newPath = path.map((p) =>
         typeof p === 'object' ? (p[VM_WATCHER_VALUE] as string) : p,
       );
@@ -271,8 +278,8 @@ export function DymPathWatcher(
         val = newVal;
         parent?.[VM_WATCHER_NOTIFY](val);
       }
-      unwatchFn();
-      unwatchFn = __innerW();
+      unwatchFn?.();
+      if (!destroyed && !isUndefined(target?.[VM_RAW])) unwatchFn = __innerW();
     },
   } as ViewWatcher;
   path.forEach((p) => {

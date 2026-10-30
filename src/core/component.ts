@@ -278,13 +278,16 @@ export function renderFunctionComponent<T extends FC>(host: ComponentHost, fc: T
   }
   // END_DROP_IN_PRODUCTION
 
-  setCurrentComponentHost(host);
-  const nodes = fc(attrs, host) as Node[];
-  setCurrentComponentHost(undefined);
-  if (!nodes?.length) {
-    throwErr('fc-render-empty');
+  const previous = setCurrentComponentHost(host);
+  try {
+    const nodes = fc(attrs, host) as Node[];
+    if (!nodes?.length) {
+      throwErr('fc-render-empty');
+    }
+    return nodes;
+  } finally {
+    setCurrentComponentHost(previous);
   }
-  return nodes;
 }
 
 export function beforeReplaceRender(
@@ -334,13 +337,16 @@ export function renderSlotFunction(host: ComponentHost, slotFc: FC | undefined, 
     // 插槽如果为空，直接返回空数组，不插入任何 DOM。当前版本插槽是单向的，不会响应变更后重新渲染。
     return [];
   }
-  setCurrentComponentHost(host);
-  const nodes = slotFc(attrs, host) as Node[];
-  if (!nodes?.length) {
-    throwErr('fc-render-empty');
+  const previous = setCurrentComponentHost(host);
+  try {
+    const nodes = slotFc(attrs, host) as Node[];
+    if (!nodes?.length) {
+      throwErr('fc-render-empty');
+    }
+    return nodes;
+  } finally {
+    setCurrentComponentHost(previous);
   }
-  setCurrentComponentHost(undefined);
-  return nodes;
 }
 
 export function replaceRenderSlot(

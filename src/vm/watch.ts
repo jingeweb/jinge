@@ -138,7 +138,14 @@ export function vmWatch(vm: any, propOrPathOrHanlder: any, optionsOrHandler?: an
   }
 }
 
-function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
+function handleVmChange(
+  vm: ViewModel,
+  changedPath?: PropertyPathItem[],
+  notifyingParents?: ViewModel[],
+) {
+  // 用数组栈记录当前通知链，遇到重复对象就停止，避免循环引用导致无限通知。
+  // 只检查当前路径，保证共享对象经其他父路径的通知仍能正常传播。
+  if (notifyingParents?.includes(vm)) return;
   vm[VM_WATCHERS]?.forEach((watcher) => {
     const listener = watcher[VM_WATCHER_LISTENER];
     const vm = watcher[VM_RAW];
@@ -208,11 +215,19 @@ function handleVmChange(vm: ViewModel, changedPath?: PropertyPathItem[]) {
       imm.p = undefined;
     });
   });
-  vm[VM_PARENTS]?.forEach((props, parent) => {
-    props.forEach((prop) => {
-      handleVmChange(parent, changedPath ? [prop, ...changedPath] : [prop]);
+  const parents = vm[VM_PARENTS];
+  if (!parents?.size) return;
+  const path = notifyingParents ?? [];
+  path.push(vm);
+  try {
+    parents.forEach((props, parent) => {
+      props.forEach((prop) => {
+        handleVmChange(parent, changedPath ? [prop, ...changedPath] : [prop], path);
+      });
     });
-  });
+  } finally {
+    path.pop();
+  }
 }
 export function notifyVmPropChange(vm: ViewModel, prop: PropertyPathItem) {
   handleVmChange(vm, [prop]);

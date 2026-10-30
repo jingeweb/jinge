@@ -47,7 +47,7 @@ if (isUndefined(window.setImmediate))
         const handle = nextHandle++;
         tasksByHandle.set(handle, callback);
 
-        window.postMessage(`${PREFIX}${nextHandle}`);
+        window.postMessage(`${PREFIX}${handle}`);
         // console.log('siiii', callback);
         return handle;
       };

@@ -91,6 +91,24 @@ bootstrap(App, document.body);
 
 因为 `jinge-compiler` 是使用 rust 编写的，未来将逐步支持 `webpack` 等打包器的项目。
 
+## 循环引用与 watch
+
+`vm()` 允许数据存在循环引用，也允许通过赋值建立循环。变更通知沿父对象关系传播时，如果同一个对象在当前递归链中再次出现，会停止这条路径，避免无限递归；共享对象的其他父路径仍正常通知。
+
+通知不会重复绕环，因此不保证经过循环别名的任意深度路径监听。需要监听环内对象时，直接监听该对象的属性：
+
+```ts
+const raw: { n: number; self?: unknown } = { n: 0 };
+raw.self = raw;
+const state = vm(raw);
+
+// 直接监听目标对象，正常接收 n 的变化。
+vmWatch(state, 'n', (n) => console.log(n));
+
+// 不依赖 ['self', 'n']、['self', 'self', 'n'] 等需要重复绕环的通知路径。
+state.n++;
+```
+
 ## 对比
 
 以下内容为 `jinge` 框架和主流 MVVM 框架的简单对比：

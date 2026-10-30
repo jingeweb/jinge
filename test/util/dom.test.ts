@@ -113,3 +113,14 @@ test('touch listeners use passive bubbling options by default', () => {
   });
   cancel();
 });
+
+test('capture cancellation remembers the registration option even if its options object changes', () => {
+  const button = document.createElement('button');
+  const handler = jestApi.fn();
+  const options = { capture: true };
+  const cancel = registerEvent(button, 'click', handler, options);
+  options.capture = false;
+  cancel();
+  button.click();
+  expect(handler).not.toHaveBeenCalled();
+});

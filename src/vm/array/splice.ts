@@ -1,27 +1,33 @@
 import { wrapViewModelArr } from '.';
-import { isUndefined } from '../../util';
 import { VM_RAW, type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { getVmAndRaw } from '../object';
 import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
-import { moveArrayItemsVmParentIndex, removeArrayItemVmParent } from './helper';
+import {
+  moveArrayItemsVmParentIndex,
+  normalizeArrayIndex,
+  removeArrayItemVmParent,
+} from './helper';
 import { arrayPush } from './push';
 
 export function arraySplice(
   targetViewModel: ViewModelArray,
   target: unknown[],
-  idx: number | undefined,
-  delCount: number | undefined,
+  idx?: number,
+  delCount?: number,
   ...args: unknown[]
 ) {
-  if (isUndefined(idx)) idx = 0;
-  if (isUndefined(delCount)) delCount = 0;
-  if (delCount === 0 && args.length === 0) return wrapViewModelArr([]);
   const len = target.length;
+  const argumentCount = arguments.length - 2;
+  idx = normalizeArrayIndex(idx ?? 0, len);
+  delCount =
+    argumentCount === 1
+      ? len - idx
+      : Math.min(Math.max(Math.trunc(delCount ?? 0) || 0, 0), len - idx);
+  if (delCount === 0 && args.length === 0) return wrapViewModelArr([]);
   if (len === 0) {
     if (args.length > 0) {
       arrayPush(targetViewModel, target, ...args);
-      notifyVmArrayChange(targetViewModel);
     }
     return wrapViewModelArr([]);
   }

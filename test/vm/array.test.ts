@@ -176,7 +176,7 @@ describe('vm:array', () => {
     expectParent(va, 1, arr);
     expect(va[VM_PARENTS]?.size).toBe(2);
 
-    expect(arr.splice(1).length).toBe(0);
+    expect(arr.splice(1).length).toBe(1);
     expect((arr as any).splice().length).toBe(0);
   });
   it('array slice filter', () => {

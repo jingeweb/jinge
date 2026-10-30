@@ -152,23 +152,27 @@ export function removeEvent<E extends keyof WindowEventMap>(
   $element: Window,
   eventName: E,
   handler: EventListener<WindowEventMap, E>,
+  capture?: boolean | EventListenerOptions,
 ): void;
 export function removeEvent<E extends keyof DocumentEventMap>(
   $element: Document,
   eventName: E,
   handler: EventListener<DocumentEventMap, E>,
+  capture?: boolean | EventListenerOptions,
 ): void;
 export function removeEvent<E extends keyof HTMLElementEventMap>(
   $element: Element,
   eventName: E,
   handler: EventListener<HTMLElementEventMap, E>,
+  capture?: boolean | EventListenerOptions,
 ): void;
 export function removeEvent(
   $element: Element | Window | Document,
   eventName: any,
   handler: any,
+  capture?: boolean | EventListenerOptions,
 ): void {
-  $element.removeEventListener(eventName, handler);
+  $element.removeEventListener(eventName, handler, capture);
 }
 
 /**
@@ -201,9 +205,10 @@ export function registerEvent(
   handler: any,
   capture?: boolean | AddEventListenerOptions,
 ) {
+  const useCapture = typeof capture === 'boolean' ? capture : (capture?.capture ?? false);
   addEvent($element as any, eventName, handler, capture);
   return () => {
-    removeEvent($element as any, eventName, handler);
+    removeEvent($element as any, eventName, handler, useCapture);
   };
 }
 

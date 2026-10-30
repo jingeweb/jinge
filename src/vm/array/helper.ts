@@ -1,6 +1,12 @@
 import { isObject } from '../../util';
 import { GlobalViewModelWeakMap, VM_RAW, type ViewModel, addParent, removeParent } from '../core';
 
+/** Normalize a relative array index using the same bounds as native array methods. */
+export function normalizeArrayIndex(index: number, length: number) {
+  const integer = Math.trunc(index) || 0;
+  return integer < 0 ? Math.max(length + integer, 0) : Math.min(integer, length);
+}
+
 export function removeArrayItemVmParent(val: unknown, targetViewModel: ViewModel, index: number) {
   const valVm = isObject(val)
     ? val[VM_RAW]

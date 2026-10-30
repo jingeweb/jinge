@@ -3,7 +3,7 @@ import { type ViewModelArray, addParent, shouldBeVm } from '../core';
 import { getVmAndRaw } from '../object';
 import { wrapViewModel } from '../proxy';
 import { notifyVmArrayChange } from '../watch';
-import { removeArrayItemVmParent } from './helper';
+import { normalizeArrayIndex, removeArrayItemVmParent } from './helper';
 
 export function arrayFill(
   targetViewModel: ViewModelArray,
@@ -14,8 +14,8 @@ export function arrayFill(
 ) {
   const len = target.length;
   if (len === 0) return targetViewModel;
-  if (isUndefined(start)) start = 0;
-  if (isUndefined(end)) end = target.length;
+  start = normalizeArrayIndex(isUndefined(start) ? 0 : start, len);
+  end = normalizeArrayIndex(isUndefined(end) ? len : end, len);
   if (end <= start) return targetViewModel;
 
   const result = getVmAndRaw(v);

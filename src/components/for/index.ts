@@ -6,7 +6,7 @@ import {
   addUnmountFn,
 } from '../../core';
 import { type FC, type JNode, type WithChildren } from '../../jsx';
-import { innerWatchPath, isViewModel } from '../../vm';
+import { destroyViewModelCore, innerWatchPath, isViewModel, vm } from '../../vm';
 import { type ForEach, KEY_DATA, KEY_INDEX, type KeyFn, type KeyMap } from './common';
 import { renderItems } from './render';
 import { handleUpdate } from './update';
@@ -45,14 +45,18 @@ export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: Comp
   let keys: KeyMap<T> | undefined = keyFn ? new Map() : undefined;
   let renderLen = 0;
 
-  if (isViewModel(props)) {
+  // 直接传入 vm 数组时，编译器可能生成普通 props。为 loop 建立局部响应式
+  // 容器，沿用属性路径监听和变更路径合并，避免漏掉同一轮中的数组结构变更。
+  const watchedProps =
+    isViewModel(props) || !isViewModel(props.loop) ? props : vm({ loop: props.loop });
+  if (isViewModel(watchedProps)) {
     const unwatchFn = innerWatchPath(
-      props,
-      props.loop,
+      watchedProps,
+      watchedProps.loop,
       (data, _, cp) => {
         // console.log('PATH:', cp);
         // console.log('-------');
-        if (!cp || cp.length <= 1) {
+        if (!cp || cp.length <= 2) {
           const oldLen = renderLen;
           renderLen = data?.length ?? 0;
           handleUpdate(
@@ -67,7 +71,7 @@ export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: Comp
             },
           );
         } else {
-          // 如果发生变更的路径 cp.length > 1，说明是数组里某个具体的元素发生变更，
+          // ['loop', index] 是元素替换，需要更新列表；更深的路径才是元素内部变更。
           // 这种情况下 For 组件不需要响应和更新渲染。render 模板中有依赖到这个具体元素的地方，会在
           // ForEach 组件中自动被更新（因为会在这个具体元素上建立监听）
         }
@@ -76,6 +80,9 @@ export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: Comp
       true,
     );
     addUnmountFn(host, unwatchFn);
+    if (watchedProps !== props) {
+      addUnmountFn(host, () => destroyViewModelCore(watchedProps));
+    }
   }
 
   const roots = host[ROOT_NODES] as (ForEach<T> | Node)[];

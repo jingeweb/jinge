@@ -39,7 +39,7 @@ test('delete should notify an existing property watcher', async () => {
 });
 
 test('cyclic vm should allow updating a scalar property', () => {
-  const raw: any = { n: 0 };
+  const raw: { n: number; self?: unknown } = { n: 0 };
   raw.self = raw;
   const state = vm(raw);
   expect(() => {

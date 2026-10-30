@@ -16,7 +16,9 @@ const MISS_KEY = 'hook-miss-component';
 let componentHost: ComponentHost | undefined = undefined;
 
 export function setCurrentComponentHost(component: ComponentHost | undefined) {
+  const previous = componentHost;
   componentHost = component;
+  return previous;
 }
 export function getCurrentComponentHost() {
   if (!componentHost) throwErr(MISS_KEY);

@@ -150,3 +150,45 @@ test('rich text can start with a fallback and replace it when another dictionary
   await intlSetLocale('unit_rich_available');
   expect(document.body.textContent).toBe('rich');
 });
+
+test('rich translation fallback preserves its parent and supports a later rich translation', async () => {
+  const rich: FC = (_, h) => [textRenderFn(h, 'rich')];
+  await intlInit({
+    defaultLocale: 'unit_roundtrip_rich',
+    dicts: { unit_roundtrip_rich: { message: rich }, unit_roundtrip_missing: {} },
+  });
+  const host = createHost();
+  const sibling = document.createElement('aside');
+  sibling.textContent = 'sibling';
+  const nodes = renderIntlRichText(host, true, 'message', undefined, 'fallback') as Node[];
+  host[ROOT_NODES].push(sibling);
+  document.body.append(...nodes, sibling);
+  await intlSetLocale('unit_roundtrip_missing');
+  expect(sibling.isConnected).toBe(true);
+  expect(document.body.textContent).toBe('fallbacksibling');
+  await intlSetLocale('unit_roundtrip_rich');
+  expect(document.body.textContent).toBe('richsibling');
+});
+test('a failed locale load restores the previous locale and can be retried', async () => {
+  const loader = jestApi
+    .fn<Promise<Dict>, [string]>()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({ greeting: 'retried' });
+  await intlInit({ defaultLocale: 'unit_en', dictLoader: loader });
+  await expect(intlSetLocale('unit_retry_fixed')).rejects.toThrow('offline');
+  expect(intlGetLocale()).toBe('unit_en');
+  expect(t('greeting')).toBe('Hello');
+  await intlSetLocale('unit_retry_fixed');
+  expect(t('greeting')).toBe('retried');
+  expect(loader).toHaveBeenCalledTimes(2);
+});
+test('a failed older locale request does not roll back a later successful switch', async () => {
+  const task = deferred<Dict>();
+  await intlInit({ defaultLocale: 'unit_en', dictLoader: () => task.promise });
+  const pending = intlSetLocale('unit_older_failure');
+  const assertion = expect(pending).rejects.toThrow('offline');
+  await intlSetLocale('unit_zh');
+  task.reject(new Error('offline'));
+  await assertion;
+  expect(intlGetLocale()).toBe('unit_zh');
+});
