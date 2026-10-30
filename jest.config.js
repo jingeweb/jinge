@@ -19,6 +19,9 @@ export default {
       'ts-jest',
       {
         useESM: true,
+        astTransformers: {
+          before: ['<rootDir>/test/vite-env-transformer.cjs'],
+        },
       },
     ],
   },
