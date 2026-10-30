@@ -58,18 +58,19 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.6",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "husky": "^9.1.7",
-    "jest": "^30.5.1",
-    "jest-environment-jsdom": "^30.5.1",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
     "jest-html-reporter": "^4.4.2",
-    "lint-staged": "^17.5.1",
-    "oxfmt": "^0.68.0",
-    "oxlint": "^1.83.0",
-    "oxlint-tsgolint": "^7.0.2001",
-    "ts-jest": "^29.4.12",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0"
+    "lint-staged": "^17.6.0",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
+    "oxlint-tsgolint": "^7.0.2005",
+    "ts-jest": "^29.4.15",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vite": "^8.3.5"
   },
   "lint-staged": {
     "*.{js,ts}": [

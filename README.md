@@ -53,7 +53,6 @@ bootstrap(App, document.body);
 - 经典的 [Todo MVC](<>)
 - 路由：[router-demo](<>)
 - 示例集合：[jinge-demos](<>)
-- UI 组件库：[jinge-preline](<>) `[编写中]`
 - UI 组件库：[jinge-antd](<>) `[规划中]`
 
 ## 使用
@@ -82,8 +81,8 @@ bootstrap(App, document.body);
 2. 修改 `vite.config.ts`
 
    ```ts
-   import { defineConfig } from 'vite';
    import { jingeVitePlugin } from 'jinge-compiler';
+   import { defineConfig } from 'vite';
 
    export default defineConfig({
      plugins: [jingeVitePlugin()],
