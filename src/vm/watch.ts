@@ -47,7 +47,9 @@ export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
   let idx = 0;
   let val = (target as AnyObj)[path[idx]];
   while (idx < path.length - 1) {
-    if (!isObject(val)) return undefined;
+    // Intermediate primitives support ordinary JS property reads, including
+    // falsy values such as '', 0 and false. Only nullish values stop the path.
+    if (val === null || val === undefined) return undefined;
     idx++;
     val = val[path[idx]];
   }
