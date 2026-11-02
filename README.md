@@ -120,3 +120,20 @@ state.n++;
 ### 渲染性能
 
 [TODO]
+
+## 发布与版本更新
+
+创建 GitHub Release 或手动运行 `.github/workflows/ci.yml`，会依次安装锁定依赖、
+执行 lint/类型检查和全部测试、构建 dev/prod 运行时及类型声明，最后发布 npm 包。
+已发布的同版本会跳过。npm 侧需为此工作流配置 trusted publishing，
+或提供有发布权限的 `NODE_AUTH_TOKEN` 仓库 secret。
+
+```sh
+npm version patch      # 或 pnpm release:patch；更新版本、提交并创建 vX.Y.Z tag
+npm version minor      # 也支持 major 等 npm version 参数
+```
+
+`patch-version` 与 compiler 保持一致，作为 `npm version patch` 的别名。
+jinge 只有主包，版本由 npm 自带的 version 命令维护，无需额外同步脚本。
+`pnpm-lock.yaml` 不记录主包自身版本，修改版本后仍可使用 frozen lock 安装。
+上述命令不推送到远端或创建 GitHub Release；提交和 tag 推送后再创建 Release 触发发布。

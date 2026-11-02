@@ -1,0 +1,47 @@
+name: build and release
+
+# Configure npm trusted publishing for this workflow, or provide a
+# NODE_AUTH_TOKEN repository secret with publish rights.
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    name: publish jinge
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: 0
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.21.0'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Lint and type-check
+        run: pnpm lint
+      - name: Test
+        run: pnpm test --runInBand
+      - name: Build runtime and type declarations
+        run: pnpm build
+      - name: Publish package
+        shell: bash
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "${name}@${version} already in registry — skipping"
+          else
+            npm publish --provenance --access public --ignore-scripts
+          fi

@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "4.1.9",
+  "version": "4.2.0",
   "description": "A small and smart web interface framework",
   "keywords": [
     "framework",
@@ -52,7 +52,9 @@
     "lint": "tsc --noEmit && oxlint --type-aware && oxfmt --check",
     "lint-fix": "oxlint --type-aware --fix && oxfmt",
     "lint-staged": "lint-staged",
+    "patch-version": "pnpm version patch",
     "prepare": "husky",
+    "release:patch": "pnpm version patch",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test-cov-file": "pnpm test -- --coverage --collectCoverageFrom=src/vm/object.ts"
   },
