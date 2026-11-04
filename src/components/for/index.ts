@@ -33,12 +33,7 @@ function getKeyFn<T>(k?: keyof T | typeof KEY_INDEX | typeof KEY_DATA): KeyFn<T>
     ) as KeyFn<T>;
   }
 }
-export type ForSlot<T> = (each: {
-  data: T;
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
-}) => JNode;
+export type ForSlot<T> = (each: { data: T; index: number }) => JNode;
 
 export function For<T>(props: ForProps<T> & WithChildren<ForSlot<T>>, host: ComponentHost) {
   const keyFn = getKeyFn(props.key);

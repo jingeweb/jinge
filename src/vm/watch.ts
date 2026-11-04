@@ -43,7 +43,7 @@ export function destoryWatcher(watcher: Watcher) {
 }
 export function getValueByPath(target: unknown, path?: PropertyPathItem[]) {
   if (!path?.length) return target;
-  if (!isObject(target)) return undefined;
+  if (!isObject(target) && typeof target !== 'function') return undefined;
   let idx = 0;
   let val = (target as AnyObj)[path[idx]];
   while (idx < path.length - 1) {

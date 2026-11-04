@@ -144,10 +144,10 @@ export function renderIntlRichText(
   host: ComponentHost,
   pushRoot: boolean,
   key: string,
-  params?: Record<string, string | number | boolean>,
+  params?: Record<string, unknown>,
   defaultText?: string,
 ) {
-  const el = new ComponentHost();
+  const el = new ComponentHost(host[CONTEXT]);
   let Fc: FC | undefined = undefined;
   Fc = dictStore[currentLocale]?.[key] as FC;
 

@@ -161,7 +161,11 @@ export function Transition(
         }
       }
     } else {
-      // isEnter === true，说明之前的 isEnter 一定是 false，则 state 只可能是 Entering 或 Entered 状态。
+      // 内容已挂载但入场尚未开始，取消后直接恢复占位节点。
+      if (state === TStateLeaved && destroyAfterLeave && rootEl) {
+        destroyMount();
+        return;
+      }
       if (state === TStateEntering || state === TStateEntered) {
         if (state === TStateEntering) {
           props['on:enterCancelled']?.(rootEl);

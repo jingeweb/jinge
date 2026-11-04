@@ -6,6 +6,7 @@ import {
   ROOT_NODES,
   IntlWatcher,
   destroyComponent,
+  context,
   intlGetLocale,
   intlInit,
   intlSetLocale,
@@ -35,6 +36,18 @@ beforeEach(async () => {
       unit_zh: { greeting: '你好', count: (p: Record<string, unknown>) => `数量 ${String(p.n)}` },
     },
   });
+});
+test('rich translations inherit the caller context on initial render and language replacement', async () => {
+  const rich: FC = (_, host) => [textRenderFn(host, context<string>('theme'))];
+  await intlInit({
+    defaultLocale: 'context_en',
+    dicts: { context_en: { message: rich }, context_zh: { message: rich } },
+  });
+  const host = createHost({ theme: 'dark' });
+  document.body.append(...(renderIntlRichText(host, true, 'message') as Node[]));
+  expect(document.body.textContent).toBe('dark');
+  await intlSetLocale('context_zh');
+  expect(document.body.textContent).toBe('dark');
 });
 test('initialization selects a locale and translations fall back to text or key', () => {
   expect(intlGetLocale()).toBe('unit_en');

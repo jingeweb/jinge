@@ -7,6 +7,7 @@ import {
   Transition,
   TransitionGroup,
   destroyComponent,
+  addUnmountFn,
   vm,
 } from '../../src';
 import { classnames2tokens, parseCls } from '../../src/components/transition/helper';
@@ -186,4 +187,70 @@ test('TransitionGroup applies appear to initial rows and cancels pending timers 
   destroyComponent(pending);
   await jestApi.advanceTimersByTimeAsync(20);
   expect(document.body.childNodes).toHaveLength(0);
+});
+
+test('F04 closing before enter begins destroys the mounted slot without transition callbacks', async () => {
+  jestApi.useFakeTimers({ doNotFake: ['queueMicrotask'] });
+  const callback = jestApi.fn(),
+    unmount = jestApi.fn();
+  const slot: FC = (props, host) => {
+    addUnmountFn(host, unmount);
+    return elementSlot()(props, host);
+  };
+  const props = vm({
+    isEnter: false,
+    destroyAfterLeave: true,
+    [DEFAULT_SLOT_NAME]: slot,
+    'on:beforeEnter': callback,
+    'on:afterEnter': callback,
+    'on:enterCancelled': callback,
+    'on:beforeLeave': callback,
+    'on:afterLeave': callback,
+    'on:leaveCancelled': callback,
+  });
+  mount(Transition, props);
+  props.isEnter = true;
+  await jestApi.advanceTimersByTimeAsync(0);
+  const node = document.querySelector('div')!;
+  expect(node).not.toBeNull();
+  props.isEnter = false;
+  await jestApi.advanceTimersByTimeAsync(0);
+  expect(node.isConnected).toBe(false);
+  expect(document.body.firstChild?.nodeType).toBe(Node.COMMENT_NODE);
+  expect(unmount).toHaveBeenCalledTimes(1);
+  await jestApi.advanceTimersByTimeAsync(20);
+  node.dispatchEvent(new Event('transitionend'));
+  expect(callback).not.toHaveBeenCalled();
+  expect(document.querySelector('div')).toBeNull();
+});
+test('F04 an aborted pending enter can reopen and complete a normal enter/leave cycle', async () => {
+  jestApi.useFakeTimers({ doNotFake: ['queueMicrotask'] });
+  const afterEnter = jestApi.fn(),
+    afterLeave = jestApi.fn();
+  const props = vm({
+    isEnter: false,
+    destroyAfterLeave: true,
+    [DEFAULT_SLOT_NAME]: elementSlot(),
+    'on:afterEnter': afterEnter,
+    'on:afterLeave': afterLeave,
+  });
+  mount(Transition, props);
+  props.isEnter = true;
+  await jestApi.advanceTimersByTimeAsync(0);
+  const old = document.querySelector('div')!;
+  props.isEnter = false;
+  await jestApi.advanceTimersByTimeAsync(0);
+  expect(old.isConnected).toBe(false);
+  props.isEnter = true;
+  await jestApi.advanceTimersByTimeAsync(20);
+  const node = document.querySelector('div')!;
+  expect(node).not.toBe(old);
+  node.dispatchEvent(new Event('transitionend'));
+  expect(afterEnter).toHaveBeenCalledTimes(1);
+  props.isEnter = false;
+  await jestApi.advanceTimersByTimeAsync(0);
+  expect(node.isConnected).toBe(true);
+  node.dispatchEvent(new Event('transitionend'));
+  expect(node.isConnected).toBe(false);
+  expect(afterLeave).toHaveBeenCalledTimes(1);
 });

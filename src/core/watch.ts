@@ -189,6 +189,109 @@ export function PathWatcher(
     },
   } as ViewWatcher;
 }
+/** A member call observes receiver identity and method replacement, never receiver contents. */
+export function MethodPathWatcher(
+  target: ViewModel,
+  path: (PropertyPathItem | ViewWatcher)[],
+  optionalReceiver = false,
+  optionalCall = false,
+): ViewWatcher {
+  if (!path.length) throw new Error('A method path must include a property');
+  const objectPath = path.slice(0, -1);
+  const objectWatcher = objectPath.some((part) => typeof part === 'object')
+    ? DymPathWatcher(target, objectPath)
+    : PathWatcher(target, objectPath as PropertyPathItem[]);
+  const last = path[path.length - 1];
+  const keyWatcher = typeof last === 'object' ? last : undefined;
+  let object = objectWatcher[VM_WATCHER_VALUE];
+  let key = (keyWatcher ? keyWatcher[VM_WATCHER_VALUE] : last) as PropertyPathItem;
+  let method: unknown;
+  let boundObject: unknown, boundMethod: unknown;
+  let value: unknown;
+  let parent: ParentWatcher | undefined;
+  let stopMethod: (() => void) | undefined;
+  let destroyed = false,
+    initialized = false;
+  function update() {
+    if (initialized && Object.is(boundObject, object) && Object.is(boundMethod, method)) return;
+    initialized = true;
+    boundObject = object;
+    boundMethod = method;
+    // Capture a pair, so an already-returned function never changes its receiver later.
+    const receiver = object,
+      fn = method;
+    value =
+      (optionalReceiver && receiver == null) || (optionalCall && receiver != null && fn == null)
+        ? undefined
+        : (...args: unknown[]) =>
+            Reflect.apply(fn as (...args: unknown[]) => unknown, receiver, args);
+    parent?.[VM_WATCHER_NOTIFY](value);
+  }
+  function rebind() {
+    stopMethod?.();
+    stopMethod = undefined;
+    method = object == null ? undefined : (object as Record<PropertyKey, unknown>)[key];
+    const vm = object as ViewModel | undefined;
+    if (!isUndefined(vm?.[VM_RAW])) {
+      stopMethod = innerWatchPath(
+        vm!,
+        method,
+        (next) => {
+          if (destroyed) return;
+          method = next;
+          update();
+        },
+        [key],
+        false,
+      );
+    }
+    update();
+  }
+  try {
+    rebind();
+  } catch (error) {
+    objectWatcher[VM_WATCHER_DESTROY]();
+    keyWatcher?.[VM_WATCHER_DESTROY]();
+    throw error;
+  }
+  objectWatcher[VM_WATCHER_PARENT] = {
+    [VM_WATCHER_NOTIFY]() {
+      if (destroyed) return;
+      const next = objectWatcher[VM_WATCHER_VALUE];
+      if (Object.is(next, object)) return;
+      object = next;
+      rebind();
+    },
+  };
+  if (keyWatcher)
+    keyWatcher[VM_WATCHER_PARENT] = {
+      [VM_WATCHER_NOTIFY]() {
+        if (destroyed) return;
+        const next = keyWatcher[VM_WATCHER_VALUE] as PropertyPathItem;
+        if (Object.is(next, key)) return;
+        key = next;
+        rebind();
+      },
+    };
+  return {
+    get [VM_WATCHER_VALUE]() {
+      return value;
+    },
+    set [VM_WATCHER_PARENT](next: ParentWatcher) {
+      parent = next;
+    },
+    [VM_WATCHER_DESTROY]() {
+      if (destroyed) return;
+      destroyed = true;
+      parent = undefined;
+      stopMethod?.();
+      stopMethod = undefined;
+      objectWatcher[VM_WATCHER_DESTROY]();
+      keyWatcher?.[VM_WATCHER_DESTROY]();
+      object = method = boundObject = boundMethod = value = undefined;
+    },
+  } as ViewWatcher;
+}
 export function ExprWatcher(path: ViewWatcher[], fn: (...args: unknown[]) => void) {
   let val = fn(...path.map((w) => w[VM_WATCHER_VALUE]));
   let parent: ParentWatcher | undefined = undefined;

@@ -138,3 +138,12 @@ test('dynamic index watcher switches keys within strings and cleans nested watch
   expect(values).toEqual(['a', 'b', 'y', undefined]);
   expect((state as unknown as ViewModel)[VM_WATCHERS]?.size).toBe(0);
 });
+
+test('function roots retain ordinary name/length properties without reactive wrapping', () => {
+  function render(first: unknown, second: unknown) {
+    return [first, second];
+  }
+  expect(getValueByPath(render, ['name'])).toBe('render');
+  expect(getValueByPath(render, ['length'])).toBe(2);
+  expect(getValueByPath(render, ['missing'])).toBeUndefined();
+});

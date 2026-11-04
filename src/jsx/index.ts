@@ -76,7 +76,7 @@ export interface WithOptChildren<T> {
 }
 
 export interface WithExpose<T extends Record<string, AnyFn>> {
-  ref?: Ref<T>;
+  ref?: Ref<T> | RefFn<T>;
 }
 
 export type JEvent<T, Event> = Omit<Event, 'target'> & { target: T };
@@ -642,6 +642,7 @@ interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
   draggable?: Booleanish | undefined;
   hidden?: boolean | undefined;
   id?: string | undefined;
+  inert?: boolean | undefined;
   lang?: string | undefined;
   nonce?: string | undefined;
   slot?: string | undefined;

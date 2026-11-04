@@ -41,12 +41,28 @@ export function isInnerObj<T extends object>(v: unknown): v is T {
       constructor: unknown;
     }
   ).constructor;
-  return (
+  if (
     clazz === OffscreenCanvas ||
     clazz === RegExp ||
     clazz === Date ||
     clazz === Promise ||
     clazz === Boolean
+  )
+    return true;
+  // Like Date, native Temporal values have internal slots which a Proxy cannot preserve.
+  // Resolve the optional namespace lazily so non-Temporal environments remain supported.
+  const temporal = (globalThis as { Temporal?: Record<string, unknown> }).Temporal;
+  return (
+    !!temporal &&
+    typeof clazz === 'function' &&
+    (clazz === temporal.PlainDate ||
+      clazz === temporal.PlainTime ||
+      clazz === temporal.PlainDateTime ||
+      clazz === temporal.PlainYearMonth ||
+      clazz === temporal.PlainMonthDay ||
+      clazz === temporal.Instant ||
+      clazz === temporal.ZonedDateTime ||
+      clazz === temporal.Duration)
   );
 }
 

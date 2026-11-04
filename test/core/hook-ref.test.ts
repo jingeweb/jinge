@@ -14,6 +14,7 @@ import {
   onMount,
   onUnmount,
   ref,
+  renderFunctionComponent,
   setRefForComponent,
   textRenderFn,
   vm,
@@ -115,4 +116,38 @@ test.each([
   ['lastDOM', () => lastDOM()],
 ])('%s rejects calls outside component rendering', (_, invoke) => {
   expect(invoke).toThrow('global component not found');
+});
+
+test('F10 component object and callback refs receive the exposed API and clear once', () => {
+  type Handle = { answer(): number };
+  function Child(_: WithExpose<Handle>, host: ComponentHost) {
+    expose<typeof Child>({ answer: () => 42 });
+    return [textRenderFn(host, 'child')];
+  }
+  const received: (Handle | undefined)[] = [];
+  const answers: (number | undefined)[] = [];
+  const props: WithExpose<Handle> = {
+    ref: (handle) => {
+      received.push(handle);
+      answers.push(handle?.answer());
+    },
+  };
+  const objectRef = ref<typeof Child>();
+  const owner = mount((_, host) => {
+    const child = createHost();
+    host[ROOT_NODES].push(child);
+    const nodes = renderFunctionComponent(child, Child, {});
+    setRefForComponent(host, objectRef, child);
+    setRefForComponent(host, props.ref!, child);
+    return nodes;
+  });
+  expect(objectRef.value?.answer()).toBe(42);
+  expect(received).toEqual([objectRef.value]);
+  expect(answers).toEqual([42]);
+  destroyComponent(owner);
+  destroyComponent(owner);
+  expect(objectRef.value).toBeUndefined();
+  expect(received).toHaveLength(2);
+  expect(received[1]).toBeUndefined();
+  expect(answers).toEqual([42, undefined]);
 });
