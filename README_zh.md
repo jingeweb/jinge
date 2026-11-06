@@ -10,6 +10,8 @@ Jinge 是一个使用 TypeScript 函数组件和 TSX 模板构建浏览器界面
 
 官网与使用文档：[jinge.embjs.com](https://jinge.embjs.com/)。
 
+Antd 组件库：[jinge-antd](https://jinge-antd.embjs.com/)。
+
 ## 特性
 
 - 轻量

@@ -10,6 +10,8 @@ Component functions initialize instances, and compiler-generated bindings update
 
 Website and documentation: [jinge.embjs.com](https://jinge.embjs.com/).
 
+Antd component library: [jinge-antd](https://jinge-antd.embjs.com/).
+
 ## Features
 
 - Lightweight
