@@ -1,6 +1,6 @@
 {
   "name": "jinge",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "A small and smart web interface framework",
   "keywords": [
     "framework",
@@ -23,8 +23,9 @@
     "types",
     "package.json",
     "tsconfig.json",
-    "README_zh-cn.md",
+    "README_zh.md",
     "README.md",
+    "FOR_AGENTS.md",
     "LICENSE"
   ],
   "type": "module",
@@ -72,7 +73,7 @@
     "oxlint-tsgolint": "^7.0.2005",
     "ts-jest": "^29.4.15",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.6"
   },
   "lint-staged": {
     "*.{js,ts}": [
